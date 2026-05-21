@@ -1,0 +1,92 @@
+import { useState, useCallback, useEffect } from 'react';
+import { useAuth } from './useAuth';
+import * as apartmentService from '../services/apartmentService';
+
+export function useApartmentDirectory() {
+  const { token } = useAuth();
+  const [statistics, setStatistics] = useState(null);
+  const [apartments, setApartments] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [filter, setFilter] = useState('TODOS');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const itemsPerPage = 4;
+
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const data = await apartmentService.getApartmentStatistics(token);
+      setStatistics(data);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al cargar estadísticas');
+    }
+  }, [token]);
+
+  const fetchApartments = useCallback(
+    async (page = 1, filterStatus = null) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = {
+          page,
+          per_page: itemsPerPage,
+        };
+
+        if (filterStatus && filterStatus !== 'TODOS') {
+          params.status = filterStatus;
+        }
+
+        const data = await apartmentService.getApartments(token, params);
+        setApartments(data.items || data);
+        setCurrentPage(data.page || page);
+        setTotalPages(data.total_pages || 1);
+        setTotal(data.total || 0);
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Error al cargar departamentos');
+        setApartments([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token]
+  );
+
+  const handleFilterChange = useCallback(
+    (newFilter) => {
+      setFilter(newFilter);
+      setCurrentPage(1);
+      fetchApartments(1, newFilter);
+    },
+    [fetchApartments]
+  );
+
+  const handlePageChange = useCallback(
+    (page) => {
+      setCurrentPage(page);
+      fetchApartments(page, filter);
+    },
+    [filter, fetchApartments]
+  );
+
+  useEffect(() => {
+    if (!token) return;
+    fetchStatistics();
+    fetchApartments(1, filter);
+  }, [token, fetchStatistics, fetchApartments, filter]);
+
+  return {
+    statistics,
+    apartments,
+    currentPage,
+    totalPages,
+    total,
+    filter,
+    loading,
+    error,
+    itemsPerPage,
+    onFilterChange: handleFilterChange,
+    onPageChange: handlePageChange,
+  };
+}

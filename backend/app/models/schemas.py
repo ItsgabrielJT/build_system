@@ -417,3 +417,83 @@ class BuildingResponse(BaseModel):
     email: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+
+# ─── APARTMENT DIRECTORY DASHBOARD ────────────────────────────────────────────
+
+class ApartmentStatisticsResponse(BaseModel):
+    total: int
+    occupied: int
+    vacant: int
+    maintenance: int
+    occupancy_rate_percent: float
+    allocated_quota_percent: float
+
+
+class ApartmentDirectoryItemResponse(BaseModel):
+    id: UUID
+    code: str
+    floor: Optional[int] = None
+    tower: Optional[str] = None
+    area_sqm: Optional[float] = None
+    status: str
+    owner_name: Optional[str] = None
+    allocated_quota_percent: float
+    image_url: Optional[str] = None
+
+
+class ApartmentDirectoryResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+    items: List[ApartmentDirectoryItemResponse]
+
+
+class OwnerUnitResponse(BaseModel):
+    id: UUID
+    code: str
+    tower: Optional[str] = None
+    floor: Optional[int] = None
+
+
+class OwnerDirectoryItemResponse(BaseModel):
+    id: UUID
+    full_name: str
+    document_id: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    units: List[OwnerUnitResponse]
+    ingress_date: Optional[date] = None
+    balance: Decimal
+    currency: str = "USD"
+
+
+class OwnerDirectoryResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+    items: List[OwnerDirectoryItemResponse]
+
+
+class TransactionResponse(BaseModel):
+    type: str  # PAYMENT or FINE
+    period: str
+    amount: Decimal
+    date: date
+    reference: str
+
+
+class OwnerDetailResponse(BaseModel):
+    id: UUID
+    full_name: str
+    document_id: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    status: str
+    units: List[OwnerUnitResponse]
+    ingress_date: Optional[date] = None
+    balance_consolidated: Decimal
+    recent_transactions: List[TransactionResponse]
+    currency: str = "USD"

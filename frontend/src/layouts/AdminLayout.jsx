@@ -1,13 +1,19 @@
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar/Sidebar';
 import Navbar from '../components/Navbar/Navbar';
 import styles from './AdminLayout.module.css';
 
 export default function AdminLayout() {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div className={styles.layout}>
-      <Sidebar role="ADMIN" />
-      <div className={styles.main}>
+      <Sidebar role="ADMIN" collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+      <div
+        className={styles.main}
+        style={{ marginLeft: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)' }}
+      >
         <Navbar />
         <main className={styles.content}>
           <Outlet />
@@ -16,3 +22,4 @@ export default function AdminLayout() {
     </div>
   );
 }
+

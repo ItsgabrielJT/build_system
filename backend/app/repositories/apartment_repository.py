@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
@@ -155,3 +156,116 @@ class ApartmentRepository:
             owner_id,
         )
         return result == "DELETE 1"
+
+    async def get_statistics(self, building_id: Optional[UUID] = None) -> dict:
+        """
+        Get occupancy statistics for apartments.
+        """
+        where_clause = ""
+        params = []
+        idx = 1
+
+        if building_id:
+            where_clause = f"WHERE a.building_id = ${idx}"
+            params.append(building_id)
+
+        row = await self._conn.fetchrow(
+            f"""
+            SELECT
+                COUNT(*) as total,
+                COUNT(CASE WHEN a.status = 'ACTIVA' AND a.owner_id IS NOT NULL THEN 1 END) as occupied,
+                COUNT(CASE WHEN a.status = 'ACTIVA' AND a.owner_id IS NULL THEN 1 END) as vacant,
+                COUNT(CASE WHEN a.status = 'MANTENIMIENTO' THEN 1 END) as maintenance,
+                CASE WHEN COUNT(*) > 0 THEN
+                    (COUNT(CASE WHEN a.status = 'ACTIVA' AND a.owner_id IS NOT NULL THEN 1 END)::float / COUNT(*)::float * 100)
+                ELSE 0 END as occupancy_rate_percent,
+                100.0 as allocated_quota_percent
+            FROM apartments a
+            {where_clause}
+            """,
+            *params,
+        )
+        return dict(row) if row else {
+            "total": 0,
+            "occupied": 0,
+            "vacant": 0,
+            "maintenance": 0,
+            "occupancy_rate_percent": 0.0,
+            "allocated_quota_percent": 0.0,
+        }
+
+    async def get_by_filter_paginated(
+        self,
+        page: int = 1,
+        per_page: int = 4,
+        status: Optional[str] = None,
+        building_id: Optional[UUID] = None,
+    ) -> tuple[list[dict], int]:
+        """
+        Get paginated apartments with optional status filter.
+        Returns (items, total_count)
+        """
+        conditions = []
+        params = []
+        idx = 1
+
+        conditions.append("a.status IN ('ACTIVA', 'MANTENIMIENTO')")
+
+        if status and status.upper() in ["OCUPADO", "VACANTE", "MANTENIMIENTO"]:
+            if status.upper() == "OCUPADO":
+                conditions.append(f"a.status = 'ACTIVA' AND a.owner_id IS NOT NULL")
+            elif status.upper() == "VACANTE":
+                conditions.append(f"a.status = 'ACTIVA' AND a.owner_id IS NULL")
+            elif status.upper() == "MANTENIMIENTO":
+                conditions.append(f"a.status = 'MANTENIMIENTO'")
+
+        if building_id:
+            conditions.append(f"a.building_id = ${idx}")
+            params.append(building_id)
+            idx += 1
+
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        # Get total count
+        count_row = await self._conn.fetchval(
+            f"SELECT COUNT(*) FROM apartments a {where}",
+            *params,
+        )
+        total_count = count_row or 0
+
+        # Get paginated items
+        offset = (page - 1) * per_page
+        rows = await self._conn.fetch(
+            f"""
+            SELECT
+                a.id,
+                a.code,
+                a.floor,
+                a.tower,
+                a.status,
+                a.building_id,
+                a.owner_id,
+                a.created_at,
+                a.updated_at,
+                o.full_name as owner_name,
+                CAST(COALESCE(af.allocated_quota, 0.0) as float) as allocated_quota_percent,
+                NULL::text as image_url,
+                COALESCE(a.area_sqm, 0.0) as area_sqm
+            FROM apartments a
+            LEFT JOIN owners o ON a.owner_id = o.id
+            LEFT JOIN (
+                SELECT apartment_id, SUM(amount)::float / (SELECT SUM(amount) FROM apartment_fees WHERE period = CURRENT_DATE::text) * 100 as allocated_quota
+                FROM apartment_fees
+                WHERE period = CURRENT_DATE::text
+                GROUP BY apartment_id
+            ) af ON a.id = af.apartment_id
+            {where}
+            ORDER BY a.code
+            LIMIT ${idx} OFFSET ${idx + 1}
+            """,
+            *params,
+            per_page,
+            offset,
+        )
+
+        return [dict(r) for r in rows], total_count

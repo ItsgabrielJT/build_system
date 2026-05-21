@@ -46,3 +46,10 @@ export async function removeOwner(apartmentId, ownerId, token) {
     { headers: { Authorization: `Bearer ${token}` } }
   );
 }
+
+export async function getApartmentStatistics(token) {
+  const res = await axios.get(`${API_BASE}/api/v1/apartments/statistics`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}

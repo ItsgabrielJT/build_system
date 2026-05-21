@@ -44,3 +44,27 @@ class ApartmentService:
 
     async def remove_owner(self, apartment_id: UUID, owner_id: UUID) -> bool:
         return await self._repo.remove_owner(apartment_id, owner_id)
+
+    async def get_statistics(self, building_id: Optional[UUID] = None) -> dict:
+        """Get occupancy statistics."""
+        return await self._repo.get_statistics(building_id)
+
+    async def get_apartments_paginated(
+        self,
+        page: int = 1,
+        per_page: int = 4,
+        status: Optional[str] = None,
+        building_id: Optional[UUID] = None,
+    ) -> tuple[list[dict], int]:
+        """Get paginated apartments with filters."""
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 100:
+            per_page = 4
+
+        return await self._repo.get_by_filter_paginated(
+            page=page,
+            per_page=per_page,
+            status=status,
+            building_id=building_id,
+        )

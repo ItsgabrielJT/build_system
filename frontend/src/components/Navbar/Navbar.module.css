@@ -8,8 +8,146 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  gap: 16px;
+  gap: 0;
 }
+
+/* Left: building name + separator + search */
+.left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.buildingName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-gray-900);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-right: 16px;
+}
+
+.separator {
+  width: 1px;
+  height: 22px;
+  background: var(--color-gray-200);
+  flex-shrink: 0;
+  margin-right: 16px;
+}
+
+.searchWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-gray-100);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--border-radius);
+  padding: 7px 12px;
+  width: 280px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.searchWrap:focus-within {
+  border-color: var(--color-primary);
+  background: #fff;
+}
+
+.searchIcon {
+  display: flex;
+  align-items: center;
+  color: var(--color-gray-400);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: var(--color-gray-700);
+  width: 100%;
+}
+
+.searchInput::placeholder {
+  color: var(--color-gray-400);
+}
+
+/* Right: icons + user info */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--border-radius);
+  border: none;
+  background: transparent;
+  color: var(--color-gray-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--color-gray-100);
+  color: var(--color-gray-700);
+}
+
+/* User info: avatar + name/role */
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 8px;
+  cursor: default;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.userText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.userName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-gray-800);
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.userRole {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+
 
 /* Left: search */
 .left {

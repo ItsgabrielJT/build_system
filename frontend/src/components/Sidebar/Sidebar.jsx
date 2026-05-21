@@ -90,6 +90,18 @@ const IconStatement = () => (
   </svg>
 );
 
+const IconChevronLeft = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+);
+
+const IconChevronRight = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+);
+
 const ADMIN_LINKS = [
   { to: '/admin/owners', label: 'Propietarios', Icon: IconOwners },
   { to: '/admin/apartments', label: 'Departamentos', Icon: IconApartments },
@@ -106,7 +118,7 @@ const OWNER_LINKS = [
   { to: '/owner/account-statement', label: 'Estado de Cuenta', Icon: IconStatement },
 ];
 
-export default function Sidebar({ role }) {
+export default function Sidebar({ role, collapsed, onToggle }) {
   const links = role === 'ADMIN' ? ADMIN_LINKS : OWNER_LINKS;
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -119,19 +131,28 @@ export default function Sidebar({ role }) {
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ''}`}>
       <div className={styles.brand}>
         <div className={styles.brandLogo}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
           </svg>
         </div>
-        <div className={styles.brandText}>
-          <span className={styles.brandName}>EdiGestion</span>
-          <span className={styles.brandSub}>
-            {role === 'ADMIN' ? 'Admin Portal' : 'Owner Portal'}
-          </span>
-        </div>
+        {!collapsed && (
+          <div className={styles.brandText}>
+            <span className={styles.brandName}>EdiGestion</span>
+            <span className={styles.brandSub}>
+              {role === 'ADMIN' ? 'Admin Portal' : 'Owner Portal'}
+            </span>
+          </div>
+        )}
+        <button
+          className={styles.toggleBtn}
+          onClick={onToggle}
+          aria-label={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+        >
+          {collapsed ? <IconChevronRight /> : <IconChevronLeft />}
+        </button>
       </div>
 
       <nav className={styles.nav}>
@@ -139,25 +160,36 @@ export default function Sidebar({ role }) {
           <NavLink
             key={link.to}
             to={link.to}
+            title={collapsed ? link.label : undefined}
             className={({ isActive }) =>
-              `${styles.link} ${isActive ? styles.linkActive : ''}`
+              `${styles.link} ${isActive ? styles.linkActive : ''} ${collapsed ? styles.linkCollapsed : ''}`
             }
           >
             <span className={styles.linkIcon}><link.Icon /></span>
-            <span>{link.label}</span>
+            {!collapsed && <span>{link.label}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className={styles.bottom}>
         <div className={styles.divider} />
-        <div className={styles.userRow}>
-          <div className={styles.userAvatar}>{userInitial}</div>
-          <span className={styles.userEmail}>{user?.email}</span>
-        </div>
-        <button className={styles.btnLogout} onClick={handleLogout}>
+        <NavLink
+          to={role === 'ADMIN' ? '/admin/profile' : '/owner/profile'}
+          title={collapsed ? 'Perfil' : undefined}
+          className={({ isActive }) =>
+            `${styles.link} ${isActive ? styles.linkActive : ''} ${collapsed ? styles.linkCollapsed : ''}`
+          }
+        >
+          <span className={styles.linkIcon}><IconProfile /></span>
+          {!collapsed && <span>Perfil</span>}
+        </NavLink>
+        <button
+          className={`${styles.btnLogout} ${collapsed ? styles.btnLogoutCollapsed : ''}`}
+          onClick={handleLogout}
+          title={collapsed ? 'Cerrar sesión' : undefined}
+        >
           <span className={styles.linkIcon}><IconLogout /></span>
-          <span>Cerrar sesión</span>
+          {!collapsed && <span>Cerrar sesión</span>}
         </button>
       </div>
     </aside>

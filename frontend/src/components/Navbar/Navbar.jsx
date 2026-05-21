@@ -22,25 +22,30 @@ const IconSearch = () => (
   </svg>
 );
 
+const ROLE_LABELS = {
+  ADMIN: 'SÚPER USUARIO',
+  PROPIETARIO: 'PROPIETARIO',
+};
+
 export default function Navbar({ buildingName = 'Edificio Horizonte' }) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
+  const displayName = user?.email?.split('@')[0] || 'Usuario';
+  const roleLabel = ROLE_LABELS[role] || role || '';
 
   return (
     <header className={styles.navbar}>
       <div className={styles.left}>
+        <span className={styles.buildingName}>{buildingName}</span>
+        <span className={styles.separator} />
         <div className={styles.searchWrap}>
           <span className={styles.searchIcon}><IconSearch /></span>
           <input
             className={styles.searchInput}
             type="text"
-            placeholder="Search..."
+            placeholder="Buscar por nombre o unidad..."
           />
         </div>
-      </div>
-
-      <div className={styles.center}>
-        <span className={styles.buildingName}>{buildingName}</span>
       </div>
 
       <div className={styles.right}>
@@ -50,7 +55,13 @@ export default function Navbar({ buildingName = 'Edificio Horizonte' }) {
         <button className={styles.iconBtn} aria-label="Configuración">
           <IconSettings />
         </button>
-        <div className={styles.avatar}>{userInitial}</div>
+        <div className={styles.userInfo}>
+          <div className={styles.avatar}>{userInitial}</div>
+          <div className={styles.userText}>
+            <span className={styles.userName}>{displayName}</span>
+            <span className={styles.userRole}>{roleLabel}</span>
+          </div>
+        </div>
       </div>
     </header>
   );

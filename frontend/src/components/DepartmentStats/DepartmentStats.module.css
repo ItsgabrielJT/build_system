@@ -1,0 +1,57 @@
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  min-height: 140px;
+}
+
+.statCard h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  font-size: 36px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.statSubtext {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+/* Variantes de color por estado */
+.occupied .statValue {
+  color: #27ae60;
+}
+
+.vacant .statValue {
+  color: #3498db;
+}
+
+.maintenance .statValue {
+  color: #e67e22;
+}
+
+.total .statValue {
+  color: #2c3e50;
+}

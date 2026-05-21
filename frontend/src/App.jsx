@@ -4,14 +4,14 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './layouts/AdminLayout';
 import OwnerLayout from './layouts/OwnerLayout';
 import LoginPage from './pages/LoginPage';
-import AdminOwnersPage from './pages/admin/AdminOwnersPage';
-import AdminApartmentsPage from './pages/admin/AdminApartmentsPage';
 import AdminFeesPage from './pages/admin/AdminFeesPage';
 import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
 import AdminFinesPage from './pages/admin/AdminFinesPage';
 import AdminExpensesPage from './pages/admin/AdminExpensesPage';
 import AdminDelinquencyPage from './pages/admin/AdminDelinquencyPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
+import DepartmentsPage from './pages/admin/DepartmentsPage';
+import OwnersDirectoryPage from './pages/admin/OwnersDirectoryPage';
 import OwnerApartmentsPage from './pages/owner/OwnerApartmentsPage';
 import OwnerAccountStatementPage from './pages/owner/OwnerAccountStatementPage';
 
@@ -36,8 +36,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="owners" element={<AdminOwnersPage />} />
-        <Route path="apartments" element={<AdminApartmentsPage />} />
+        <Route path="owners" element={<OwnersDirectoryPage />} />
+        <Route path="apartments" element={<DepartmentsPage />} />
         <Route path="fees" element={<AdminFeesPage />} />
         <Route path="payments" element={<AdminPaymentsPage />} />
         <Route path="fines" element={<AdminFinesPage />} />

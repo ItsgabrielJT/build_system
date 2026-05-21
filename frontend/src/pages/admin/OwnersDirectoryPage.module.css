@@ -1,0 +1,50 @@
+.ownersDirectoryPage {
+  padding: 24px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.pageSubtitle {
+  font-size: 14px;
+  color: #999;
+  margin: 4px 0 0 0;
+}
+
+.addButton {
+  padding: 12px 20px;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.addButton:hover {
+  background: #229954;
+}
+
+.errorContainer {
+  padding: 20px;
+  background: #fef5f5;
+  border: 1px solid #e74c3c;
+  border-radius: 6px;
+  color: #c0392b;
+  margin-bottom: 20px;
+}

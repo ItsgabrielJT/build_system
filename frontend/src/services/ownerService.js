@@ -36,3 +36,11 @@ export async function deleteOwner(ownerId, token) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+export async function getOwnerDirectory(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/owners/directory`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+  });
+  return res.data;
+}

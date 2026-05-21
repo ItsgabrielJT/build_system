@@ -38,3 +38,25 @@ class OwnerService:
 
     async def soft_delete(self, owner_id: UUID) -> bool:
         return await self._repo.soft_delete(owner_id)
+
+    async def get_directory_paginated(
+        self,
+        page: int = 1,
+        per_page: int = 10,
+        search: Optional[str] = None,
+    ) -> tuple[list[dict], int]:
+        """Get paginated owners directory with balance."""
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 100:
+            per_page = 10
+
+        return await self._repo.get_directory_paginated(
+            page=page,
+            per_page=per_page,
+            search=search,
+        )
+
+    async def get_owner_detail(self, owner_id: UUID) -> dict | None:
+        """Get owner details with recent transactions."""
+        return await self._repo.get_detail_with_transactions(owner_id)

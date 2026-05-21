@@ -12,6 +12,7 @@ from app.routes import (
     apartment_fees,
     apartments,
     auth,
+    buildings,
     delinquency,
     expenses,
     fines,
@@ -53,6 +54,7 @@ PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=PREFIX)
 app.include_router(users.router, prefix=PREFIX)
 app.include_router(owners.router, prefix=PREFIX)
+app.include_router(buildings.router, prefix=PREFIX)
 app.include_router(apartments.router, prefix=PREFIX)
 app.include_router(apartment_fees.router, prefix=PREFIX)
 app.include_router(payments.router, prefix=PREFIX)

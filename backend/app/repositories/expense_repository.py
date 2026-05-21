@@ -39,6 +39,6 @@ class ExpenseRepository:
             data.category,
             data.concept,
             data.amount,
-            created_by,
+            str(created_by),
         )
         return dict(row)

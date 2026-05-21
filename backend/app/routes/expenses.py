@@ -30,4 +30,4 @@ async def create_expense(
     db=Depends(get_db),
 ):
     service = ExpenseService(ExpenseRepository(db))
-    return await service.create(body, created_by=user["uid"])
+    return await service.create(body, created_by=user["user_id"])

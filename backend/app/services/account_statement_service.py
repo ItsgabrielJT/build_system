@@ -29,7 +29,7 @@ class AccountStatementService:
         if user.get("role") == "ADMIN" and requested_owner_id:
             return requested_owner_id
 
-        owner = await self._owner_repo.get_by_firebase_uid(user["uid"])
+        owner = await self._owner_repo.get_by_firebase_uid(user["user_id"])
         return owner["id"] if owner else None
 
     async def get_statement(

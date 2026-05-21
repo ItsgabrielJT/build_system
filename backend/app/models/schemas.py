@@ -45,12 +45,40 @@ class OwnerResponse(BaseModel):
     updated_at: datetime
 
 
+# ─── BUILDING ─────────────────────────────────────────────────────────────────
+
+class BuildingCreate(BaseModel):
+    name: str
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class BuildingUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class BuildingResponse(BaseModel):
+    id: UUID
+    name: str
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
 # ─── APARTMENT ────────────────────────────────────────────────────────────────
 
 class ApartmentCreate(BaseModel):
     code: str
     floor: Optional[int] = None
     tower: Optional[str] = None
+    building_id: Optional[UUID] = None
+    owner_id: Optional[UUID] = None
 
 
 class ApartmentUpdate(BaseModel):
@@ -66,6 +94,10 @@ class ApartmentResponse(BaseModel):
     floor: Optional[int] = None
     tower: Optional[str] = None
     status: str
+    building_id: Optional[UUID] = None
+    owner_id: Optional[UUID] = None
+    owner_name: Optional[str] = None
+    owner_email: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -357,5 +389,31 @@ class UserResponse(BaseModel):
     email: str
     role: RoleResponse
     status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# ─── BUILDING ────────────────────────────────────────────────────────────────
+
+class BuildingCreate(BaseModel):
+    name: str
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class BuildingUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class BuildingResponse(BaseModel):
+    id: UUID
+    name: str
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
     created_at: datetime
     updated_at: datetime

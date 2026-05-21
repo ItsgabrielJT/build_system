@@ -69,7 +69,7 @@ class FineRepository:
             data.issued_at,
             data.reason,
             data.amount,
-            created_by,
+            str(created_by),
         )
         return dict(row)
 

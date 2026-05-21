@@ -32,6 +32,14 @@ export default function AdminFinesPage() {
   const [annulTarget, setAnnulTarget] = useState(null);
   const [filterPeriod, setFilterPeriod] = useState('');
   const [actionError, setActionError] = useState(null);
+  const [formData, setFormData] = useState({});
+  const [filteredApartments, setFilteredApartments] = useState([]);
+
+  // Inicializar período con mes actual
+  const getCurrentMonth = () => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     fetchApartments();
@@ -42,13 +50,57 @@ export default function AdminFinesPage() {
     fetchFines(filterPeriod ? { period: filterPeriod } : {});
   }, [filterPeriod, fetchFines]);
 
-  const fineFields = [
+  // Cuando abre el formulario, inicializar periodo con mes actual
+  useEffect(() => {
+    if (isFormOpen) {
+      setFormData((prev) => ({
+        ...prev,
+        period: getCurrentMonth(),
+      }));
+      setFilteredApartments(apartments);
+    }
+  }, [isFormOpen, apartments]);
+
+  // Manejar cambio de apartamento - auto-cargar propietario
+  const handleApartmentChange = (apartmentId) => {
+    const selectedApartment = apartments.find((a) => a.id === apartmentId);
+    if (selectedApartment?.owner_id) {
+      setFormData((prev) => ({
+        ...prev,
+        apartment_id: apartmentId,
+        owner_id: selectedApartment.owner_id,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        apartment_id: apartmentId,
+        owner_id: '',
+      }));
+    }
+  };
+
+  // Manejar cambio de propietario - filtrar apartamentos
+  const handleOwnerChange = (ownerId) => {
+    const filtered = apartments.filter((a) => a.owner_id === ownerId);
+    setFilteredApartments(filtered);
+    setFormData((prev) => ({
+      ...prev,
+      owner_id: ownerId,
+      apartment_id: filtered.length === 1 ? filtered[0].id : '',
+    }));
+  };
+
+  // Campos dinámicos del formulario
+  const getFineFields = () => [
     {
       name: 'apartment_id',
       label: 'Departamento',
       type: 'select',
       required: true,
-      options: apartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` })),
+      options: filteredApartments.length > 0 
+        ? filteredApartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` }))
+        : apartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` })),
+      onChange: handleApartmentChange,
     },
     {
       name: 'owner_id',
@@ -56,6 +108,7 @@ export default function AdminFinesPage() {
       type: 'select',
       required: true,
       options: owners.map((o) => ({ value: o.id, label: o.full_name })),
+      onChange: handleOwnerChange,
     },
     { name: 'period', label: 'Período (YYYY-MM)', type: 'month', required: true },
     { name: 'amount', label: 'Monto', type: 'number', required: true, min: '0', step: '0.01' },
@@ -66,6 +119,14 @@ export default function AdminFinesPage() {
   const handleCreate = async (data) => {
     await createFine({ ...data, amount: parseFloat(data.amount) });
     setIsFormOpen(false);
+    setFormData({});
+    setFilteredApartments(apartments);
+  };
+
+  const handleFormClose = () => {
+    setIsFormOpen(false);
+    setFormData({});
+    setFilteredApartments(apartments);
   };
 
   const handleAnnul = async () => {
@@ -106,9 +167,10 @@ export default function AdminFinesPage() {
       <FormModal
         isOpen={isFormOpen}
         title="Registrar multa"
-        fields={fineFields}
+        fields={getFineFields()}
+        initialData={formData}
         onSubmit={handleCreate}
-        onClose={() => setIsFormOpen(false)}
+        onClose={handleFormClose}
       />
 
       <ConfirmDialog

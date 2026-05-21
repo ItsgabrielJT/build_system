@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useApartments } from '../../hooks/useApartments';
 import { useOwners } from '../../hooks/useOwners';
+import { useBuilding } from '../../hooks/useBuilding';
+import { useAuth } from '../../hooks/useAuth';
 import Table from '../../components/Table/Table';
 import FormModal from '../../components/FormModal/FormModal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
+import BuildingInfoModal from '../../components/BuildingInfoModal/BuildingInfoModal';
 import styles from './AdminApartmentsPage.module.css';
 
 const APARTMENT_FIELDS = [
@@ -16,6 +19,16 @@ const COLUMNS = [
   { key: 'code', label: 'Código' },
   { key: 'floor', label: 'Piso' },
   { key: 'tower', label: 'Torre' },
+  {
+    key: 'owner_name',
+    label: 'Propietario',
+    render: (val) => val || 'Sin asignar',
+  },
+  {
+    key: 'owner_email',
+    label: 'Email del propietario',
+    render: (val) => val || '—',
+  },
   {
     key: 'status',
     label: 'Estado',
@@ -31,16 +44,27 @@ export default function AdminApartmentsPage() {
   const { apartments, loading, error, fetchApartments, createApartment, assignOwner, removeOwner } =
     useApartments();
   const { owners, fetchOwners } = useOwners();
+  const { building, fetchBuilding, updateBuilding } = useBuilding();
+  const { token } = useAuth();
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isBuildingModalOpen, setIsBuildingModalOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
   const [removeTarget, setRemoveTarget] = useState(null);
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const [actionError, setActionError] = useState(null);
+  const [buildingId] = useState('default'); // Puede ser dinámico si hay múltiples edificios
 
   useEffect(() => {
     fetchApartments();
     fetchOwners();
-  }, [fetchApartments, fetchOwners]);
+    // Cargar información del edificio
+    if (buildingId) {
+      fetchBuilding(buildingId).catch(() => {
+        // Si falla, continuar sin información del edificio
+      });
+    }
+  }, [fetchApartments, fetchOwners, buildingId]);
 
   const handleCreate = async (data) => {
     await createApartment({ ...data, floor: data.floor ? parseInt(data.floor) : null });
@@ -70,6 +94,15 @@ export default function AdminApartmentsPage() {
       setActionError(err.response?.data?.detail || 'Error al remover');
     } finally {
       setRemoveTarget(null);
+    }
+  };
+
+  const handleSaveBuilding = async (data) => {
+    try {
+      await updateBuilding(buildingId, data);
+      await fetchApartments(); // Refrescar por si cambió algo relevante
+    } catch (err) {
+      throw err;
     }
   };
 
@@ -103,9 +136,18 @@ export default function AdminApartmentsPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Departamentos</h1>
-        <button className={styles.btnPrimary} onClick={() => setIsFormOpen(true)}>
-          + Nuevo departamento
-        </button>
+        <div className={styles.headerActions}>
+          <button 
+            className={styles.btnSecondary} 
+            onClick={() => setIsBuildingModalOpen(true)}
+            title="Editar información del edificio"
+          >
+            🏢 Editar Edificio
+          </button>
+          <button className={styles.btnPrimary} onClick={() => setIsFormOpen(true)}>
+            + Nuevo departamento
+          </button>
+        </div>
       </div>
 
       {(error || actionError) && (
@@ -157,6 +199,13 @@ export default function AdminApartmentsPage() {
         confirmLabel="Remover"
         onConfirm={handleRemove}
         onCancel={() => setRemoveTarget(null)}
+      />
+
+      <BuildingInfoModal
+        isOpen={isBuildingModalOpen}
+        onClose={() => setIsBuildingModalOpen(false)}
+        onSave={handleSaveBuilding}
+        building={building}
       />
     </div>
   );

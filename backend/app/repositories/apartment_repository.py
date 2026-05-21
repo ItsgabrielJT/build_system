@@ -13,12 +13,38 @@ class ApartmentRepository:
         self._conn = conn
 
     async def get_all(self) -> list[dict]:
-        rows = await self._conn.fetch("SELECT * FROM apartments ORDER BY code")
+        rows = await self._conn.fetch(
+            """
+            SELECT 
+                a.id,
+                a.code,
+                a.floor,
+                a.tower,
+                a.status,
+                a.building_id,
+                a.owner_id,
+                a.created_at,
+                a.updated_at,
+                o.full_name as owner_name,
+                o.email as owner_email
+            FROM apartments a
+            LEFT JOIN owners o ON a.owner_id = o.id
+            ORDER BY a.code
+            """
+        )
         return [dict(r) for r in rows]
 
     async def get_by_id(self, apartment_id: UUID) -> dict | None:
         row = await self._conn.fetchrow(
-            "SELECT * FROM apartments WHERE id = $1",
+            """
+            SELECT 
+                a.*,
+                o.full_name as owner_name,
+                o.email as owner_email
+            FROM apartments a
+            LEFT JOIN owners o ON a.owner_id = o.id
+            WHERE a.id = $1
+            """,
             apartment_id,
         )
         return dict(row) if row else None
@@ -42,13 +68,15 @@ class ApartmentRepository:
     async def create(self, data: ApartmentCreate) -> dict:
         row = await self._conn.fetchrow(
             """
-            INSERT INTO apartments (code, floor, tower)
-            VALUES ($1, $2, $3)
-            RETURNING *
+            INSERT INTO apartments (code, floor, tower, building_id, owner_id)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, code, floor, tower, status, building_id, owner_id, created_at, updated_at
             """,
             data.code,
             data.floor,
             data.tower,
+            data.building_id,
+            data.owner_id,
         )
         return dict(row)
 
@@ -62,7 +90,7 @@ class ApartmentRepository:
                 status     = COALESCE($5, status),
                 updated_at = NOW()
             WHERE id = $1
-            RETURNING *
+            RETURNING id, code, floor, tower, status, building_id, owner_id, created_at, updated_at
             """,
             apartment_id,
             data.code,

@@ -35,7 +35,7 @@ async def create_payment(
     db=Depends(get_db),
 ):
     service = PaymentService(PaymentRepository(db))
-    return await service.create(body, created_by=user["uid"])
+    return await service.create(body, created_by=user["user_id"])
 
 
 @router.put("/payments/{payment_id}")

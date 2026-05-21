@@ -75,7 +75,7 @@ class PaymentRepository:
             data.amount,
             data.method,
             data.reference,
-            created_by,
+            str(created_by),
         )
         return dict(row)
 

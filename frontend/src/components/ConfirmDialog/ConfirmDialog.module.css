@@ -1,0 +1,60 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+
+.dialog {
+  background: #fff;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 28px 28px 24px;
+  max-width: 400px;
+  width: 100%;
+}
+
+.message {
+  font-size: 15px;
+  color: var(--color-gray-800);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btnCancel {
+  padding: 8px 20px;
+  background: #fff;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--border-radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-gray-700);
+}
+
+.btnCancel:hover {
+  background: var(--color-gray-50);
+}
+
+.btnConfirm {
+  padding: 8px 20px;
+  background: var(--color-danger);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.btnConfirm:hover {
+  background: #c81e1e;
+}

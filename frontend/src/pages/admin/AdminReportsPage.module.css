@@ -1,0 +1,123 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-gray-900);
+}
+
+.errorBanner {
+  padding: 12px 16px;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  border-radius: var(--border-radius-sm);
+  font-size: 14px;
+  border: 1px solid var(--color-danger);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: #fff;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  display: flex;
+  gap: 16px;
+  border: 1px solid var(--color-gray-200);
+  transition: box-shadow 0.15s;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.cardIcon {
+  font-size: 36px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.cardDesc {
+  font-size: 13px;
+  color: var(--color-gray-500);
+  line-height: 1.5;
+}
+
+.cardActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.btnPdf {
+  padding: 7px 14px;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.btnPdf:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.btnPdf:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnExcel {
+  padding: 7px 14px;
+  background: var(--color-success-light);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.btnExcel:hover:not(:disabled) {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.btnExcel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

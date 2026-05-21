@@ -1,0 +1,29 @@
+.zone {
+  border: 2px dashed var(--color-gray-300);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--color-gray-50);
+}
+
+.zone:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.icon {
+  display: block;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.text {
+  font-size: 13px;
+  color: var(--color-gray-600);
+}
+
+.input {
+  display: none;
+}

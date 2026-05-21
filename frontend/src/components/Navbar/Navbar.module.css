@@ -4,20 +4,41 @@
   border-bottom: 1px solid var(--color-gray-200);
   display: flex;
   align-items: center;
-  padding: 0 24px;
+  padding: 0 20px 0 16px;
   position: sticky;
   top: 0;
   z-index: 50;
   gap: 0;
 }
 
-/* Left: building name + separator + search */
+/* Left: hamburger + building name + separator + search */
 .left {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 0;
   min-width: 0;
+}
+
+.menuBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--border-radius);
+  border: none;
+  background: transparent;
+  color: var(--color-gray-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-right: 10px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.menuBtn:hover {
+  background: var(--color-gray-100);
+  color: var(--color-gray-800);
 }
 
 .buildingName {
@@ -32,8 +53,8 @@
 
 .separator {
   width: 1px;
-  height: 22px;
-  background: var(--color-gray-200);
+  height: 20px;
+  background: var(--color-gray-300);
   flex-shrink: 0;
   margin-right: 16px;
 }
@@ -46,7 +67,7 @@
   border: 1px solid var(--color-gray-200);
   border-radius: var(--border-radius);
   padding: 7px 12px;
-  width: 280px;
+  width: 260px;
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -79,7 +100,7 @@
 .right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
@@ -102,33 +123,21 @@
   color: var(--color-gray-700);
 }
 
-/* User info: avatar + name/role */
+/* User info */
 .userInfo {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-left: 8px;
-  cursor: default;
-}
-
-.avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--color-gray-200);
 }
 
 .userText {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  text-align: right;
 }
 
 .userName {
@@ -148,103 +157,16 @@
   line-height: 1.2;
 }
 
-
-/* Left: search */
-.left {
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-
-.searchWrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--color-gray-100);
-  border: 1px solid var(--color-gray-200);
-  border-radius: var(--border-radius);
-  padding: 7px 12px;
-  width: 240px;
-  transition: border-color 0.15s;
-}
-
-.searchWrap:focus-within {
-  border-color: var(--color-primary);
-  background: #fff;
-}
-
-.searchIcon {
-  display: flex;
-  align-items: center;
-  color: var(--color-gray-400);
-  flex-shrink: 0;
-}
-
-.searchInput {
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 13px;
-  color: var(--color-gray-700);
-  width: 100%;
-}
-
-.searchInput::placeholder {
-  color: var(--color-gray-400);
-}
-
-/* Center: building name */
-.center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-}
-
-.buildingName {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-gray-800);
-  letter-spacing: -0.01em;
-}
-
-/* Right: icons + avatar */
-.right {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-}
-
-.iconBtn {
+.avatar {
   width: 36px;
   height: 36px;
-  border-radius: var(--border-radius);
-  border: none;
-  background: transparent;
-  color: var(--color-gray-500);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, color 0.15s;
-}
-
-.iconBtn:hover {
-  background: var(--color-gray-100);
-  color: var(--color-gray-700);
-}
-
-.avatar {
-  width: 34px;
-  height: 34px;
   border-radius: 50%;
   background: var(--color-primary);
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 8px;
   flex-shrink: 0;
 }

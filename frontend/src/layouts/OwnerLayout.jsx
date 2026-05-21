@@ -9,12 +9,12 @@ export default function OwnerLayout() {
 
   return (
     <div className={styles.layout}>
-      <Sidebar role="PROPIETARIO" collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+      <Sidebar role="PROPIETARIO" collapsed={collapsed} />
       <div
         className={styles.main}
         style={{ marginLeft: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)' }}
       >
-        <Navbar />
+        <Navbar onToggleSidebar={() => setCollapsed(c => !c)} />
         <main className={styles.content}>
           <Outlet />
         </main>

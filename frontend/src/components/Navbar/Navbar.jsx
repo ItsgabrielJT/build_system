@@ -22,12 +22,20 @@ const IconSearch = () => (
   </svg>
 );
 
+const IconMenu = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="6" x2="21" y2="6"/>
+    <line x1="3" y1="12" x2="21" y2="12"/>
+    <line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+);
+
 const ROLE_LABELS = {
   ADMIN: 'SÚPER USUARIO',
   PROPIETARIO: 'PROPIETARIO',
 };
 
-export default function Navbar({ buildingName = 'Edificio Horizonte' }) {
+export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSidebar }) {
   const { user, role } = useAuth();
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
   const displayName = user?.email?.split('@')[0] || 'Usuario';
@@ -36,6 +44,9 @@ export default function Navbar({ buildingName = 'Edificio Horizonte' }) {
   return (
     <header className={styles.navbar}>
       <div className={styles.left}>
+        <button className={styles.menuBtn} onClick={onToggleSidebar} aria-label="Toggle sidebar">
+          <IconMenu />
+        </button>
         <span className={styles.buildingName}>{buildingName}</span>
         <span className={styles.separator} />
         <div className={styles.searchWrap}>
@@ -56,13 +67,14 @@ export default function Navbar({ buildingName = 'Edificio Horizonte' }) {
           <IconSettings />
         </button>
         <div className={styles.userInfo}>
-          <div className={styles.avatar}>{userInitial}</div>
           <div className={styles.userText}>
             <span className={styles.userName}>{displayName}</span>
             <span className={styles.userRole}>{roleLabel}</span>
           </div>
+          <div className={styles.avatar}>{userInitial}</div>
         </div>
       </div>
     </header>
   );
 }
+

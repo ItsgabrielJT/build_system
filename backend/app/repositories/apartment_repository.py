@@ -15,20 +15,25 @@ class ApartmentRepository:
     async def get_all(self) -> list[dict]:
         rows = await self._conn.fetch(
             """
-            SELECT 
+            SELECT
                 a.id,
                 a.code,
                 a.floor,
                 a.tower,
                 a.status,
                 a.building_id,
-                a.owner_id,
+                COALESCE(a.owner_id, oa.owner_id)          AS owner_id,
                 a.created_at,
                 a.updated_at,
-                o.full_name as owner_name,
-                o.email as owner_email
+                COALESCE(od.full_name, op.full_name)        AS owner_name,
+                COALESCE(od.email,     op.email)            AS owner_email
             FROM apartments a
-            LEFT JOIN owners o ON a.owner_id = o.id
+            LEFT JOIN owners od
+                ON a.owner_id = od.id
+            LEFT JOIN owner_apartments oa
+                ON a.id = oa.apartment_id AND oa.is_primary = TRUE
+            LEFT JOIN owners op
+                ON oa.owner_id = op.id
             ORDER BY a.code
             """
         )
@@ -37,12 +42,25 @@ class ApartmentRepository:
     async def get_by_id(self, apartment_id: UUID) -> dict | None:
         row = await self._conn.fetchrow(
             """
-            SELECT 
-                a.*,
-                o.full_name as owner_name,
-                o.email as owner_email
+            SELECT
+                a.id,
+                a.code,
+                a.floor,
+                a.tower,
+                a.status,
+                a.building_id,
+                COALESCE(a.owner_id, oa.owner_id)          AS owner_id,
+                a.created_at,
+                a.updated_at,
+                COALESCE(od.full_name, op.full_name)        AS owner_name,
+                COALESCE(od.email,     op.email)            AS owner_email
             FROM apartments a
-            LEFT JOIN owners o ON a.owner_id = o.id
+            LEFT JOIN owners od
+                ON a.owner_id = od.id
+            LEFT JOIN owner_apartments oa
+                ON a.id = oa.apartment_id AND oa.is_primary = TRUE
+            LEFT JOIN owners op
+                ON oa.owner_id = op.id
             WHERE a.id = $1
             """,
             apartment_id,
@@ -114,9 +132,23 @@ class ApartmentRepository:
             owner_id,
             is_primary,
         )
+        if is_primary:
+            await self._conn.execute(
+                "UPDATE apartments SET owner_id = $1, updated_at = NOW() WHERE id = $2",
+                owner_id,
+                apartment_id,
+            )
         return dict(row)
 
     async def remove_owner(self, apartment_id: UUID, owner_id: UUID) -> bool:
+        await self._conn.execute(
+            """
+            UPDATE apartments SET owner_id = NULL, updated_at = NOW()
+            WHERE id = $1 AND owner_id = $2
+            """,
+            apartment_id,
+            owner_id,
+        )
         result = await self._conn.execute(
             "DELETE FROM owner_apartments WHERE apartment_id = $1 AND owner_id = $2",
             apartment_id,

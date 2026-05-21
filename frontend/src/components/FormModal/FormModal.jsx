@@ -1,26 +1,41 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from './FormModal.module.css';
 
-export default function FormModal({ isOpen, title, fields = [], defaultValues, onSubmit, onClose }) {
+export default function FormModal({ isOpen, title, fields = [], initialData, defaultValues, onSubmit, onClose }) {
   const [formData, setFormData] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  const fieldsRef = useRef(fields);
+  const defaultsRef = useRef(initialData ?? defaultValues);
+  fieldsRef.current = fields;
+  defaultsRef.current = initialData ?? defaultValues;
+
   useEffect(() => {
     if (isOpen) {
+      const effectiveDefaults = defaultsRef.current ?? {};
       const initial = {};
-      fields.forEach((f) => {
-        initial[f.name] = defaultValues?.[f.name] ?? f.defaultValue ?? '';
+      fieldsRef.current.forEach((f) => {
+        initial[f.name] = effectiveDefaults[f.name] ?? f.defaultValue ?? '';
       });
       setFormData(initial);
       setError(null);
     }
-  }, [isOpen, defaultValues, fields]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (field, value) => {
+    const extraUpdates = field.onChange ? field.onChange(value) : null;
+    setFormData((prev) => ({
+      ...prev,
+      [field.name]: value,
+      ...(extraUpdates || {}),
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -56,7 +71,7 @@ export default function FormModal({ isOpen, title, fields = [], defaultValues, o
                 <select
                   className={styles.input}
                   value={formData[field.name] ?? ''}
-                  onChange={(e) => handleChange(field.name, e.target.value)}
+                  onChange={(e) => handleSelectChange(field, e.target.value)}
                   required={field.required}
                 >
                   <option value="">Seleccionar...</option>

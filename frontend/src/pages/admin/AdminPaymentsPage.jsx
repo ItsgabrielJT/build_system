@@ -24,6 +24,11 @@ const COLUMNS = [
   },
 ];
 
+const getCurrentMonth = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+};
+
 export default function AdminPaymentsPage() {
   const { payments, loading, error, fetchPayments, createPayment, annulPayment } = usePayments();
   const { apartments, fetchApartments } = useApartments();
@@ -32,14 +37,7 @@ export default function AdminPaymentsPage() {
   const [annulTarget, setAnnulTarget] = useState(null);
   const [filterPeriod, setFilterPeriod] = useState('');
   const [actionError, setActionError] = useState(null);
-  const [formData, setFormData] = useState({});
   const [filteredApartments, setFilteredApartments] = useState([]);
-
-  // Inicializar período con mes actual
-  const getCurrentMonth = () => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  };
 
   useEffect(() => {
     fetchApartments();
@@ -50,54 +48,27 @@ export default function AdminPaymentsPage() {
     fetchPayments(filterPeriod ? { period: filterPeriod } : {});
   }, [filterPeriod, fetchPayments]);
 
-  // Cuando abre el formulario, inicializar periodo con mes actual
-  useEffect(() => {
-    if (isFormOpen) {
-      setFormData((prev) => ({
-        ...prev,
-        period: getCurrentMonth(),
-      }));
-      setFilteredApartments(apartments);
-    }
-  }, [isFormOpen, apartments]);
-
-  // Manejar cambio de apartamento - auto-cargar propietario
   const handleApartmentChange = (apartmentId) => {
-    const selectedApartment = apartments.find((a) => a.id === apartmentId);
-    if (selectedApartment?.owner_id) {
-      setFormData((prev) => ({
-        ...prev,
-        apartment_id: apartmentId,
-        owner_id: selectedApartment.owner_id,
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        apartment_id: apartmentId,
-        owner_id: '',
-      }));
-    }
+    const selectedApartment = apartments.find((a) => String(a.id) === String(apartmentId));
+    return { owner_id: selectedApartment?.owner_id || '' };
   };
 
-  // Manejar cambio de propietario - filtrar apartamentos
   const handleOwnerChange = (ownerId) => {
-    const filtered = apartments.filter((a) => a.owner_id === ownerId);
+    const filtered = apartments.filter((a) => String(a.owner_id) === String(ownerId));
     setFilteredApartments(filtered);
-    setFormData((prev) => ({
-      ...prev,
+    return {
       owner_id: ownerId,
       apartment_id: filtered.length === 1 ? filtered[0].id : '',
-    }));
+    };
   };
 
-  // Campos dinámicos del formulario
   const getPaymentFields = () => [
     {
       name: 'apartment_id',
       label: 'Departamento',
       type: 'select',
       required: true,
-      options: filteredApartments.length > 0 
+      options: filteredApartments.length > 0
         ? filteredApartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` }))
         : apartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` })),
       onChange: handleApartmentChange,
@@ -110,7 +81,7 @@ export default function AdminPaymentsPage() {
       options: owners.map((o) => ({ value: o.id, label: o.full_name })),
       onChange: handleOwnerChange,
     },
-    { name: 'period', label: 'Período (YYYY-MM)', type: 'month', required: true },
+    { name: 'period', label: 'Período (YYYY-MM)', type: 'month', required: true, defaultValue: getCurrentMonth() },
     { name: 'amount', label: 'Monto', type: 'number', required: true, min: '0', step: '0.01' },
     {
       name: 'method',
@@ -129,14 +100,12 @@ export default function AdminPaymentsPage() {
   const handleCreate = async (data) => {
     await createPayment({ ...data, amount: parseFloat(data.amount) });
     setIsFormOpen(false);
-    setFormData({});
-    setFilteredApartments(apartments);
+    setFilteredApartments([]);
   };
 
   const handleFormClose = () => {
     setIsFormOpen(false);
-    setFormData({});
-    setFilteredApartments(apartments);
+    setFilteredApartments([]);
   };
 
   const handleAnnul = async () => {
@@ -149,8 +118,6 @@ export default function AdminPaymentsPage() {
       setAnnulTarget(null);
     }
   };
-
-  const activePayments = payments.filter((p) => p.status !== 'ANULADO');
 
   return (
     <div className={styles.page}>
@@ -180,7 +147,6 @@ export default function AdminPaymentsPage() {
         isOpen={isFormOpen}
         title="Registrar pago"
         fields={getPaymentFields()}
-        initialData={formData}
         onSubmit={handleCreate}
         onClose={handleFormClose}
       />

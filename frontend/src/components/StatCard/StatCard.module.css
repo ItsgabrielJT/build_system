@@ -1,51 +1,66 @@
 .card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   background: #fff;
   border-radius: var(--border-radius-lg);
-  padding: 20px 24px;
-  box-shadow: var(--shadow-sm);
-  border-left: 4px solid transparent;
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--color-gray-200);
 }
 
-.primary {
-  border-left-color: var(--color-primary);
+.primary .icon {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
-.success {
-  border-left-color: var(--color-success);
+.success .icon {
+  background: var(--color-success-light);
+  color: var(--color-success);
 }
 
-.danger {
-  border-left-color: var(--color-danger);
+.danger .icon {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
 }
 
-.warning {
-  border-left-color: var(--color-warning);
+.warning .icon {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
 }
 
 .icon {
-  font-size: 28px;
+  font-size: 20px;
   line-height: 1;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--color-gray-100);
 }
 
 .body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  flex: 1;
 }
 
 .label {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--color-gray-500);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .value {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--color-gray-900);
+  letter-spacing: -0.02em;
+  line-height: 1;
 }

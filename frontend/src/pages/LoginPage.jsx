@@ -26,7 +26,6 @@ export default function LoginPage() {
     setError(null);
     try {
       await login(email, password);
-      // Login exitoso - la redirección ocurre automáticamente después
     } catch (err) {
       setError(err.message || 'Correo o contraseña incorrectos');
     } finally {
@@ -38,14 +37,20 @@ export default function LoginPage() {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <span className={styles.logo}>🏛️</span>
-          <h1 className={styles.title}>Gestión de Edificios</h1>
+          <div className={styles.logoWrap}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <h1 className={styles.brand}>EdiGestion</h1>
           <p className={styles.subtitle}>Ingresa tus credenciales para acceder</p>
         </div>
+
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.field}>
-            <label className={styles.label}>Correo electrónico</label>
+            <label className={styles.label} htmlFor="email">Correo electrónico</label>
             <input
+              id="email"
               className={styles.input}
               type="email"
               value={email}
@@ -56,8 +61,9 @@ export default function LoginPage() {
             />
           </div>
           <div className={styles.field}>
-            <label className={styles.label}>Contraseña</label>
+            <label className={styles.label} htmlFor="password">Contraseña</label>
             <input
+              id="password"
               className={styles.input}
               type="password"
               value={password}

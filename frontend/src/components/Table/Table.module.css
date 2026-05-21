@@ -1,29 +1,33 @@
 .wrapper {
   overflow-x: auto;
-  border-radius: var(--border-radius);
+  border-radius: var(--border-radius-lg);
   border: 1px solid var(--color-gray-200);
+  box-shadow: var(--shadow);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
   background: #fff;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .th {
   padding: 12px 16px;
   text-align: left;
-  font-weight: 600;
-  color: var(--color-gray-600);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-gray-500);
   background: var(--color-gray-50);
   border-bottom: 1px solid var(--color-gray-200);
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .tr {
   border-bottom: 1px solid var(--color-gray-100);
-  transition: background 0.15s;
+  transition: background 0.12s;
 }
 
 .tr:last-child {
@@ -35,27 +39,27 @@
 }
 
 .td {
-  padding: 12px 16px;
-  color: var(--color-gray-800);
+  padding: 13px 16px;
+  color: var(--color-gray-700);
   vertical-align: middle;
 }
 
 .tdActions {
   padding: 8px 16px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
 .btnEdit {
-  padding: 4px 12px;
+  padding: 5px 12px;
   background: var(--color-primary-light);
   color: var(--color-primary);
-  border: 1px solid var(--color-primary);
+  border: 1px solid transparent;
   border-radius: var(--border-radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  transition: background 0.15s;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.12s, color 0.12s;
 }
 
 .btnEdit:hover {
@@ -64,14 +68,14 @@
 }
 
 .btnDelete {
-  padding: 4px 12px;
+  padding: 5px 12px;
   background: var(--color-danger-light);
   color: var(--color-danger);
-  border: 1px solid var(--color-danger);
+  border: 1px solid transparent;
   border-radius: var(--border-radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  transition: background 0.15s;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.12s, color 0.12s;
 }
 
 .btnDelete:hover {
@@ -80,10 +84,11 @@
 }
 
 .empty {
-  padding: 48px 24px;
+  padding: 56px 24px;
   text-align: center;
-  color: var(--color-gray-500);
+  color: var(--color-gray-400);
   background: #fff;
-  border-radius: var(--border-radius);
+  border-radius: var(--border-radius-lg);
   border: 1px solid var(--color-gray-200);
+  font-size: 14px;
 }

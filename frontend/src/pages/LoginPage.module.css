@@ -3,35 +3,43 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--color-gray-800) 0%, var(--color-primary-dark) 100%);
+  background: var(--color-neutral);
   padding: 24px;
 }
 
 .card {
   background: #fff;
-  border-radius: var(--border-radius-lg);
+  border-radius: var(--border-radius-xl);
   box-shadow: var(--shadow-lg);
-  padding: 40px 36px;
+  padding: 44px 40px;
   width: 100%;
   max-width: 400px;
+  border: 1px solid var(--color-gray-200);
 }
 
 .header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
 }
 
-.logo {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 12px;
+.logoWrap {
+  width: 52px;
+  height: 52px;
+  background: var(--color-sidebar-bg);
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  margin-bottom: 16px;
 }
 
-.title {
-  font-size: 22px;
+.brand {
+  font-size: 24px;
   font-weight: 700;
   color: var(--color-gray-900);
   margin-bottom: 6px;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
@@ -42,7 +50,7 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .field {
@@ -60,41 +68,49 @@
 .input {
   padding: 10px 14px;
   border: 1px solid var(--color-gray-300);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: var(--color-gray-900);
-  transition: border-color 0.15s;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
 }
 
 .input:focus {
-  outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.input::placeholder {
+  color: var(--color-gray-400);
 }
 
 .error {
   font-size: 13px;
   color: var(--color-danger);
   background: var(--color-danger-light);
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: var(--border-radius-sm);
+  border: 1px solid rgba(220, 38, 38, 0.2);
   text-align: center;
 }
 
 .btnSubmit {
-  padding: 11px;
+  padding: 12px;
   background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: var(--border-radius-sm);
-  font-size: 15px;
+  border-radius: var(--border-radius);
+  font-size: 14px;
   font-weight: 600;
   margin-top: 4px;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s;
+  letter-spacing: 0.01em;
 }
 
 .btnSubmit:hover:not(:disabled) {
   background: var(--color-primary-dark);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .btnSubmit:disabled {

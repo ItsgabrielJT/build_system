@@ -86,7 +86,7 @@
 .textarea:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .textarea {
@@ -109,10 +109,10 @@
 }
 
 .btnCancel {
-  padding: 8px 20px;
+  padding: 9px 20px;
   background: #fff;
   border: 1px solid var(--color-gray-300);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: var(--color-gray-700);
@@ -124,18 +124,19 @@
 }
 
 .btnSubmit {
-  padding: 8px 20px;
+  padding: 9px 20px;
   background: var(--color-primary);
   border: none;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: #fff;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s;
 }
 
 .btnSubmit:hover:not(:disabled) {
   background: var(--color-primary-dark);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
 
 .btnSubmit:disabled {

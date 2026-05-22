@@ -29,10 +29,13 @@ class ApartmentRepository:
                 o.full_name                                 AS owner_name,
                 o.email                                     AS owner_email
             FROM apartments a
-            LEFT JOIN owner_apartments oa
-                ON a.id = oa.apartment_id AND oa.is_primary = TRUE
-            LEFT JOIN owners o
-                ON oa.owner_id = o.id
+            LEFT JOIN (
+                SELECT DISTINCT ON (apartment_id) apartment_id, owner_id
+                FROM owner_apartments
+                WHERE is_primary = TRUE
+                ORDER BY apartment_id, assigned_at DESC
+            ) oa ON a.id = oa.apartment_id
+            LEFT JOIN owners o ON oa.owner_id = o.id
             ORDER BY a.code
             """
         )
@@ -54,10 +57,13 @@ class ApartmentRepository:
                 o.full_name                                 AS owner_name,
                 o.email                                     AS owner_email
             FROM apartments a
-            LEFT JOIN owner_apartments oa
-                ON a.id = oa.apartment_id AND oa.is_primary = TRUE
-            LEFT JOIN owners o
-                ON oa.owner_id = o.id
+            LEFT JOIN (
+                SELECT DISTINCT ON (apartment_id) apartment_id, owner_id
+                FROM owner_apartments
+                WHERE is_primary = TRUE
+                ORDER BY apartment_id, assigned_at DESC
+            ) oa ON a.id = oa.apartment_id
+            LEFT JOIN owners o ON oa.owner_id = o.id
             WHERE a.id = $1
             """,
             apartment_id,
@@ -117,6 +123,12 @@ class ApartmentRepository:
     async def assign_owner(
         self, apartment_id: UUID, owner_id: UUID, is_primary: bool
     ) -> dict:
+        if is_primary:
+            await self._conn.execute(
+                "UPDATE owner_apartments SET is_primary = FALSE WHERE apartment_id = $1 AND owner_id != $2",
+                apartment_id,
+                owner_id,
+            )
         row = await self._conn.fetchrow(
             """
             INSERT INTO owner_apartments (apartment_id, owner_id, is_primary)
@@ -194,8 +206,10 @@ class ApartmentRepository:
 
         if status and status.upper() in ["OCUPADO", "VACANTE", "MANTENIMIENTO"]:
             if status.upper() == "OCUPADO":
+                conditions.append("a.status IN ('ACTIVA', 'ACTIVO')")
                 conditions.append("EXISTS (SELECT 1 FROM owner_apartments oa_f WHERE oa_f.apartment_id = a.id)")
             elif status.upper() == "VACANTE":
+                conditions.append("a.status IN ('ACTIVA', 'ACTIVO')")
                 conditions.append("NOT EXISTS (SELECT 1 FROM owner_apartments oa_f WHERE oa_f.apartment_id = a.id)")
             elif status.upper() == "MANTENIMIENTO":
                 conditions.append("a.status = 'MANTENIMIENTO'")
@@ -232,7 +246,12 @@ class ApartmentRepository:
                 CAST(COALESCE(af.allocated_quota, 0.0) as float) as allocated_quota_percent,
                 NULL::text as image_url
             FROM apartments a
-            LEFT JOIN owner_apartments oa ON a.id = oa.apartment_id AND oa.is_primary = TRUE
+            LEFT JOIN (
+                SELECT DISTINCT ON (apartment_id) apartment_id, owner_id
+                FROM owner_apartments
+                WHERE is_primary = TRUE
+                ORDER BY apartment_id, assigned_at DESC
+            ) oa ON a.id = oa.apartment_id
             LEFT JOIN owners o ON oa.owner_id = o.id
             LEFT JOIN (
                 SELECT apartment_id, SUM(amount)::float / (SELECT SUM(amount) FROM apartment_fees WHERE period = CURRENT_DATE::text) * 100 as allocated_quota

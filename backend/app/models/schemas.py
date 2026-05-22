@@ -78,7 +78,6 @@ class ApartmentCreate(BaseModel):
     floor: Optional[int] = None
     tower: Optional[str] = None
     building_id: Optional[UUID] = None
-    owner_id: Optional[UUID] = None
 
 
 class ApartmentUpdate(BaseModel):

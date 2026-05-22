@@ -196,3 +196,273 @@
   gap: 12px;
   justify-content: flex-end;
 }
+
+.detailModal {
+  background: #fff;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 28px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.statsModal {
+  background: #fff;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 28px;
+  width: 100%;
+  max-width: 780px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--color-gray-500);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--border-radius-sm);
+  line-height: 1;
+}
+
+.modalClose:hover {
+  background: var(--color-gray-100);
+  color: var(--color-gray-800);
+}
+
+.statsModalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.statRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-gray-100);
+}
+
+.statLabel {
+  font-size: 14px;
+  color: var(--color-gray-600);
+}
+
+.statValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.statValueSuccess {
+  color: var(--color-success);
+}
+
+.statValueDanger {
+  color: var(--color-danger);
+}
+
+.statValueBadge {
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.statProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.statProgressLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--color-gray-600);
+}
+
+.progressTrack {
+  height: 8px;
+  background: var(--color-gray-100);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFillGreen {
+  height: 100%;
+  background: var(--color-success);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.progressFillRed {
+  height: 100%;
+  background: var(--color-danger);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.modalSubtitle {
+  font-size: 13px;
+  color: var(--color-gray-500);
+  margin-top: 2px;
+}
+
+.inlineBadge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.03em;
+}
+
+.inlineBadge_ABIERTO {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.inlineBadge_VENCIDO {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.inlineBadge_CERRADO {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.statsSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .statsSummaryGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.statsSummaryItem {
+  background: var(--color-gray-50);
+  border-radius: var(--border-radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statsSummaryLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-gray-500);
+}
+
+.statsSummaryValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-gray-900);
+}
+
+.colorSuccess {
+  color: #16a34a;
+}
+
+.colorDanger {
+  color: #dc2626;
+}
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 600px) {
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chartBox {
+  border: 1px solid var(--color-gray-100);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  position: relative;
+}
+
+.chartTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  margin-bottom: 8px;
+  margin-top: 0;
+}
+
+.donutCenter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -10%);
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-gray-900);
+  pointer-events: none;
+  line-height: 1.2;
+}
+
+.donutCenter span {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-gray-500);
+}
+
+.chartLoading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progressSectionHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--color-gray-600);
+}
+
+.progressPct {
+  font-weight: 700;
+  color: var(--color-gray-900);
+}

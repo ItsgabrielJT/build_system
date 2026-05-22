@@ -23,18 +23,16 @@ class ApartmentRepository:
                 a.tower,
                 a.status,
                 a.building_id,
-                COALESCE(a.owner_id, oa.owner_id)          AS owner_id,
+                oa.owner_id                                 AS owner_id,
                 a.created_at,
                 a.updated_at,
-                COALESCE(od.full_name, op.full_name)        AS owner_name,
-                COALESCE(od.email,     op.email)            AS owner_email
+                o.full_name                                 AS owner_name,
+                o.email                                     AS owner_email
             FROM apartments a
-            LEFT JOIN owners od
-                ON a.owner_id = od.id
             LEFT JOIN owner_apartments oa
                 ON a.id = oa.apartment_id AND oa.is_primary = TRUE
-            LEFT JOIN owners op
-                ON oa.owner_id = op.id
+            LEFT JOIN owners o
+                ON oa.owner_id = o.id
             ORDER BY a.code
             """
         )
@@ -50,18 +48,16 @@ class ApartmentRepository:
                 a.tower,
                 a.status,
                 a.building_id,
-                COALESCE(a.owner_id, oa.owner_id)          AS owner_id,
+                oa.owner_id                                 AS owner_id,
                 a.created_at,
                 a.updated_at,
-                COALESCE(od.full_name, op.full_name)        AS owner_name,
-                COALESCE(od.email,     op.email)            AS owner_email
+                o.full_name                                 AS owner_name,
+                o.email                                     AS owner_email
             FROM apartments a
-            LEFT JOIN owners od
-                ON a.owner_id = od.id
             LEFT JOIN owner_apartments oa
                 ON a.id = oa.apartment_id AND oa.is_primary = TRUE
-            LEFT JOIN owners op
-                ON oa.owner_id = op.id
+            LEFT JOIN owners o
+                ON oa.owner_id = o.id
             WHERE a.id = $1
             """,
             apartment_id,
@@ -87,15 +83,14 @@ class ApartmentRepository:
     async def create(self, data: ApartmentCreate) -> dict:
         row = await self._conn.fetchrow(
             """
-            INSERT INTO apartments (code, floor, tower, building_id, owner_id)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, code, floor, tower, status, building_id, owner_id, created_at, updated_at
+            INSERT INTO apartments (code, floor, tower, building_id)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, code, floor, tower, status, building_id, created_at, updated_at
             """,
             data.code,
             data.floor,
             data.tower,
             data.building_id,
-            data.owner_id,
         )
         return dict(row)
 
@@ -109,7 +104,7 @@ class ApartmentRepository:
                 status     = COALESCE($5, status),
                 updated_at = NOW()
             WHERE id = $1
-            RETURNING id, code, floor, tower, status, building_id, owner_id, created_at, updated_at
+            RETURNING id, code, floor, tower, status, building_id, created_at, updated_at
             """,
             apartment_id,
             data.code,
@@ -133,23 +128,9 @@ class ApartmentRepository:
             owner_id,
             is_primary,
         )
-        if is_primary:
-            await self._conn.execute(
-                "UPDATE apartments SET owner_id = $1, updated_at = NOW() WHERE id = $2",
-                owner_id,
-                apartment_id,
-            )
         return dict(row)
 
     async def remove_owner(self, apartment_id: UUID, owner_id: UUID) -> bool:
-        await self._conn.execute(
-            """
-            UPDATE apartments SET owner_id = NULL, updated_at = NOW()
-            WHERE id = $1 AND owner_id = $2
-            """,
-            apartment_id,
-            owner_id,
-        )
         result = await self._conn.execute(
             "DELETE FROM owner_apartments WHERE apartment_id = $1 AND owner_id = $2",
             apartment_id,
@@ -173,11 +154,11 @@ class ApartmentRepository:
             f"""
             SELECT
                 COUNT(*) as total,
-                COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND a.owner_id IS NOT NULL THEN 1 END) as occupied,
-                COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND a.owner_id IS NULL THEN 1 END) as vacant,
+                COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND EXISTS (SELECT 1 FROM owner_apartments oa WHERE oa.apartment_id = a.id) THEN 1 END) as occupied,
+                COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND NOT EXISTS (SELECT 1 FROM owner_apartments oa WHERE oa.apartment_id = a.id) THEN 1 END) as vacant,
                 COUNT(CASE WHEN a.status = 'MANTENIMIENTO' THEN 1 END) as maintenance,
                 CASE WHEN COUNT(*) > 0 THEN
-                    (COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND a.owner_id IS NOT NULL THEN 1 END)::float / COUNT(*)::float * 100)
+                    (COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND EXISTS (SELECT 1 FROM owner_apartments oa WHERE oa.apartment_id = a.id) THEN 1 END)::float / COUNT(*)::float * 100)
                 ELSE 0 END as occupancy_rate_percent,
                 100.0 as allocated_quota_percent
             FROM apartments a
@@ -213,11 +194,11 @@ class ApartmentRepository:
 
         if status and status.upper() in ["OCUPADO", "VACANTE", "MANTENIMIENTO"]:
             if status.upper() == "OCUPADO":
-                conditions.append(f"a.status = 'ACTIVA' AND a.owner_id IS NOT NULL")
+                conditions.append("EXISTS (SELECT 1 FROM owner_apartments oa_f WHERE oa_f.apartment_id = a.id)")
             elif status.upper() == "VACANTE":
-                conditions.append(f"a.status = 'ACTIVA' AND a.owner_id IS NULL")
+                conditions.append("NOT EXISTS (SELECT 1 FROM owner_apartments oa_f WHERE oa_f.apartment_id = a.id)")
             elif status.upper() == "MANTENIMIENTO":
-                conditions.append(f"a.status = 'MANTENIMIENTO'")
+                conditions.append("a.status = 'MANTENIMIENTO'")
 
         if building_id:
             conditions.append(f"a.building_id = ${idx}")
@@ -244,14 +225,15 @@ class ApartmentRepository:
                 a.tower,
                 a.status,
                 a.building_id,
-                a.owner_id,
+                oa.owner_id,
                 a.created_at,
                 a.updated_at,
                 o.full_name as owner_name,
                 CAST(COALESCE(af.allocated_quota, 0.0) as float) as allocated_quota_percent,
                 NULL::text as image_url
             FROM apartments a
-            LEFT JOIN owners o ON a.owner_id = o.id
+            LEFT JOIN owner_apartments oa ON a.id = oa.apartment_id AND oa.is_primary = TRUE
+            LEFT JOIN owners o ON oa.owner_id = o.id
             LEFT JOIN (
                 SELECT apartment_id, SUM(amount)::float / (SELECT SUM(amount) FROM apartment_fees WHERE period = CURRENT_DATE::text) * 100 as allocated_quota
                 FROM apartment_fees

@@ -50,7 +50,7 @@ export function useApartmentDirectory() {
           params.status = filterStatus;
         }
 
-        const data = await apartmentService.getApartments(token, params);
+        const data = await apartmentService.getApartmentDirectory(token, params);
         setApartments(data.items || data);
         setCurrentPage(data.page || page);
         setTotalPages(data.total_pages || 1);

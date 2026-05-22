@@ -173,6 +173,6 @@ def _map_apartment_status(db_status: str, owner_id: Optional[UUID]) -> str:
     """Map database status to API status."""
     if db_status == "MANTENIMIENTO":
         return "MANTENIMIENTO"
-    elif db_status == "ACTIVA":
+    elif db_status in ("ACTIVA", "ACTIVO"):
         return "OCUPADO" if owner_id else "VACANTE"
     return db_status

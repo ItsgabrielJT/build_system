@@ -23,3 +23,22 @@ export async function getFeesByPeriod(token, period) {
   });
   return res.data;
 }
+
+export async function getApartmentFeeStats(period, token) {
+  const params = period ? { period } : {};
+  const res = await axios.get(`${API_BASE}/api/v1/apartment-fees/stats`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+  });
+  return res.data;
+}
+
+export async function getPeriodsSummary(page = 1, pageSize = 10, year = null, token) {
+  const params = { page, page_size: pageSize };
+  if (year) params.year = year;
+  const res = await axios.get(`${API_BASE}/api/v1/apartment-fees/periods-summary`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+  });
+  return res.data;
+}

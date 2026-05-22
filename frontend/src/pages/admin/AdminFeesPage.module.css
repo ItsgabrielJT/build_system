@@ -32,6 +32,18 @@
   margin-top: 2px;
 }
 
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .btnPrimary {
   padding: 10px 20px;
   background: var(--color-primary);

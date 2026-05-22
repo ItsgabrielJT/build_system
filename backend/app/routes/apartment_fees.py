@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, status
@@ -11,6 +12,28 @@ from app.repositories.apartment_fee_repository import ApartmentFeeRepository
 from app.services.apartment_fee_service import ApartmentFeeService
 
 router = APIRouter(tags=["apartment-fees"])
+
+
+@router.get("/apartment-fees/stats")
+async def get_fee_stats(
+    period: Optional[str] = None,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = ApartmentFeeService(ApartmentFeeRepository(db))
+    return await service.get_stats(period or datetime.now().strftime("%Y-%m"))
+
+
+@router.get("/apartment-fees/periods-summary")
+async def get_periods_summary(
+    page: int = 1,
+    page_size: int = 10,
+    year: Optional[int] = None,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = ApartmentFeeService(ApartmentFeeRepository(db))
+    return await service.get_periods_summary(page, page_size, year)
 
 
 @router.get("/apartment-fees")

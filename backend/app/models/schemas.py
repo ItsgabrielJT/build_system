@@ -497,3 +497,32 @@ class OwnerDetailResponse(BaseModel):
     balance_consolidated: Decimal
     recent_transactions: List[TransactionResponse]
     currency: str = "USD"
+
+
+# ─── APARTMENT FEE STATISTICS ─────────────────────────────────────────────────
+
+class ApartmentFeeStatsResponse(BaseModel):
+    period: str
+    total_emitido: Decimal
+    total_recaudado: Decimal
+    pendiente_cobro: Decimal
+    porcentaje_recaudado: float
+    unidades_deuda_vencida: int
+    tendencia_emitido: Optional[float]  # None si no hay mes anterior
+
+
+class PeriodSummaryItem(BaseModel):
+    period: str
+    label: str
+    vencimiento: Optional[str]
+    estado: str  # ABIERTO | VENCIDO | CERRADO
+    total_emitido: Decimal
+    total_recaudado: Decimal
+    morosidad_pct: float
+
+
+class PeriodsSummaryResponse(BaseModel):
+    data: List[PeriodSummaryItem]
+    total: int
+    page: int
+    page_size: int

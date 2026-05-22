@@ -1,0 +1,117 @@
+.card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid var(--color-gray-200);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.cardTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-gray-500);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.iconCircle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon_arrow {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.icon_bank {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.icon_clock {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.cardValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-gray-900);
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.badge_green {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.badge_red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.badge_orange {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.badgeSubtext {
+  font-size: 12px;
+  color: var(--color-gray-500);
+}
+
+.progressWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.progressBar {
+  height: 6px;
+  background: var(--color-gray-100);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.progressLabel {
+  font-size: 12px;
+  color: var(--color-gray-500);
+}

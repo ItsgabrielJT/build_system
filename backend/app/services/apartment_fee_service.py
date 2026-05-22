@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import HTTPException, status
 
 from app.models.schemas import ApartmentFeeCreate, BulkFeeCreate
@@ -33,3 +35,27 @@ class ApartmentFeeService:
             else:
                 updated += 1
         return {"created": created, "updated": updated}
+
+    async def get_stats(self, period: str) -> dict:
+        import re
+        if not re.match(r"^\d{4}-\d{2}$", period):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Período debe tener formato YYYY-MM",
+            )
+        return await self._repo.get_stats(period)
+
+    async def get_periods_summary(
+        self, page: int, page_size: int, year: Optional[int]
+    ) -> dict:
+        if page < 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="page debe ser >= 1",
+            )
+        if page_size > 100:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="page_size no puede ser mayor a 100",
+            )
+        return await self._repo.get_periods_summary(page, page_size, year)

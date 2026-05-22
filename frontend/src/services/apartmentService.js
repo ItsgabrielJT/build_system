@@ -53,3 +53,11 @@ export async function getApartmentStatistics(token) {
   });
   return res.data;
 }
+
+export async function getApartmentDirectory(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/apartments/directory`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+  });
+  return res.data;
+}

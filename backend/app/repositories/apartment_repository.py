@@ -173,11 +173,11 @@ class ApartmentRepository:
             f"""
             SELECT
                 COUNT(*) as total,
-                COUNT(CASE WHEN a.status = 'ACTIVA' AND a.owner_id IS NOT NULL THEN 1 END) as occupied,
-                COUNT(CASE WHEN a.status = 'ACTIVA' AND a.owner_id IS NULL THEN 1 END) as vacant,
+                COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND a.owner_id IS NOT NULL THEN 1 END) as occupied,
+                COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND a.owner_id IS NULL THEN 1 END) as vacant,
                 COUNT(CASE WHEN a.status = 'MANTENIMIENTO' THEN 1 END) as maintenance,
                 CASE WHEN COUNT(*) > 0 THEN
-                    (COUNT(CASE WHEN a.status = 'ACTIVA' AND a.owner_id IS NOT NULL THEN 1 END)::float / COUNT(*)::float * 100)
+                    (COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND a.owner_id IS NOT NULL THEN 1 END)::float / COUNT(*)::float * 100)
                 ELSE 0 END as occupancy_rate_percent,
                 100.0 as allocated_quota_percent
             FROM apartments a
@@ -209,7 +209,7 @@ class ApartmentRepository:
         params = []
         idx = 1
 
-        conditions.append("a.status IN ('ACTIVA', 'MANTENIMIENTO')")
+        conditions.append("a.status IN ('ACTIVA', 'ACTIVO', 'MANTENIMIENTO')")
 
         if status and status.upper() in ["OCUPADO", "VACANTE", "MANTENIMIENTO"]:
             if status.upper() == "OCUPADO":
@@ -249,8 +249,7 @@ class ApartmentRepository:
                 a.updated_at,
                 o.full_name as owner_name,
                 CAST(COALESCE(af.allocated_quota, 0.0) as float) as allocated_quota_percent,
-                NULL::text as image_url,
-                COALESCE(a.area_sqm, 0.0) as area_sqm
+                NULL::text as image_url
             FROM apartments a
             LEFT JOIN owners o ON a.owner_id = o.id
             LEFT JOIN (

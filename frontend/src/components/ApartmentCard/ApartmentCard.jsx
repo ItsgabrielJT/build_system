@@ -1,15 +1,3 @@
-/**
- * ApartmentCard Component
- * 
- * Tarjeta individual que muestra:
- * - Código de unidad
- * - Estado de ocupación (con color)
- * - Ubicación (Piso, Torre)
- * - Área (m²)
- * - Alícuota asignada (%)
- * - Foto/Imagen de referencia
- */
-
 import styles from './ApartmentCard.module.css';
 
 export default function ApartmentCard({ apartment, onClick }) {
@@ -23,6 +11,15 @@ export default function ApartmentCard({ apartment, onClick }) {
         return styles.maintenance;
       default:
         return '';
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'OCUPADO': return 'Ocupado';
+      case 'VACANTE': return 'Vacante';
+      case 'MANTENIMIENTO': return 'Mantenimiento';
+      default: return status;
     }
   };
 
@@ -50,7 +47,7 @@ export default function ApartmentCard({ apartment, onClick }) {
         <div className={styles.cardHeader}>
           <h3 className={styles.cardTitle}>{apartment.code}</h3>
           <span className={`${styles.statusBadge} ${getStatusClass(apartment.status)}`}>
-            {apartment.status}
+            {getStatusLabel(apartment.status)}
           </span>
         </div>
 
@@ -58,21 +55,11 @@ export default function ApartmentCard({ apartment, onClick }) {
         <div className={styles.cardMeta}>
           <div className={styles.metaItem}>
             <div className={styles.metaLabel}>Ubicación</div>
-            <div className={styles.metaValue}>{getLocationLabel()}</div>
+            <div className={styles.metaValue}>{getLocationLabel() || '—'}</div>
           </div>
           <div className={styles.metaItem}>
             <div className={styles.metaLabel}>Propietario</div>
             <div className={styles.metaValue}>{apartment.owner_name || '—'}</div>
-          </div>
-        </div>
-
-        {/* Pie de la tarjeta */}
-        <div className={styles.cardFooter}>
-          <div className={styles.area}>
-            Área: <span className={styles.areaValue}>{apartment.area_sqm}m²</span>
-          </div>
-          <div className={styles.aliquot}>
-            Alícuota: <span className={styles.aliquotValue}>{apartment.allocated_quota_percent?.toFixed(2)}%</span>
           </div>
         </div>
       </div>

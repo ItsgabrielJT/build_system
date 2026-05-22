@@ -1,9 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useApartmentFees } from '../../hooks/useApartmentFees';
 import { useApartments } from '../../hooks/useApartments';
-import PeriodSelector from '../../components/PeriodSelector/PeriodSelector';
-import FormModal from '../../components/FormModal/FormModal';
+import { useApartmentFeeStats } from '../../hooks/useApartmentFeeStats';
+import { usePeriodsSummary } from '../../hooks/usePeriodsSummary';
+import StatsCard from '../../components/StatsCard/StatsCard';
+import PeriodsHistoryTable from '../../components/PeriodsHistoryTable/PeriodsHistoryTable';
 import styles from './AdminFeesPage.module.css';
+
+const MONTH_ABBR = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+
+function getNextMonth(period) {
+  const [year, month] = period.split('-').map(Number);
+  if (month === 12) return `${year + 1}-01`;
+  return `${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
+function getMonthAbbr(period) {
+  const [, month] = period.split('-').map(Number);
+  return MONTH_ABBR[month - 1] || '';
+}
+
+function formatMoney(value) {
+  if (value == null) return '—';
+  return `$${Number(value).toLocaleString('es-CL')}`;
+}
 
 export default function AdminFeesPage() {
   const currentPeriod = new Date().toISOString().slice(0, 7);
@@ -13,19 +33,29 @@ export default function AdminFeesPage() {
   const [bulkResult, setBulkResult] = useState(null);
   const [actionError, setActionError] = useState(null);
 
-  const { fees, loading, error, fetchFees, bulkUpload } = useApartmentFees();
+  const { stats, fetchStats } = useApartmentFeeStats();
+  const { periods, total, page, loading: periodsLoading, fetchPeriods } = usePeriodsSummary();
+  const { fees, fetchFees, bulkUpload } = useApartmentFees();
   const { apartments, fetchApartments } = useApartments();
+
+  useEffect(() => {
+    fetchStats(currentPeriod);
+    fetchPeriods(1, 10);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchApartments();
   }, [fetchApartments]);
 
-  useEffect(() => {
-    if (period) fetchFees(period);
-  }, [period, fetchFees]);
-
   const feeMap = {};
   fees.forEach((f) => { feeMap[f.apartment_id] = f.amount; });
+
+  const handleEmitirProximoMes = () => {
+    const nextMonth = getNextMonth(currentPeriod);
+    setPeriod(nextMonth);
+    setIsBulkOpen(true);
+    setBulkValues({});
+  };
 
   const handleBulkChange = (aptId, value) => {
     setBulkValues((prev) => ({ ...prev, [aptId]: value }));
@@ -49,20 +79,32 @@ export default function AdminFeesPage() {
     }
   };
 
+  const handleExport = () => {
+    console.log('Exportar períodos');
+  };
+
+  const variacion = stats?.variacion_porcentaje;
+  const emitidoBadge = variacion != null
+    ? {
+        text: `${variacion >= 0 ? '↑' : '↓'} ${Math.abs(variacion).toFixed(1)}% vs mes anterior`,
+        color: variacion >= 0 ? 'green' : 'red',
+      }
+    : undefined;
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Cuotas por Período</h1>
-        <div className={styles.headerActions}>
-          <PeriodSelector period={period} onChange={setPeriod} label="Período:" />
-          <button className={styles.btnPrimary} onClick={() => { setIsBulkOpen(true); setBulkValues({ ...feeMap }); }}>
-            Carga masiva
-          </button>
+        <div>
+          <h1 className={styles.title}>Gestión de Cuotas</h1>
+          <p className={styles.subtitle}>Control centralizado de emisión y recaudación por períodos.</p>
         </div>
+        <button className={styles.btnPrimary} onClick={handleEmitirProximoMes}>
+          + Emitir Cuota Próximo Mes
+        </button>
       </div>
 
-      {(error || actionError) && (
-        <div className={styles.errorBanner}>{error || actionError}</div>
+      {actionError && (
+        <div className={styles.errorBanner}>{actionError}</div>
       )}
       {bulkResult && (
         <div className={styles.successBanner}>
@@ -70,37 +112,42 @@ export default function AdminFeesPage() {
         </div>
       )}
 
-      {loading ? (
-        <p className={styles.loading}>Cargando...</p>
-      ) : (
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>Departamento</th>
-                <th className={styles.th}>Piso</th>
-                <th className={styles.th}>Torre</th>
-                <th className={styles.th}>Cuota ({period})</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apartments.map((apt) => (
-                <tr key={apt.id} className={styles.tr}>
-                  <td className={styles.td}>{apt.code}</td>
-                  <td className={styles.td}>{apt.floor ?? '—'}</td>
-                  <td className={styles.td}>{apt.tower ?? '—'}</td>
-                  <td className={styles.td}>
-                    {feeMap[apt.id] != null
-                      ? `$${Number(feeMap[apt.id]).toLocaleString()}`
-                      : <span className={styles.noFee}>Sin cuota</span>
-                    }
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className={styles.statsGrid}>
+        <StatsCard
+          title={`TOTAL EMITIDO (${getMonthAbbr(currentPeriod)})`}
+          value={formatMoney(stats?.total_emitido)}
+          badge={emitidoBadge}
+          icon="arrow"
+        />
+        <StatsCard
+          title="TOTAL RECAUDADO"
+          value={formatMoney(stats?.total_recaudado)}
+          progressBar
+          progressValue={stats?.porcentaje_recaudado ?? 0}
+          progressLabel={`${stats?.porcentaje_recaudado ?? 0}% de la meta alcanzada`}
+          icon="bank"
+        />
+        <StatsCard
+          title="PENDIENTE DE COBRO"
+          value={formatMoney(stats?.total_pendiente)}
+          badge={{ text: `${stats?.unidades_deuda_vencida ?? 0} UNIDADES`, color: 'red' }}
+          badgeSubtext="con deuda vencida"
+          icon="clock"
+        />
+      </div>
+
+      <PeriodsHistoryTable
+        data={periods}
+        loading={periodsLoading}
+        total={total}
+        page={page}
+        pageSize={10}
+        onPageChange={(p) => fetchPeriods(p, 10)}
+        onFilterYear={(y) => fetchPeriods(1, 10, y)}
+        onExport={handleExport}
+        onViewDetail={(p) => console.log('ver', p)}
+        onViewChart={(p) => console.log('chart', p)}
+      />
 
       {isBulkOpen && (
         <div className={styles.overlay} onClick={() => setIsBulkOpen(false)}>

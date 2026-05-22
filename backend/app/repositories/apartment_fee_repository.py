@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 from uuid import UUID
 
 import asyncpg
@@ -78,3 +80,162 @@ class ApartmentFeeRepository:
                 amount,
             )
             return dict(row), True
+
+    async def get_stats(self, period: str) -> dict:
+        row = await self._conn.fetchrow(
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM apartment_fees WHERE period = $1",
+            period,
+        )
+        total_emitido = Decimal(str(row["total"]))
+
+        row = await self._conn.fetchrow(
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE period = $1 AND status = 'CONFIRMED'",
+            period,
+        )
+        total_recaudado = Decimal(str(row["total"]))
+
+        pendiente_cobro = total_emitido - total_recaudado
+
+        if total_emitido > 0:
+            porcentaje_recaudado = float(total_recaudado / total_emitido * 100)
+        else:
+            porcentaje_recaudado = 0.0
+
+        current_period = datetime.now().strftime("%Y-%m")
+        row = await self._conn.fetchrow(
+            """
+            SELECT COUNT(DISTINCT af.apartment_id) AS cnt
+            FROM apartment_fees af
+            LEFT JOIN (
+                SELECT apartment_id, period, COALESCE(SUM(amount), 0) AS pagado
+                FROM payments
+                WHERE status = 'CONFIRMED'
+                GROUP BY apartment_id, period
+            ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
+            WHERE af.period < $1
+              AND COALESCE(p.pagado, 0) < af.amount
+            """,
+            current_period,
+        )
+        unidades_deuda_vencida = int(row["cnt"])
+
+        year_val, month_val = map(int, period.split("-"))
+        if month_val == 1:
+            prev_year, prev_month = year_val - 1, 12
+        else:
+            prev_year, prev_month = year_val, month_val - 1
+        prev_period = f"{prev_year:04d}-{prev_month:02d}"
+
+        row = await self._conn.fetchrow(
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM apartment_fees WHERE period = $1",
+            prev_period,
+        )
+        prev_emitido = Decimal(str(row["total"]))
+
+        if prev_emitido > 0:
+            tendencia_emitido: Optional[float] = float(
+                (total_emitido - prev_emitido) / prev_emitido * 100
+            )
+        else:
+            tendencia_emitido = None
+
+        return {
+            "period": period,
+            "total_emitido": total_emitido,
+            "total_recaudado": total_recaudado,
+            "pendiente_cobro": pendiente_cobro,
+            "porcentaje_recaudado": porcentaje_recaudado,
+            "unidades_deuda_vencida": unidades_deuda_vencida,
+            "tendencia_emitido": tendencia_emitido,
+        }
+
+    async def get_periods_summary(
+        self, page: int, page_size: int, year: Optional[int]
+    ) -> dict:
+        current_period = datetime.now().strftime("%Y-%m")
+        offset = (page - 1) * page_size
+
+        count_row = await self._conn.fetchrow(
+            """
+            SELECT COUNT(DISTINCT period) AS cnt
+            FROM apartment_fees
+            WHERE ($1::int IS NULL OR SUBSTRING(period, 1, 4)::int = $1)
+            """,
+            year,
+        )
+        total = int(count_row["cnt"])
+
+        rows = await self._conn.fetch(
+            """
+            SELECT
+                af.period,
+                COALESCE(SUM(af.amount), 0) AS total_emitido,
+                COALESCE(SUM(p.amount), 0) AS total_recaudado
+            FROM apartment_fees af
+            LEFT JOIN payments p
+                ON p.apartment_id = af.apartment_id
+                AND p.period = af.period
+                AND p.status = 'CONFIRMED'
+            WHERE ($1::int IS NULL OR SUBSTRING(af.period, 1, 4)::int = $1)
+            GROUP BY af.period
+            ORDER BY af.period DESC
+            OFFSET $2 LIMIT $3
+            """,
+            year,
+            offset,
+            page_size,
+        )
+
+        _MONTHS = {
+            "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
+            "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
+            "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre",
+        }
+
+        data = []
+        for r in rows:
+            p = r["period"]
+            year_p, month_p = p.split("-")
+            label = f"{_MONTHS[month_p]} {year_p}"
+
+            month_int = int(month_p)
+            year_int = int(year_p)
+            if month_int == 12:
+                venc_year, venc_month = year_int + 1, 1
+            else:
+                venc_year, venc_month = year_int, month_int + 1
+            vencimiento = f"{venc_year:04d}-{venc_month:02d}-10"
+
+            total_emitido = Decimal(str(r["total_emitido"]))
+            total_recaudado = Decimal(str(r["total_recaudado"]))
+
+            if total_emitido > 0:
+                morosidad_pct = float(
+                    (total_emitido - total_recaudado) / total_emitido * 100
+                )
+            else:
+                morosidad_pct = 0.0
+
+            if p >= current_period:
+                estado = "ABIERTO"
+            elif morosidad_pct == 0:
+                estado = "CERRADO"
+            else:
+                estado = "VENCIDO"
+
+            data.append({
+                "period": p,
+                "label": label,
+                "vencimiento": vencimiento,
+                "estado": estado,
+                "total_emitido": total_emitido,
+                "total_recaudado": total_recaudado,
+                "morosidad_pct": morosidad_pct,
+            })
+
+        return {
+            "data": data,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }

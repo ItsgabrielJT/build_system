@@ -1,16 +1,7 @@
-/**
- * DepartmentsPage Component
- * 
- * Página de Directorio de Departamentos con:
- * - 4 tarjetas de estadísticas (ocupados, vacantes, mantenimiento, total)
- * - Filtros por estado
- * - Grid paginado de apartamentos (4 por página)
- * - Botón "Agregar Apartamento"
- */
-
 import { useApartmentDirectory } from '../../hooks/useApartmentDirectory';
 import DepartmentStats from '../../components/DepartmentStats/DepartmentStats';
 import ApartmentGrid from '../../components/ApartmentGrid/ApartmentGrid';
+import FormModal from '../../components/FormModal/FormModal';
 import styles from './DepartmentsPage.module.css';
 
 export default function DepartmentsPage() {
@@ -24,21 +15,32 @@ export default function DepartmentsPage() {
     loading,
     error,
     itemsPerPage,
+    showCreateModal,
+    buildings,
     onFilterChange,
     onPageChange,
+    onOpenCreateModal,
+    onCloseCreateModal,
+    onCreateApartment,
   } = useApartmentDirectory();
 
-  const handleAddApartment = () => {
-    // TODO: Navegar a formulario de agregar apartamento
-    alert('Función de agregar departamento será implementada próximamente');
-  };
+  const buildingOptions = buildings.map((b) => ({ value: b.id, label: b.name }));
+
+  const createApartmentFields = [
+    { name: 'code', label: 'Código de apartamento', required: true, placeholder: 'Ej: 101, A-202' },
+    { name: 'floor', label: 'Piso', type: 'number', placeholder: 'Ej: 1', min: 1 },
+    { name: 'tower', label: 'Torre', placeholder: 'Ej: A, Norte' },
+    ...(buildingOptions.length > 0
+      ? [{ name: 'building_id', label: 'Edificio', type: 'select', options: buildingOptions }]
+      : []),
+  ];
 
   return (
     <div className={styles.departmentsPage}>
       {/* Header */}
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Directorio de Departamentos</h1>
-        <button className={styles.addButton} onClick={handleAddApartment}>
+        <button className={styles.addButton} onClick={onOpenCreateModal}>
           + Agregar Apartamento
         </button>
       </div>
@@ -71,12 +73,20 @@ export default function DepartmentsPage() {
             onFilterChange={onFilterChange}
             onPageChange={onPageChange}
             onCardClick={(apartment) => {
-              // TODO: Navegar a detalles del apartamento
               console.log('Apartamento seleccionado:', apartment);
             }}
           />
         </>
       )}
+
+      {/* Modal crear apartamento */}
+      <FormModal
+        isOpen={showCreateModal}
+        title="Agregar Apartamento"
+        fields={createApartmentFields}
+        onSubmit={onCreateApartment}
+        onClose={onCloseCreateModal}
+      />
     </div>
   );
 }

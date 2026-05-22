@@ -12,6 +12,7 @@ export function useOwnerDirectory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const itemsPerPage = 10;
   const debounceDelay = 300;
@@ -80,6 +81,21 @@ export function useOwnerDirectory() {
     setSelectedOwner(null);
   }, []);
 
+  const handleCreateOwner = useCallback(
+    async (formData) => {
+      const payload = {
+        full_name: formData.full_name,
+        document_id: formData.document_id,
+        phone: formData.phone || undefined,
+        email: formData.email || undefined,
+      };
+      await ownerService.createOwner(payload, token);
+      setShowCreateModal(false);
+      fetchOwners(1, searchTerm);
+    },
+    [token, fetchOwners, searchTerm]
+  );
+
   useEffect(() => {
     if (!token) return;
     fetchOwners(1, searchTerm);
@@ -95,9 +111,13 @@ export function useOwnerDirectory() {
     error,
     itemsPerPage,
     selectedOwner,
+    showCreateModal,
     onSearchChange: handleSearchChange,
     onPageChange: handlePageChange,
     onSelectOwner: handleSelectOwner,
     onCloseModal: handleCloseModal,
+    onOpenCreateModal: () => setShowCreateModal(true),
+    onCloseCreateModal: () => setShowCreateModal(false),
+    onCreateOwner: handleCreateOwner,
   };
 }

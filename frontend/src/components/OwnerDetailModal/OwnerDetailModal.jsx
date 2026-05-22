@@ -124,42 +124,6 @@ export default function OwnerDetailModal({ owner, onClose }) {
             </div>
           </div>
 
-          {/* Últimas Transacciones (simuladas) */}
-          <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>
-              <span className={styles.sectionIcon}>💰</span>
-              Últimas Transacciones
-            </h3>
-            <div className={styles.transactionsList}>
-              <div className={styles.transactionItem}>
-                <div className={styles.transactionHeader}>
-                  <span className={styles.transactionDate}>Hace 15 días</span>
-                  <span className={`${styles.transactionAmount} ${styles.negative}`}>
-                    -$5,000.00
-                  </span>
-                </div>
-                <div className={styles.transactionDescription}>Pago de alícuota - Período Mayo 2026</div>
-              </div>
-              <div className={styles.transactionItem}>
-                <div className={styles.transactionHeader}>
-                  <span className={styles.transactionDate}>Hace 22 días</span>
-                  <span className={`${styles.transactionAmount} ${styles.negative}`}>
-                    -$2,150.00
-                  </span>
-                </div>
-                <div className={styles.transactionDescription}>Multa por pago tardío</div>
-              </div>
-              <div className={styles.transactionItem}>
-                <div className={styles.transactionHeader}>
-                  <span className={styles.transactionDate}>Hace 30 días</span>
-                  <span className={`${styles.transactionAmount} ${styles.negative}`}>
-                    -$5,000.00
-                  </span>
-                </div>
-                <div className={styles.transactionDescription}>Pago de alícuota - Período Abril 2026</div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

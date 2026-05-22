@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import * as apartmentService from '../services/apartmentService';
+import { getBuildings } from '../services/buildingService';
 
 export function useApartmentDirectory() {
   const { token } = useAuth();
@@ -12,6 +13,8 @@ export function useApartmentDirectory() {
   const [filter, setFilter] = useState('TODOS');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [buildings, setBuildings] = useState([]);
 
   const itemsPerPage = 4;
 
@@ -21,6 +24,15 @@ export function useApartmentDirectory() {
       setStatistics(data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al cargar estadísticas');
+    }
+  }, [token]);
+
+  const fetchBuildings = useCallback(async () => {
+    try {
+      const data = await getBuildings(token);
+      setBuildings(Array.isArray(data) ? data : []);
+    } catch {
+      setBuildings([]);
     }
   }, [token]);
 
@@ -70,11 +82,28 @@ export function useApartmentDirectory() {
     [filter, fetchApartments]
   );
 
+  const handleCreateApartment = useCallback(
+    async (formData) => {
+      const payload = {
+        code: formData.code,
+        floor: formData.floor ? parseInt(formData.floor, 10) : undefined,
+        tower: formData.tower || undefined,
+        building_id: formData.building_id || undefined,
+      };
+      await apartmentService.createApartment(payload, token);
+      setShowCreateModal(false);
+      fetchStatistics();
+      fetchApartments(1, filter);
+    },
+    [token, fetchStatistics, fetchApartments, filter]
+  );
+
   useEffect(() => {
     if (!token) return;
     fetchStatistics();
     fetchApartments(1, filter);
-  }, [token, fetchStatistics, fetchApartments, filter]);
+    fetchBuildings();
+  }, [token, fetchStatistics, fetchApartments, fetchBuildings, filter]);
 
   return {
     statistics,
@@ -86,7 +115,12 @@ export function useApartmentDirectory() {
     loading,
     error,
     itemsPerPage,
+    showCreateModal,
+    buildings,
     onFilterChange: handleFilterChange,
     onPageChange: handlePageChange,
+    onOpenCreateModal: () => setShowCreateModal(true),
+    onCloseCreateModal: () => setShowCreateModal(false),
+    onCreateApartment: handleCreateApartment,
   };
 }

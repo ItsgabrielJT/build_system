@@ -288,3 +288,42 @@
   color: var(--color-gray-400);
   padding: 0 4px;
 }
+
+.yearFilterWrapper {
+  position: relative;
+}
+
+.yearMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 10;
+  min-width: 140px;
+  overflow: hidden;
+}
+
+.yearMenuItem {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: var(--color-gray-700);
+  cursor: pointer;
+}
+
+.yearMenuItem:hover {
+  background: var(--color-gray-50);
+}
+
+.yearMenuItemActive {
+  background: var(--color-primary-light, #eff6ff);
+  color: var(--color-primary);
+  font-weight: 600;
+}

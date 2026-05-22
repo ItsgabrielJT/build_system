@@ -17,7 +17,7 @@ export function usePeriodsSummary() {
     setError(null);
     try {
       const data = await getPeriodsSummary(p, ps, y, token);
-      setPeriods(data.items ?? (Array.isArray(data) ? data : []));
+      setPeriods(data.data ?? (Array.isArray(data) ? data : []));
       setTotal(data.total ?? (Array.isArray(data) ? data.length : 0));
       setPage(p);
       setYear(y);

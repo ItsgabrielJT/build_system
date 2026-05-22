@@ -80,10 +80,33 @@ export default function AdminFeesPage() {
   };
 
   const handleExport = () => {
-    console.log('Exportar períodos');
+    if (!periods || periods.length === 0) return;
+
+    const headers = ['Período', 'Estado', 'Total Emitido', 'Total Recaudado', 'Morosidad (%)'];
+    const rows = periods.map((p) => [
+      p.label || p.period,
+      p.estado || '',
+      p.total_emitido != null ? Number(p.total_emitido).toFixed(2) : '0',
+      p.total_recaudado != null ? Number(p.total_recaudado).toFixed(2) : '0',
+      p.morosidad_pct != null ? Number(p.morosidad_pct).toFixed(1) : '0',
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `historial-cuotas-${new Date().toISOString().slice(0, 7)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const variacion = stats?.variacion_porcentaje;
+  const variacion = stats?.tendencia_emitido;
   const emitidoBadge = variacion != null
     ? {
         text: `${variacion >= 0 ? '↑' : '↓'} ${Math.abs(variacion).toFixed(1)}% vs mes anterior`,
@@ -129,7 +152,7 @@ export default function AdminFeesPage() {
         />
         <StatsCard
           title="PENDIENTE DE COBRO"
-          value={formatMoney(stats?.total_pendiente)}
+          value={formatMoney(stats?.pendiente_cobro)}
           badge={{ text: `${stats?.unidades_deuda_vencida ?? 0} UNIDADES`, color: 'red' }}
           badgeSubtext="con deuda vencida"
           icon="clock"

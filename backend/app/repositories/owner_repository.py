@@ -175,26 +175,24 @@ class OwnerRepository:
                     UNION ALL
                     
                     SELECT
-                        a.owner_id,
+                        oa.owner_id,
                         af.amount as fees_amount,
                         0.0 as payments_amount,
                         0.0 as fines_amount
                     FROM apartment_fees af
-                    JOIN apartments a ON af.apartment_id = a.id
-                    WHERE a.owner_id IS NOT NULL
-                        AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.apartment_id = af.apartment_id AND p.period = af.period)
+                    JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
+                    WHERE NOT EXISTS (SELECT 1 FROM payments p WHERE p.apartment_id = af.apartment_id AND p.period = af.period)
                     
                     UNION ALL
                     
                     SELECT
-                        a.owner_id,
+                        oa.owner_id,
                         0.0 as fees_amount,
                         0.0 as payments_amount,
                         f.amount as fines_amount
                     FROM fines f
-                    JOIN apartments a ON f.apartment_id = a.id
-                    WHERE a.owner_id IS NOT NULL
-                        AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.apartment_id = f.apartment_id AND p.period = f.period)
+                    JOIN owner_apartments oa ON f.apartment_id = oa.apartment_id
+                    WHERE NOT EXISTS (SELECT 1 FROM payments p WHERE p.apartment_id = f.apartment_id AND p.period = f.period)
                 ) balance_calc
                 GROUP BY owner_id
             ) balance ON o.id = balance.owner_id

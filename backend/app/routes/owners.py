@@ -49,9 +49,8 @@ async def get_owners_directory(
             """
             SELECT a.id, a.code, a.tower, a.floor
             FROM apartments a
-            WHERE a.owner_id = $1 OR a.id IN (
-                SELECT apartment_id FROM owner_apartments WHERE owner_id = $1
-            )
+            JOIN owner_apartments oa ON a.id = oa.apartment_id
+            WHERE oa.owner_id = $1
             ORDER BY a.code
             """,
             item["id"],

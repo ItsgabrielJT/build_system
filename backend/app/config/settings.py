@@ -17,6 +17,8 @@ class Settings(BaseSettings):
         "http://localhost:5173,http://localhost:5174,http://localhost:5175"
     )
     due_day: int = 5
+    budget_monthly: float = 15000.0
+    budget_maintenance: float = 3500.0
     
     # JWT Configuration
     jwt_secret: str = "your-secret-key-change-in-production"

@@ -13,6 +13,38 @@ from app.services.expense_service import ExpenseService
 router = APIRouter(tags=["expenses"])
 
 
+@router.get("/expenses/stats/monthly")
+async def get_monthly_stats(
+    month: Optional[str] = None,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = ExpenseService(ExpenseRepository(db))
+    if not month:
+        from datetime import date
+        month = date.today().strftime("%Y-%m")
+    return await service.get_monthly_stats(month)
+
+
+@router.get("/expenses/stats/chart")
+async def get_chart_stats(
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = ExpenseService(ExpenseRepository(db))
+    return await service.get_chart_data()
+
+
+@router.get("/expenses/recent")
+async def get_recent_expenses(
+    limit: int = 10,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = ExpenseService(ExpenseRepository(db))
+    return await service.get_recent(limit)
+
+
 @router.get("/expenses")
 async def list_expenses(
     month: Optional[str] = None,

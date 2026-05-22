@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin, require_authenticated
 from app.config.database import get_db
 from app.models.schemas import (
     ApartmentCreate,
@@ -16,6 +16,7 @@ from app.models.schemas import (
     OwnerAssign,
 )
 from app.repositories.apartment_repository import ApartmentRepository
+from app.repositories.owner_repository import OwnerRepository
 from app.services.apartment_service import ApartmentService
 
 router = APIRouter(tags=["apartments"])
@@ -83,11 +84,19 @@ async def get_apartments_directory(
 
 @router.get("/apartments")
 async def list_apartments(
-    _user: dict = Depends(require_admin),
+    user: dict = Depends(require_authenticated),
     db=Depends(get_db),
 ):
     service = ApartmentService(ApartmentRepository(db))
-    return await service.get_all()
+    if user.get("role") == "ADMIN":
+        return await service.get_all()
+    owner = await OwnerRepository(db).get_by_firebase_uid(str(user["user_id"]))
+    if not owner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Propietario no encontrado para este usuario",
+        )
+    return await service.get_by_owner_id(owner["id"])
 
 
 @router.post("/apartments", status_code=status.HTTP_201_CREATED)

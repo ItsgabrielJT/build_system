@@ -68,3 +68,6 @@ class ApartmentService:
             status=status,
             building_id=building_id,
         )
+
+    async def get_by_owner_id(self, owner_id: UUID) -> list[dict]:
+        return await self._repo.get_by_owner_id(owner_id)

@@ -269,3 +269,28 @@ class ApartmentRepository:
         )
 
         return [dict(r) for r in rows], total_count
+
+    async def get_by_owner_id(self, owner_id: UUID) -> list[dict]:
+        rows = await self._conn.fetch(
+            """
+            SELECT
+                a.id,
+                a.code,
+                a.floor,
+                a.tower,
+                a.status,
+                a.building_id,
+                oa.owner_id                                 AS owner_id,
+                a.created_at,
+                a.updated_at,
+                o.full_name                                 AS owner_name,
+                o.email                                     AS owner_email
+            FROM apartments a
+            JOIN owner_apartments oa ON a.id = oa.apartment_id
+            JOIN owners o ON oa.owner_id = o.id
+            WHERE oa.owner_id = $1
+            ORDER BY a.code
+            """,
+            owner_id,
+        )
+        return [dict(r) for r in rows]

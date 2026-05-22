@@ -10,7 +10,8 @@ function formatCurrency(value) {
 
 export default function OwnerAccountStatementPage() {
   const now = new Date();
-  const defaultStart = `${now.getFullYear()}-${String(now.getMonth() - 2).padStart(2, '0')}`;
+  const startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+  const defaultStart = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
   const defaultEnd = now.toISOString().slice(0, 7);
 
   const [range, setRange] = useState({ startPeriod: defaultStart, endPeriod: defaultEnd });

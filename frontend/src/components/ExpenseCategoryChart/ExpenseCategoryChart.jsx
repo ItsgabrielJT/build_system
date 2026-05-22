@@ -8,7 +8,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     return (
       <div className={styles.tooltip}>
         <p className={styles.tooltipLabel}>{label}</p>
-        <p className={styles.tooltipValue}>${Number(payload[0].value).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+        <p className={styles.tooltipValue}>Monto: ${Number(payload[0].value).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
       </div>
     );
   }
@@ -18,11 +18,11 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function ExpenseCategoryChart({ data, loading }) {
   return (
     <div className={styles.chartBox}>
-      <p className={styles.chartTitle}>Expenses by Category</p>
+      <p className={styles.chartTitle}>Gastos por Categoría</p>
       {loading ? (
-        <div className={styles.loading}>Loading...</div>
+        <div className={styles.loading}>Cargando datos...</div>
       ) : !data || data.length === 0 ? (
-        <div className={styles.empty}>No data available</div>
+        <div className={styles.empty}>Sin datos disponibles</div>
       ) : (
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>

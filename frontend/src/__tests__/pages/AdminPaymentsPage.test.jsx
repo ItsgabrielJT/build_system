@@ -104,7 +104,7 @@ describe('AdminPaymentsPage', () => {
 
     // Abrir formulario
     const addButton = screen.getByRole('button', { name: /Registrar pago/i });
-    await user.click(addButton);
+    fireEvent.click(addButton);
 
     // Obtener mes actual esperado
     const today = new Date();
@@ -155,7 +155,7 @@ describe('AdminPaymentsPage', () => {
 
     // Abrir formulario
     const addButton = screen.getByRole('button', { name: /Registrar pago/i });
-    await user.click(addButton);
+    fireEvent.click(addButton);
 
     // Seleccionar apartamento con propietario
     await waitFor(() => {
@@ -171,7 +171,5 @@ describe('AdminPaymentsPage', () => {
       const ownerSelect = screen.getByLabelText('Propietario');
       expect(ownerSelect).toHaveValue('owner1');
     });
-  });
-});
   });
 });

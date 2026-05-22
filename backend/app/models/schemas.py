@@ -244,6 +244,36 @@ class ExpenseListResponse(BaseModel):
     total: Decimal
 
 
+class ExpenseCategoryStats(BaseModel):
+    category: Optional[str]
+    amount: Decimal
+    budget: Optional[Decimal] = None
+    percentage_used: Optional[Decimal] = None
+
+
+class ExpenseMonthlyStatsResponse(BaseModel):
+    total_spend: Decimal
+    budget: Decimal
+    percentage_used: Decimal
+    month: str
+    categories: List[ExpenseCategoryStats]
+
+
+class ChartCategoryData(BaseModel):
+    category: Optional[str]
+    amount: Decimal
+
+
+class ChartMonthData(BaseModel):
+    month: str
+    total: Decimal
+
+
+class ExpenseChartDataResponse(BaseModel):
+    by_category: List[ChartCategoryData]
+    monthly_trend: List[ChartMonthData]
+
+
 # ─── DELINQUENCY ──────────────────────────────────────────────────────────────
 
 class PeriodBalance(BaseModel):

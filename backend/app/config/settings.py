@@ -35,3 +35,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+from decimal import Decimal  # noqa: E402
+
+BUDGET_MONTHLY = Decimal(str(settings.budget_monthly))
+BUDGET_MAINTENANCE = Decimal(str(settings.budget_maintenance))

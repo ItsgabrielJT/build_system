@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import styles from './FormModal.module.css';
 
 export default function FormModal({ isOpen, title, fields = [], initialData, defaultValues, onSubmit, onClose }) {
+  const formId = useId();
   const [formData, setFormData] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -61,49 +62,55 @@ export default function FormModal({ isOpen, title, fields = [], initialData, def
           </button>
         </div>
         <form className={styles.form} onSubmit={handleSubmit}>
-          {fields.map((field) => (
-            <div key={field.name} className={styles.field}>
-              <label className={styles.label}>
-                {field.label}
-                {field.required && <span className={styles.required}> *</span>}
-              </label>
-              {field.type === 'select' ? (
-                <select
-                  className={styles.input}
-                  value={formData[field.name] ?? ''}
-                  onChange={(e) => handleSelectChange(field, e.target.value)}
-                  required={field.required}
-                >
-                  <option value="">Seleccionar...</option>
-                  {(field.options || []).map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              ) : field.type === 'textarea' ? (
-                <textarea
-                  className={styles.textarea}
-                  value={formData[field.name] ?? ''}
-                  onChange={(e) => handleChange(field.name, e.target.value)}
-                  required={field.required}
-                  rows={3}
-                  placeholder={field.placeholder}
-                />
-              ) : (
-                <input
-                  className={styles.input}
-                  type={field.type || 'text'}
-                  value={formData[field.name] ?? ''}
-                  onChange={(e) => handleChange(field.name, e.target.value)}
-                  required={field.required}
-                  placeholder={field.placeholder}
-                  min={field.min}
-                  step={field.step}
-                />
-              )}
-            </div>
-          ))}
+          {fields.map((field) => {
+            const fieldId = `${formId}-${field.name}`;
+            return (
+              <div key={field.name} className={styles.field}>
+                <label className={styles.label} htmlFor={fieldId}>
+                  {field.label}
+                  {field.required && <span className={styles.required} aria-hidden="true"> *</span>}
+                </label>
+                {field.type === 'select' ? (
+                  <select
+                    id={fieldId}
+                    className={styles.input}
+                    value={formData[field.name] ?? ''}
+                    onChange={(e) => handleSelectChange(field, e.target.value)}
+                    required={field.required}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {(field.options || []).map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : field.type === 'textarea' ? (
+                  <textarea
+                    id={fieldId}
+                    className={styles.textarea}
+                    value={formData[field.name] ?? ''}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
+                    required={field.required}
+                    rows={3}
+                    placeholder={field.placeholder}
+                  />
+                ) : (
+                  <input
+                    id={fieldId}
+                    className={styles.input}
+                    type={field.type || 'text'}
+                    value={formData[field.name] ?? ''}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
+                    required={field.required}
+                    placeholder={field.placeholder}
+                    min={field.min}
+                    step={field.step}
+                  />
+                )}
+              </div>
+            );
+          })}
           {error && <p className={styles.error}>{error}</p>}
           <div className={styles.actions}>
             <button type="button" className={styles.btnCancel} onClick={onClose}>

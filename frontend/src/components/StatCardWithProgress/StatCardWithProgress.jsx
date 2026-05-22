@@ -8,17 +8,17 @@ export default function StatCardWithProgress({ label, amount, budget, percentage
 
   return (
     <div className={`${styles.card} ${isOver ? styles.cardOver : ''}`}>
-      {isOver && <span className={styles.overBadge}>Over Budget</span>}
+      {isOver && <span className={styles.overBadge}>Presupuesto Excedido</span>}
       <p className={styles.label}>{label}</p>
-      <p className={styles.amount}>${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-      <p className={styles.budget}>/ ${Number(budget).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} Budget</p>
+      <p className={styles.amount}>${Number(amount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+      <p className={styles.budget}>/ ${Number(budget).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} presupuesto</p>
       <div className={styles.barTrack}>
         <div className={`${styles.barFill} ${barClass}`} style={{ width: `${barPct}%` }} />
       </div>
       {isOver ? (
-        <p className={styles.overText}>+${Number(overBudgetAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} over</p>
+        <p className={styles.overText}>+${Number(overBudgetAmount).toLocaleString('es-MX', { minimumFractionDigits: 2 })} sobre el presupuesto</p>
       ) : (
-        <p className={styles.pctText}>{Number(percentage).toFixed(0)}% utilized</p>
+        <p className={styles.pctText}>{Number(percentage).toFixed(0)}% utilizado</p>
       )}
     </div>
   );

@@ -12,20 +12,20 @@ const CATEGORY_ICONS = {
 function formatDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  return d.toLocaleDateString('es', { day: '2-digit', month: 'short' }).toUpperCase();
 }
 
 export default function RecentExpensesList({ expenses, loading }) {
   return (
     <div className={styles.panel}>
       <div className={styles.panelHeader}>
-        <span className={styles.panelTitle}>Recent Expenses</span>
-        <span className={styles.viewAll}>View All</span>
+        <span className={styles.panelTitle}>Gastos Recientes</span>
+        <span className={styles.viewAll}>Ver Todo</span>
       </div>
       {loading ? (
-        <p className={styles.empty}>Loading...</p>
+        <p className={styles.empty}>Cargando...</p>
       ) : !expenses || expenses.length === 0 ? (
-        <p className={styles.empty}>No recent expenses</p>
+        <p className={styles.empty}>No hay gastos recientes</p>
       ) : (
         <ul className={styles.list}>
           {expenses.map((exp) => (
@@ -38,7 +38,7 @@ export default function RecentExpensesList({ expenses, loading }) {
                 <p className={styles.provider}>{exp.provider || '—'}</p>
               </div>
               <div className={styles.right}>
-                <p className={styles.amount}>-${Number(exp.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className={styles.amount}>-${Number(exp.amount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 <p className={styles.date}>{formatDate(exp.date)}</p>
               </div>
             </li>

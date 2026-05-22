@@ -76,6 +76,58 @@ class ExpenseRepository:
             "by_category": [{"category": r["category"] or "Sin categoría", "amount": float(r["total"])} for r in category_rows],
         }
 
+    async def get_stats_by_month(self, month: str) -> list[dict]:
+        """Agrupa gastos por categoría para un mes. Retorna [{category, total}]"""
+        rows = await self._conn.fetch(
+            """
+            SELECT category, SUM(amount) as total
+            FROM expenses
+            WHERE TO_CHAR(date, 'YYYY-MM') = $1
+            GROUP BY category
+            """,
+            month,
+        )
+        return [{"category": r["category"], "total": r["total"]} for r in rows]
+
+    async def get_monthly_total(self, month: str):
+        """Suma total de gastos para un mes."""
+        from decimal import Decimal
+        row = await self._conn.fetchval(
+            """
+            SELECT COALESCE(SUM(amount), 0)
+            FROM expenses
+            WHERE TO_CHAR(date, 'YYYY-MM') = $1
+            """,
+            month,
+        )
+        return Decimal(str(row)) if row is not None else Decimal("0")
+
+    async def get_last_6_months_totals(self) -> list[dict]:
+        """Totales agrupados por mes de los últimos 6 meses. Retorna [{month, total}]"""
+        rows = await self._conn.fetch(
+            """
+            SELECT TO_CHAR(date, 'YYYY-MM') as month, SUM(amount) as total
+            FROM expenses
+            WHERE date >= CURRENT_DATE - INTERVAL '6 months'
+            GROUP BY TO_CHAR(date, 'YYYY-MM')
+            ORDER BY month ASC
+            """,
+        )
+        return [{"month": r["month"], "total": r["total"]} for r in rows]
+
+    async def get_category_totals_last_6_months(self) -> list[dict]:
+        """Suma de gastos por categoría de los últimos 6 meses."""
+        rows = await self._conn.fetch(
+            """
+            SELECT category, SUM(amount) as total
+            FROM expenses
+            WHERE date >= CURRENT_DATE - INTERVAL '6 months'
+            GROUP BY category
+            ORDER BY total DESC
+            """,
+        )
+        return [{"category": r["category"], "total": r["total"]} for r in rows]
+
     async def get_recent(self, limit: int = 10) -> list[dict]:
         rows = await self._conn.fetch(
             """

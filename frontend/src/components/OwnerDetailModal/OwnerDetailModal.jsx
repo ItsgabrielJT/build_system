@@ -1,39 +1,90 @@
-/**
- * OwnerDetailModal Component
- * 
- * Modal con detalles completos del propietario:
- * - Información personal
- * - Listado de unidades asignadas
- * - Historial de ingresos/egresos (últimas 3 transacciones)
- * - Balance consolidado
- */
-
+import { useState, useEffect } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import FormModal from '../FormModal/FormModal';
+import * as ownerService from '../../services/ownerService';
+import * as apartmentService from '../../services/apartmentService';
 import styles from './OwnerDetailModal.module.css';
 
-export default function OwnerDetailModal({ owner, onClose }) {
+const EDIT_FIELDS = [
+  { name: 'full_name', label: 'Nombre completo', required: true },
+  { name: 'document_id', label: 'Documento de identidad', required: true },
+  { name: 'email', label: 'Correo electrónico', type: 'email' },
+  { name: 'phone', label: 'Teléfono', type: 'tel' },
+];
+
+export default function OwnerDetailModal({ owner, onClose, onRefresh }) {
+  const { token } = useAuth();
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [availableApartments, setAvailableApartments] = useState([]);
+  const [selectedAptId, setSelectedAptId] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [removing, setRemoving] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!token || !owner) return;
+    apartmentService.getApartments(token).then((data) => {
+      const all = Array.isArray(data) ? data : data.items || [];
+      const assignedIds = new Set((owner.units || []).map((u) => u.id));
+      setAvailableApartments(all.filter((a) => !assignedIds.has(a.id)));
+    }).catch(() => setAvailableApartments([]));
+  }, [token, owner]);
   if (!owner) return null;
 
   const formatDate = (dateString) => {
     if (!dateString) return '—';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+    return new Date(dateString).toLocaleDateString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
     });
   };
 
   const formatBalance = (balance) => {
     const formatted = Math.abs(balance).toLocaleString('es-ES', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
     });
     return `$${formatted}`;
   };
 
-  const handleDownloadPDF = () => {
-    // TODO: Implementar descarga de PDF
-    alert('Función de descarga de PDF será implementada próximamente');
+  const handleSaveEdit = async (formData) => {
+    const payload = {
+      full_name: formData.full_name,
+      document_id: formData.document_id,
+      phone: formData.phone || undefined,
+      email: formData.email || undefined,
+    };
+    await ownerService.updateOwner(owner.id, payload, token);
+    setShowEditModal(false);
+    onRefresh?.();
+    onClose();
+  };
+
+  const handleAssignApartment = async () => {
+    if (!selectedAptId) return;
+    setAssigning(true);
+    setError(null);
+    try {
+      await apartmentService.assignOwner(selectedAptId, owner.id, {}, token);
+      onRefresh?.();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al asignar apartamento');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleRemoveUnit = async (unitId) => {
+    setRemoving(unitId);
+    setError(null);
+    try {
+      await apartmentService.removeOwner(unitId, owner.id, token);
+      onRefresh?.();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al quitar apartamento');
+    } finally {
+      setRemoving(null);
+    }
   };
 
   return (
@@ -42,9 +93,12 @@ export default function OwnerDetailModal({ owner, onClose }) {
         {/* Header */}
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Detalles del Propietario</h2>
-          <button className={styles.closeButton} onClick={onClose}>
-            ✕
-          </button>
+          <div className={styles.headerActions}>
+            <button className={styles.editButton} onClick={() => setShowEditModal(true)} type="button">
+              ✏️ Editar
+            </button>
+            <button className={styles.closeButton} onClick={onClose}>✕</button>
+          </div>
         </div>
 
         {/* Body */}
@@ -80,62 +134,93 @@ export default function OwnerDetailModal({ owner, onClose }) {
           </div>
 
           {/* Unidades Asignadas */}
-          {owner.units && owner.units.length > 0 && (
-            <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>
-                <span className={styles.sectionIcon}>🏠</span>
-                Unidades Asignadas ({owner.units.length})
-              </h3>
-              <div className={styles.unitsList}>
-                {owner.units.map((unit) => (
-                  <div key={unit.id} className={styles.unitItem}>
-                    <div>
-                      <div className={styles.unitCode}>{unit.code}</div>
-                      <div className={styles.unitLocation}>
-                        {unit.tower && `Torre ${unit.tower}`}
-                        {unit.tower && unit.floor && ' - '}
-                        {unit.floor && `Piso ${unit.floor}`}
-                      </div>
+          <div className={styles.section}>
+            <h3 className={styles.sectionTitle}>
+              <span className={styles.sectionIcon}>🏠</span>
+              Unidades Asignadas ({(owner.units || []).length})
+            </h3>
+            <div className={styles.unitsList}>
+              {(owner.units || []).map((unit) => (
+                <div key={unit.id} className={styles.unitItem}>
+                  <div>
+                    <div className={styles.unitCode}>{unit.code}</div>
+                    <div className={styles.unitLocation}>
+                      {unit.tower && `Torre ${unit.tower}`}
+                      {unit.tower && unit.floor && ' - '}
+                      {unit.floor && `Piso ${unit.floor}`}
                     </div>
                   </div>
-                ))}
-              </div>
+                  <button
+                    className={styles.removeUnitBtn}
+                    onClick={() => handleRemoveUnit(unit.id)}
+                    disabled={removing === unit.id}
+                    type="button"
+                    title="Quitar asignación"
+                  >
+                    {removing === unit.id ? '...' : '✕'}
+                  </button>
+                </div>
+              ))}
             </div>
-          )}
+
+            {availableApartments.length > 0 && (
+              <div className={styles.assignRow}>
+                <select
+                  className={styles.assignSelect}
+                  value={selectedAptId}
+                  onChange={(e) => setSelectedAptId(e.target.value)}
+                >
+                  <option value="">Asignar apartamento...</option>
+                  {availableApartments.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.code}{a.tower ? ` – Torre ${a.tower}` : ''}{a.floor ? ` Piso ${a.floor}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className={styles.assignBtn}
+                  onClick={handleAssignApartment}
+                  disabled={!selectedAptId || assigning}
+                  type="button"
+                >
+                  {assigning ? 'Asignando...' : 'Asignar'}
+                </button>
+              </div>
+            )}
+            {error && <p className={styles.errorMsg}>{error}</p>}
+          </div>
 
           {/* Balance Consolidado */}
           <div className={styles.section}>
             <div
-              className={`${styles.balanceSection} ${
-                owner.balance < 0 ? styles.balanceValue : ''
-              }`}
+              className={styles.balanceSection}
               style={{
                 backgroundColor: owner.balance < 0 ? '#fef5f5' : '#f0f9f6',
                 borderLeftColor: owner.balance < 0 ? '#e74c3c' : '#27ae60',
               }}
             >
               <div className={styles.balanceLabel}>Balance Consolidado</div>
-              <div
-                className={`${styles.balanceValue} ${owner.balance < 0 ? styles.negative : ''}`}
-              >
-                {owner.balance < 0 ? '-' : ''}
-                {formatBalance(owner.balance)}
+              <div className={`${styles.balanceValue} ${owner.balance < 0 ? styles.negative : ''}`}>
+                {owner.balance < 0 ? '-' : ''}{formatBalance(owner.balance)}
               </div>
             </div>
           </div>
-
         </div>
 
         {/* Footer */}
         <div className={styles.modalFooter}>
-          <button className={styles.buttonSecondary} onClick={onClose}>
-            Cerrar
-          </button>
-          <button className={styles.buttonPrimary} onClick={handleDownloadPDF}>
-            📄 Descargar Estado de Cuenta
-          </button>
+          <button className={styles.buttonSecondary} onClick={onClose}>Cerrar</button>
         </div>
       </div>
+
+      <FormModal
+        isOpen={showEditModal}
+        title="Editar Propietario"
+        fields={EDIT_FIELDS}
+        initialData={owner}
+        onSubmit={handleSaveEdit}
+        onClose={() => setShowEditModal(false)}
+      />
     </div>
   );
 }

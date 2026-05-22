@@ -119,5 +119,6 @@ export function useOwnerDirectory() {
     onOpenCreateModal: () => setShowCreateModal(true),
     onCloseCreateModal: () => setShowCreateModal(false),
     onCreateOwner: handleCreateOwner,
+    onRefresh: () => fetchOwners(1, searchTerm),
   };
 }

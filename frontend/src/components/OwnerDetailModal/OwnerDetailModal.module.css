@@ -266,3 +266,93 @@
     padding: 16px;
   }
 }
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editButton {
+  padding: 6px 14px;
+  background: white;
+  color: #3498db;
+  border: 1px solid #3498db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.editButton:hover {
+  background: #3498db;
+  color: white;
+}
+
+.removeUnitBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+  flex-shrink: 0;
+}
+
+.removeUnitBtn:hover:not(:disabled) {
+  color: #e74c3c;
+  background: #fef5f5;
+}
+
+.removeUnitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assignRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.assignSelect {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  background: white;
+}
+
+.assignBtn {
+  padding: 8px 16px;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.assignBtn:hover:not(:disabled) {
+  background: #229954;
+}
+
+.assignBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.errorMsg {
+  color: #e74c3c;
+  font-size: 13px;
+  margin-top: 8px;
+  margin-bottom: 0;
+}

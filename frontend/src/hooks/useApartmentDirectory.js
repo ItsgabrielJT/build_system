@@ -122,5 +122,6 @@ export function useApartmentDirectory() {
     onOpenCreateModal: () => setShowCreateModal(true),
     onCloseCreateModal: () => setShowCreateModal(false),
     onCreateApartment: handleCreateApartment,
+    onRefresh: () => { fetchStatistics(); fetchApartments(1, filter); },
   };
 }

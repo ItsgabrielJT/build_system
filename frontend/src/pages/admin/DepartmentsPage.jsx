@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useApartmentDirectory } from '../../hooks/useApartmentDirectory';
 import DepartmentStats from '../../components/DepartmentStats/DepartmentStats';
 import ApartmentGrid from '../../components/ApartmentGrid/ApartmentGrid';
 import FormModal from '../../components/FormModal/FormModal';
+import ApartmentDetailModal from '../../components/ApartmentDetailModal/ApartmentDetailModal';
 import styles from './DepartmentsPage.module.css';
 
 export default function DepartmentsPage() {
@@ -22,7 +24,10 @@ export default function DepartmentsPage() {
     onOpenCreateModal,
     onCloseCreateModal,
     onCreateApartment,
+    onRefresh,
   } = useApartmentDirectory();
+
+  const [selectedApartment, setSelectedApartment] = useState(null);
 
   const buildingOptions = buildings.map((b) => ({ value: b.id, label: b.name }));
 
@@ -37,7 +42,6 @@ export default function DepartmentsPage() {
 
   return (
     <div className={styles.departmentsPage}>
-      {/* Header */}
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Directorio de Departamentos</h1>
         <button className={styles.addButton} onClick={onOpenCreateModal}>
@@ -45,24 +49,16 @@ export default function DepartmentsPage() {
         </button>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className={styles.errorContainer}>
-          {error}
-        </div>
-      )}
+      {error && <div className={styles.errorContainer}>{error}</div>}
 
-      {/* Loading */}
       {loading && statistics === null ? (
         <div className={styles.loadingContainer}>
           <p>Cargando departamentos...</p>
         </div>
       ) : (
         <>
-          {/* Estadísticas */}
           <DepartmentStats statistics={statistics} loading={loading} />
 
-          {/* Grid de apartamentos */}
           <ApartmentGrid
             apartments={apartments}
             currentPage={currentPage}
@@ -72,14 +68,19 @@ export default function DepartmentsPage() {
             loading={loading}
             onFilterChange={onFilterChange}
             onPageChange={onPageChange}
-            onCardClick={(apartment) => {
-              console.log('Apartamento seleccionado:', apartment);
-            }}
+            onCardClick={(apartment) => setSelectedApartment(apartment)}
           />
         </>
       )}
 
-      {/* Modal crear apartamento */}
+      {selectedApartment && (
+        <ApartmentDetailModal
+          apartment={selectedApartment}
+          onClose={() => setSelectedApartment(null)}
+          onRefresh={onRefresh}
+        />
+      )}
+
       <FormModal
         isOpen={showCreateModal}
         title="Agregar Apartamento"

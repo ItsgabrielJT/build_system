@@ -29,11 +29,11 @@ export default function OwnersDirectoryPage() {
     onOpenCreateModal,
     onCloseCreateModal,
     onCreateOwner,
+    onRefresh,
   } = useOwnerDirectory();
 
   return (
     <div className={styles.ownersDirectoryPage}>
-      {/* Header */}
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Directorio de Propietarios</h1>
@@ -44,14 +44,8 @@ export default function OwnersDirectoryPage() {
         </button>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className={styles.errorContainer}>
-          {error}
-        </div>
-      )}
+      {error && <div className={styles.errorContainer}>{error}</div>}
 
-      {/* Tabla */}
       <OwnerDirectoryTable
         owners={owners}
         currentPage={currentPage}
@@ -64,12 +58,14 @@ export default function OwnersDirectoryPage() {
         onSelectOwner={onSelectOwner}
       />
 
-      {/* Modal de detalles */}
       {selectedOwner && (
-        <OwnerDetailModal owner={selectedOwner} onClose={onCloseModal} />
+        <OwnerDetailModal
+          owner={selectedOwner}
+          onClose={onCloseModal}
+          onRefresh={onRefresh}
+        />
       )}
 
-      {/* Modal crear propietario */}
       <FormModal
         isOpen={showCreateModal}
         title="Agregar Propietario"

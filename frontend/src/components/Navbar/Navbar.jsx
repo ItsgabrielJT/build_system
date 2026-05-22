@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import styles from './Navbar.module.css';
 
@@ -37,29 +38,36 @@ const ROLE_LABELS = {
 
 export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSidebar }) {
   const { user, role } = useAuth();
+  const { pathname } = useLocation();
+  const isReports = pathname === '/admin/reports';
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
   const displayName = user?.email?.split('@')[0] || 'Usuario';
   const roleLabel = ROLE_LABELS[role] || role || '';
 
   return (
-    <header className={styles.navbar}>
+    <header className={`${styles.navbar} ${isReports ? styles.reportsNavbar : ''}`}>
       <div className={styles.left}>
         <button className={styles.menuBtn} onClick={onToggleSidebar} aria-label="Toggle sidebar">
           <IconMenu />
         </button>
-        <span className={styles.buildingName}>{buildingName}</span>
-        <span className={styles.separator} />
         <div className={styles.searchWrap}>
           <span className={styles.searchIcon}><IconSearch /></span>
           <input
             className={styles.searchInput}
             type="text"
-            placeholder="Buscar por nombre o unidad..."
+            placeholder={isReports ? 'Buscar reportes...' : 'Buscar por nombre o unidad...'}
           />
         </div>
+        {!isReports && (
+          <>
+            <span className={styles.separator} />
+            <span className={styles.buildingName}>{buildingName}</span>
+          </>
+        )}
       </div>
 
       <div className={styles.right}>
+        {isReports && <span className={styles.reportBuildingName}>{buildingName}</span>}
         <button className={styles.iconBtn} aria-label="Notificaciones">
           <IconBell />
         </button>
@@ -77,4 +85,3 @@ export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSi
     </header>
   );
 }
-

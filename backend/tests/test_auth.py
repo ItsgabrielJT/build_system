@@ -193,6 +193,42 @@ class TestAuthLogout:
         assert response.status_code == 200
 
 
+class TestPasswordRecovery:
+    """Tests para endpoint POST /api/v1/auth/forgot-password."""
+
+    @pytest.mark.asyncio
+    async def test_forgot_password_registered_email(self, async_client: AsyncClient):
+        response = await async_client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": ADMIN_EMAIL},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+        assert "Si el correo está registrado" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_forgot_password_unknown_email_is_generic(self, async_client: AsyncClient):
+        response = await async_client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "noexiste@edificios.com"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "Si el correo está registrado" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_forgot_password_invalid_email(self, async_client: AsyncClient):
+        response = await async_client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "correo-invalido"},
+        )
+
+        assert response.status_code == 422
+
+
 class TestJWTTokenValidation:
     """Tests para validación de JWT tokens — RN-03."""
 

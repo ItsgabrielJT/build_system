@@ -335,6 +335,21 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class PasswordRecoveryRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        if not v or "@" not in v:
+            raise ValueError("Email válido requerido")
+        return v.lower()
+
+
+class PasswordRecoveryResponse(BaseModel):
+    message: str
+
+
 class TokenPayload(BaseModel):
     sub: str  # user_id
     email: str

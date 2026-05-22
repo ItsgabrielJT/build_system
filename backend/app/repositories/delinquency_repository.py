@@ -50,6 +50,16 @@ class DelinquencyRepository:
         rows = await self._conn.fetch(query)
         return [dict(r) for r in rows]
 
+    async def get_active_apartment_count(self) -> int:
+        row = await self._conn.fetchrow(
+            """
+            SELECT COUNT(*) AS total
+            FROM apartments
+            WHERE status IN ('ACTIVA', 'ACTIVO')
+            """
+        )
+        return int(row["total"] or 0) if row else 0
+
     async def get_period_data_for_owner(self, owner_id: UUID) -> list[dict]:
         query = (
             _PERIOD_DATA_QUERY

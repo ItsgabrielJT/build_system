@@ -24,7 +24,7 @@ export default function ProtectedRoute({ children, requiredRole }) {
   }
 
   if (requiredRole && role !== requiredRole) {
-    if (role === 'ADMIN') return <Navigate to="/admin/owners" replace />;
+    if (role === 'ADMIN') return <Navigate to="/admin/reports" replace />;
     if (role === 'PROPIETARIO') return <Navigate to="/owner/apartments" replace />;
     return <Navigate to="/login" replace />;
   }

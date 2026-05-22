@@ -14,8 +14,67 @@ class FineService:
     def __init__(self, repo: FineRepository) -> None:
         self._repo = repo
 
-    async def get_all(self, period=None, status_filter=None) -> list[dict]:
-        return await self._repo.get_all(period=period, status=status_filter)
+    async def get_all(
+        self,
+        period=None,
+        status_filter=None,
+        owner_id=None,
+        reason=None,
+        search=None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ):
+        if page is None or page_size is None:
+            return await self._repo.get_all(
+                period=period,
+                status=status_filter,
+                owner_id=owner_id,
+                reason=reason,
+                search=search,
+            )
+
+        safe_page = max(page, 1)
+        safe_page_size = min(max(page_size, 1), 100)
+        offset = (safe_page - 1) * safe_page_size
+        items = await self._repo.get_all(
+            period=period,
+            status=status_filter,
+            owner_id=owner_id,
+            reason=reason,
+            search=search,
+            limit=safe_page_size,
+            offset=offset,
+        )
+        total = await self._repo.count_all(
+            period=period,
+            status=status_filter,
+            owner_id=owner_id,
+            reason=reason,
+            search=search,
+        )
+        return {
+            "items": items,
+            "total": total,
+            "page": safe_page,
+            "page_size": safe_page_size,
+            "total_pages": (total + safe_page_size - 1) // safe_page_size,
+        }
+
+    async def get_stats(
+        self,
+        period=None,
+        status_filter=None,
+        owner_id=None,
+        reason=None,
+        search=None,
+    ) -> dict:
+        return await self._repo.get_stats(
+            period=period,
+            status=status_filter,
+            owner_id=owner_id,
+            reason=reason,
+            search=search,
+        )
 
     async def create(self, data: FineCreate, created_by: str) -> dict:
         return await self._repo.create(data, created_by)

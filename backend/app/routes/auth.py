@@ -10,7 +10,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.config.database import get_db
 from app.auth.dependencies import get_current_user
-from app.models.schemas import LoginRequest, LoginResponse, UserResponse
+from app.models.schemas import (
+    LoginRequest,
+    LoginResponse,
+    PasswordRecoveryRequest,
+    PasswordRecoveryResponse,
+    UserResponse,
+)
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import AuthService
@@ -65,6 +71,44 @@ async def login(
             "created_at": user["created_at"],
             "updated_at": user["updated_at"],
         },
+    }
+
+
+@router.post(
+    "/forgot-password",
+    response_model=PasswordRecoveryResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def forgot_password(
+    request: PasswordRecoveryRequest,
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    """
+    Solicita recuperación de contraseña.
+
+    La respuesta es siempre genérica para no revelar si un correo existe.
+    Mientras no haya proveedor SMTP configurado, se registra la solicitud para
+    que soporte/admin pueda continuar el proceso interno.
+    """
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_email(request.email)
+
+    if user:
+        logger.info(
+            "Solicitud de recuperación de contraseña para usuario %s",
+            request.email,
+        )
+    else:
+        logger.info(
+            "Solicitud de recuperación de contraseña para correo no registrado %s",
+            request.email,
+        )
+
+    return {
+        "message": (
+            "Si el correo está registrado, recibirás instrucciones para recuperar "
+            "tu contraseña."
+        )
     }
 
 

@@ -11,6 +11,7 @@ export function useApartmentDirectory() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState('TODOS');
+  const [buildingFilter, setBuildingFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -18,14 +19,14 @@ export function useApartmentDirectory() {
 
   const itemsPerPage = 4;
 
-  const fetchStatistics = useCallback(async () => {
+  const fetchStatistics = useCallback(async (buildingId = buildingFilter) => {
     try {
-      const data = await apartmentService.getApartmentStatistics(token);
+      const data = await apartmentService.getApartmentStatistics(token, buildingId ? { building_id: buildingId } : {});
       setStatistics(data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al cargar estadísticas');
     }
-  }, [token]);
+  }, [token, buildingFilter]);
 
   const fetchBuildings = useCallback(async () => {
     try {
@@ -50,6 +51,10 @@ export function useApartmentDirectory() {
           params.status = filterStatus;
         }
 
+        if (buildingFilter) {
+          params.building_id = buildingFilter;
+        }
+
         const data = await apartmentService.getApartmentDirectory(token, params);
         setApartments(data.items || data);
         setCurrentPage(data.page || page);
@@ -62,7 +67,7 @@ export function useApartmentDirectory() {
         setLoading(false);
       }
     },
-    [token]
+    [token, buildingFilter]
   );
 
   const handleFilterChange = useCallback(
@@ -82,6 +87,14 @@ export function useApartmentDirectory() {
     [filter, fetchApartments]
   );
 
+  const handleBuildingFilterChange = useCallback(
+    (buildingId) => {
+      setBuildingFilter(buildingId);
+      setCurrentPage(1);
+    },
+    []
+  );
+
   const handleCreateApartment = useCallback(
     async (formData) => {
       const payload = {
@@ -92,18 +105,18 @@ export function useApartmentDirectory() {
       };
       await apartmentService.createApartment(payload, token);
       setShowCreateModal(false);
-      fetchStatistics();
+      fetchStatistics(buildingFilter);
       fetchApartments(1, filter);
     },
-    [token, fetchStatistics, fetchApartments, filter]
+    [token, fetchStatistics, fetchApartments, filter, buildingFilter]
   );
 
   useEffect(() => {
     if (!token) return;
-    fetchStatistics();
+    fetchStatistics(buildingFilter);
     fetchApartments(1, filter);
     fetchBuildings();
-  }, [token, fetchStatistics, fetchApartments, fetchBuildings, filter]);
+  }, [token, fetchStatistics, fetchApartments, fetchBuildings, filter, buildingFilter]);
 
   return {
     statistics,
@@ -112,16 +125,18 @@ export function useApartmentDirectory() {
     totalPages,
     total,
     filter,
+    buildingFilter,
     loading,
     error,
     itemsPerPage,
     showCreateModal,
     buildings,
     onFilterChange: handleFilterChange,
+    onBuildingFilterChange: handleBuildingFilterChange,
     onPageChange: handlePageChange,
     onOpenCreateModal: () => setShowCreateModal(true),
     onCloseCreateModal: () => setShowCreateModal(false),
     onCreateApartment: handleCreateApartment,
-    onRefresh: () => { fetchStatistics(); fetchApartments(1, filter); },
+    onRefresh: () => { fetchStatistics(buildingFilter); fetchApartments(1, filter); },
   };
 }

@@ -90,14 +90,13 @@ const IconStatement = () => (
 );
 
 const ADMIN_LINKS = [
+  { to: '/admin/reports', label: 'Reportes', Icon: IconReports },
   { to: '/admin/owners', label: 'Propietarios', Icon: IconOwners },
   { to: '/admin/apartments', label: 'Departamentos', Icon: IconApartments },
   { to: '/admin/fees', label: 'Cuotas', Icon: IconFees },
   { to: '/admin/payments', label: 'Pagos', Icon: IconPayments },
   { to: '/admin/fines', label: 'Multas', Icon: IconFines },
   { to: '/admin/expenses', label: 'Gastos', Icon: IconExpenses },
-  { to: '/admin/delinquency', label: 'Morosidad', Icon: IconDelinquency },
-  { to: '/admin/reports', label: 'Reportes', Icon: IconReports },
 ];
 
 const OWNER_LINKS = [
@@ -128,7 +127,7 @@ export default function Sidebar({ role, collapsed }) {
           <div className={styles.brandText}>
             <span className={styles.brandName}>EdiGestion</span>
             <span className={styles.brandSub}>
-              {role === 'ADMIN' ? 'Admin Portal' : 'Owner Portal'}
+              {role === 'ADMIN' ? 'Portal Admin' : 'Portal Propietario'}
             </span>
           </div>
         )}
@@ -173,4 +172,3 @@ export default function Sidebar({ role, collapsed }) {
     </aside>
   );
 }
-

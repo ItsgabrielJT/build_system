@@ -23,6 +23,15 @@ async def list_delinquent_owners(
     return await service.list_owners(status_filter=status)
 
 
+@router.get("/delinquency/stats")
+async def get_delinquency_stats(
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = DelinquencyService(DelinquencyRepository(db))
+    return await service.get_stats()
+
+
 @router.get("/delinquency/detail/{owner_id}")
 async def get_owner_delinquency_detail(
     owner_id: UUID,

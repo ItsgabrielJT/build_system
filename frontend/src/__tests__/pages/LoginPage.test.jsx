@@ -10,6 +10,7 @@ import { MOCK_TOKEN, MOCK_USER, MOCK_OWNER_USER } from '../setupTests';
 // Mock authService
 vi.mock('../../services/authService', () => ({
   login: vi.fn(),
+  requestPasswordRecovery: vi.fn(),
   logout: vi.fn(),
   getCurrentUser: vi.fn(),
   changePassword: vi.fn(),
@@ -51,9 +52,9 @@ describe('LoginPage', () => {
       renderLoginPage();
 
       // Assert
-      expect(screen.getByPlaceholderText('usuario@ejemplo.com')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('admin@edificio.com')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /ingresar/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /sign in to portal/i })).toBeInTheDocument();
     });
 
     it('deve renderizar títulos da página', () => {
@@ -61,9 +62,9 @@ describe('LoginPage', () => {
       renderLoginPage();
 
       // Assert
-      expect(screen.getByText(/Gestión de Edificios/i)).toBeInTheDocument();
+      expect(screen.getByText(/EdiGestion/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/Ingresa tus credenciales para acceder/i)
+        screen.getByText(/Enterprise Management Portal/i)
       ).toBeInTheDocument();
     });
 
@@ -72,7 +73,7 @@ describe('LoginPage', () => {
       renderLoginPage();
 
       // Assert
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       expect(emailInput).toHaveAttribute('type', 'email');
       expect(emailInput).toHaveAttribute('required');
     });
@@ -93,8 +94,8 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const submitButton = screen.getByRole('button', { name: /ingresar/i });
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const submitButton = screen.getByRole('button', { name: /sign in to portal/i });
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       const passwordInput = screen.getByPlaceholderText('••••••••');
 
       // Enviar form vazio
@@ -109,7 +110,7 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
 
       // Enviar email inválido
       await userEvent.type(emailInput, 'invalid-email');
@@ -135,9 +136,9 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       const passwordInput = screen.getByPlaceholderText('••••••••');
-      const submitButton = screen.getByRole('button', { name: /ingresar/i });
+      const submitButton = screen.getByRole('button', { name: /sign in to portal/i });
 
       await userEvent.type(emailInput, 'admin@edificios.com');
       await userEvent.type(passwordInput, 'Admin123!');
@@ -162,9 +163,9 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       const passwordInput = screen.getByPlaceholderText('••••••••');
-      const submitButton = screen.getByRole('button', { name: /ingresar/i });
+      const submitButton = screen.getByRole('button', { name: /sign in to portal/i });
 
       await userEvent.type(emailInput, 'admin@edificios.com');
       await userEvent.type(passwordInput, 'Admin123!');
@@ -184,16 +185,16 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       const passwordInput = screen.getByPlaceholderText('••••••••');
-      const submitButton = screen.getByRole('button', { name: /ingresar/i });
+      const submitButton = screen.getByRole('button', { name: /sign in to portal/i });
 
       await userEvent.type(emailInput, 'admin@edificios.com');
       await userEvent.type(passwordInput, 'Admin123!');
       await userEvent.click(submitButton);
 
       // Assert
-      expect(submitButton).toHaveTextContent('Ingresando...');
+      expect(submitButton).toHaveTextContent('Signing in...');
     });
   });
 
@@ -207,9 +208,9 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       const passwordInput = screen.getByPlaceholderText('••••••••');
-      const submitButton = screen.getByRole('button', { name: /ingresar/i });
+      const submitButton = screen.getByRole('button', { name: /sign in to portal/i });
 
       await userEvent.type(emailInput, 'admin@edificios.com');
       await userEvent.type(passwordInput, 'WrongPassword');
@@ -235,9 +236,9 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       const passwordInput = screen.getByPlaceholderText('••••••••');
-      const submitButton = screen.getByRole('button', { name: /ingresar/i });
+      const submitButton = screen.getByRole('button', { name: /sign in to portal/i });
 
       // Primeira tentativa - erro
       await userEvent.type(emailInput, 'admin@edificios.com');
@@ -272,9 +273,9 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       const passwordInput = screen.getByPlaceholderText('••••••••');
-      const submitButton = screen.getByRole('button', { name: /ingresar/i });
+      const submitButton = screen.getByRole('button', { name: /sign in to portal/i });
 
       await userEvent.type(emailInput, 'admin@edificios.com');
       await userEvent.type(passwordInput, 'Admin123!');
@@ -294,7 +295,7 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       await userEvent.type(emailInput, 'test@example.com');
 
       // Assert
@@ -323,9 +324,9 @@ describe('LoginPage', () => {
       // Act
       renderLoginPage();
 
-      const emailInput = screen.getByPlaceholderText('usuario@ejemplo.com');
+      const emailInput = screen.getByPlaceholderText('admin@edificio.com');
       const passwordInput = screen.getByPlaceholderText('••••••••');
-      const submitButton = screen.getByRole('button', { name: /ingresar/i });
+      const submitButton = screen.getByRole('button', { name: /sign in to portal/i });
 
       await userEvent.type(emailInput, 'admin@edificios.com');
       await userEvent.type(passwordInput, 'Admin123!');
@@ -339,7 +340,7 @@ describe('LoginPage', () => {
   });
 
   describe('redirect for already authenticated users', () => {
-    it('deve redirecionar para /admin/owners se user é ADMIN', async () => {
+    it('deve redirecionar para /admin/reports se user é ADMIN', async () => {
       // Arrange
       localStorage.setItem('auth_token', MOCK_TOKEN);
       vi.mocked(authService.getToken).mockReturnValue(MOCK_TOKEN);
@@ -350,7 +351,7 @@ describe('LoginPage', () => {
 
       // Assert
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/admin/owners', {
+        expect(mockNavigate).toHaveBeenCalledWith('/admin/reports', {
           replace: true,
         });
       });
@@ -373,6 +374,25 @@ describe('LoginPage', () => {
           replace: true,
         });
       });
+    });
+  });
+
+  describe('password recovery', () => {
+    it('debe enviar solicitud de recuperación con el correo ingresado', async () => {
+      vi.mocked(authService.requestPasswordRecovery).mockResolvedValueOnce({
+        message: 'Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña.',
+      });
+
+      renderLoginPage();
+
+      await userEvent.click(screen.getByRole('button', { name: /reset password/i }));
+      await userEvent.type(screen.getByPlaceholderText('admin@edificio.com'), 'admin@edificios.com');
+      await userEvent.click(screen.getByRole('button', { name: /send recovery request/i }));
+
+      await waitFor(() => {
+        expect(authService.requestPasswordRecovery).toHaveBeenCalledWith('admin@edificios.com');
+      });
+      expect(screen.getByText(/recibirás instrucciones/i)).toBeInTheDocument();
     });
   });
 });

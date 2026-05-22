@@ -2,6 +2,15 @@ import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const TOKEN_KEY = 'auth_token';
+let memoryToken = null;
+
+function getStorage() {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Login con credenciales locales
@@ -16,12 +25,30 @@ export async function login(email, password) {
       password,
     });
     const { access_token } = response.data;
-    // Guardar token en localStorage
-    localStorage.setItem(TOKEN_KEY, access_token);
+    setToken(access_token);
     return response.data;
   } catch (error) {
     if (error.response?.status === 401) {
       throw new Error('Credenciales inválidas');
+    }
+    throw error;
+  }
+}
+
+/**
+ * Solicitar recuperación de contraseña
+ * @param {string} email
+ * @returns {Promise<{message: string}>}
+ */
+export async function requestPasswordRecovery(email) {
+  try {
+    const response = await axios.post(`${API_BASE}/api/v1/auth/forgot-password`, {
+      email,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.data?.detail) {
+      throw new Error('Ingresa un correo válido para continuar');
     }
     throw error;
   }
@@ -46,8 +73,7 @@ export async function logout() {
   } catch (error) {
     console.error('Error en logout:', error);
   } finally {
-    // Limpiar token incluso si hay error
-    localStorage.removeItem(TOKEN_KEY);
+    clearToken();
   }
 }
 
@@ -69,7 +95,7 @@ export async function getCurrentUser() {
     return response.data;
   } catch (error) {
     if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
+      clearToken();
     }
     throw error;
   }
@@ -102,7 +128,7 @@ export async function changePassword(currentPassword, newPassword) {
     return response.data;
   } catch (error) {
     if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
+      clearToken();
     }
     throw error;
   }
@@ -113,7 +139,8 @@ export async function changePassword(currentPassword, newPassword) {
  * @returns {string|null}
  */
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  const storage = getStorage();
+  return storage ? storage.getItem(TOKEN_KEY) : memoryToken;
 }
 
 /**
@@ -121,10 +148,13 @@ export function getToken() {
  * @param {string} token
  */
 export function setToken(token) {
+  const storage = getStorage();
   if (token) {
-    localStorage.setItem(TOKEN_KEY, token);
+    memoryToken = token;
+    storage?.setItem(TOKEN_KEY, token);
   } else {
-    localStorage.removeItem(TOKEN_KEY);
+    memoryToken = null;
+    storage?.removeItem(TOKEN_KEY);
   }
 }
 
@@ -132,5 +162,6 @@ export function setToken(token) {
  * Limpiar token del localStorage
  */
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  memoryToken = null;
+  getStorage()?.removeItem(TOKEN_KEY);
 }

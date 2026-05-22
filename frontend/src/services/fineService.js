@@ -17,6 +17,14 @@ export async function getFines(token, params = {}) {
   return res.data;
 }
 
+export async function getFineStats(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/fines/stats`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+  });
+  return res.data;
+}
+
 export async function annulFine(fineId, token) {
   const res = await axios.put(
     `${API_BASE}/api/v1/fines/${fineId}`,

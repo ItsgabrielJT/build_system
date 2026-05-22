@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
 import {
   login,
+  requestPasswordRecovery,
   logout,
   getCurrentUser,
   changePassword,
@@ -82,6 +83,37 @@ describe('authService', () => {
 
       // Act & Assert
       await expect(login('', 'Admin123!')).rejects.toThrow();
+    });
+  });
+
+  describe('requestPasswordRecovery()', () => {
+    it('debe solicitar recuperación de contraseña', async () => {
+      const response = {
+        message: 'Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña.',
+      };
+      vi.mocked(axios.post).mockResolvedValueOnce({ data: response });
+
+      const result = await requestPasswordRecovery('admin@edificios.com');
+
+      expect(result).toEqual(response);
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/auth/forgot-password'),
+        { email: 'admin@edificios.com' }
+      );
+      expect(localStorage.getItem('auth_token')).toBeNull();
+    });
+
+    it('debe mostrar error amigable con email inválido', async () => {
+      vi.mocked(axios.post).mockRejectedValueOnce({
+        response: {
+          status: 422,
+          data: { detail: [{ msg: 'Email válido requerido' }] },
+        },
+      });
+
+      await expect(requestPasswordRecovery('correo-invalido')).rejects.toThrow(
+        'Ingresa un correo válido para continuar'
+      );
     });
   });
 

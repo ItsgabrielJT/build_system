@@ -1,107 +1,135 @@
 .ownerTable {
   width: 100%;
-  margin-bottom: 24px;
 }
 
 .searchContainer {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .searchInput {
-  width: 100%;
-  max-width: 400px;
-  padding: 10px 14px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  width: min(420px, 100%);
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--border-radius-sm);
+  background: #fff;
+  color: var(--color-gray-800);
   font-size: 14px;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .searchInput:focus {
   outline: none;
-  border-color: #27ae60;
-  box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--border-radius);
 }
 
 .table {
   width: 100%;
+  min-width: 860px;
   border-collapse: collapse;
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #fff;
 }
 
 .table th {
-  background: #f5f5f5;
-  padding: 14px;
+  padding: 14px 16px;
+  background: var(--color-gray-50);
+  color: var(--color-gray-600);
   text-align: left;
-  font-weight: 600;
-  font-size: 13px;
-  color: #444;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 2px solid #ddd;
+  border-bottom: 1px solid var(--color-gray-200);
 }
 
 .table td {
-  padding: 14px;
-  border-bottom: 1px solid #eee;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-gray-100);
+  color: var(--color-gray-700);
   font-size: 14px;
-  color: #555;
-}
-
-.table tbody tr {
-  transition: background 0.2s;
+  vertical-align: top;
 }
 
 .table tbody tr:hover {
-  background: #f9f9f9;
+  background: var(--color-gray-50);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .ownerName {
-  font-weight: 600;
-  color: #2c3e50;
+  color: var(--color-gray-900);
+  font-weight: 800;
+}
+
+.ownerDoc {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-gray-500);
+  font-size: 12px;
 }
 
 .units {
-  max-width: 200px;
-  font-size: 13px;
-  color: #666;
+  display: flex;
+  max-width: 220px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .unitBadge {
-  display: inline-block;
-  background: #ecf0f1;
-  color: #2c3e50;
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
   padding: 3px 8px;
-  border-radius: 3px;
-  margin-right: 4px;
-  margin-bottom: 2px;
+  border-radius: 999px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 800;
 }
 
+.muted,
 .ingressDate {
-  color: #666;
-  font-size: 13px;
+  color: var(--color-gray-500);
+}
+
+.contactStack {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .balance {
-  font-weight: 600;
-  font-size: 15px;
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
-.balance.positive {
-  color: #27ae60;
+.positive {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
 }
 
-.balance.negative {
-  color: #e74c3c;
+.negative {
+  background: var(--color-success-light);
+  color: var(--color-success);
 }
 
-.balance.zero {
-  color: #7f8c8d;
+.zero {
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
 }
 
 .actions {
@@ -109,93 +137,85 @@
   gap: 8px;
 }
 
+.actionButton,
+.paginationButton {
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--border-radius-sm);
+  background: #fff;
+  color: var(--color-gray-700);
+  font-weight: 700;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
 .actionButton {
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s;
-  color: #27ae60;
-  border-color: #27ae60;
+  padding: 7px 12px;
+  color: var(--color-primary);
+  border-color: #bfdbfe;
+  background: var(--color-primary-light);
 }
 
 .actionButton:hover {
-  background: #27ae60;
-  color: white;
+  color: #fff;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
 }
 
 .emptyState {
-  text-align: center;
-  padding: 40px;
-  color: #999;
-  background: white;
-  border-radius: 8px;
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-gray-300);
+  border-radius: var(--border-radius);
+  color: var(--color-gray-500);
+  background: var(--color-gray-50);
+  font-weight: 700;
 }
 
 .pagination {
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  margin-top: 24px;
+  margin-top: 18px;
 }
 
 .paginationButton {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
+  min-height: 34px;
+  padding: 7px 11px;
 }
 
 .paginationButton:hover:not(:disabled) {
-  border-color: #27ae60;
-  color: #27ae60;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .paginationButton:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
+  color: var(--color-gray-400);
+  background: var(--color-gray-100);
 }
 
 .paginationButton.active {
-  background: #27ae60;
-  color: white;
-  border-color: #27ae60;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .pageInfo {
-  font-size: 14px;
-  color: #666;
-  margin: 0 8px;
+  margin-left: 6px;
+  color: var(--color-gray-500);
+  font-size: 13px;
+  font-weight: 700;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .table {
-    font-size: 12px;
-  }
-
-  .table th,
-  .table td {
-    padding: 10px;
-  }
-
-  .units {
-    max-width: 120px;
-  }
-
-  .actionButton {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-
+@media (max-width: 720px) {
   .searchInput {
-    max-width: 100%;
+    width: 100%;
+  }
+
+  .pagination {
+    justify-content: flex-start;
   }
 }

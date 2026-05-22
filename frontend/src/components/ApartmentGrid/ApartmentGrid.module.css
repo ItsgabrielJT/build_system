@@ -1,113 +1,114 @@
 .apartmentGrid {
-  margin-top: 32px;
+  margin-top: 18px;
 }
 
 .filterBar {
   display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
   flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
 .filterButton {
-  padding: 10px 16px;
-  border: 2px solid #ddd;
-  background: white;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-  color: #666;
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-gray-700);
+  font-size: 13px;
+  font-weight: 800;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .filterButton:hover {
-  border-color: #999;
-  color: #333;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .filterButton.active {
-  border-color: #27ae60;
-  background: #27ae60;
-  color: white;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .gridContainer {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
-  margin-bottom: 24px;
 }
 
 .emptyState {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 40px 20px;
-  color: #999;
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-gray-300);
+  border-radius: var(--border-radius);
+  background: var(--color-gray-50);
+  color: var(--color-gray-500);
+  font-weight: 700;
 }
 
 .emptyState p {
-  font-size: 16px;
   margin: 0;
 }
 
 .pagination {
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .paginationButton {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--border-radius-sm);
+  background: #fff;
+  color: var(--color-gray-700);
   font-size: 14px;
-  transition: all 0.2s;
+  font-weight: 700;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .paginationButton:hover:not(:disabled) {
-  border-color: #27ae60;
-  color: #27ae60;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .paginationButton:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
+  color: var(--color-gray-400);
+  background: var(--color-gray-100);
 }
 
 .paginationButton.active {
-  background: #27ae60;
-  color: white;
-  border-color: #27ae60;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .pageInfo {
-  font-size: 14px;
-  color: #666;
-  margin: 0 8px;
+  margin-left: 6px;
+  color: var(--color-gray-500);
+  font-size: 13px;
+  font-weight: 700;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .gridContainer {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
+@media (max-width: 720px) {
   .gridContainer {
     grid-template-columns: 1fr;
   }
 
-  .filterBar {
-    flex-direction: column;
+  .filterButton {
+    flex: 1 1 calc(50% - 8px);
   }
 
-  .filterButton {
-    width: 100%;
+  .pagination {
+    justify-content: flex-start;
   }
 }

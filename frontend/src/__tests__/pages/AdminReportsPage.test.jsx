@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminReportsPage from '../../pages/admin/AdminReportsPage';
 import * as reportService from '../../services/reportService';
 
@@ -13,83 +13,137 @@ vi.mock('../../hooks/useAuth', () => ({
   }),
 }));
 
+const statsFixture = {
+  summary: {
+    total_revenue: 124500,
+    total_expenses: 98200,
+    net_income: 26300,
+    revenue_change_percent: 4.2,
+    expense_change_percent: -1.5,
+    net_income_change_percent: 9,
+  },
+  expense_categories: [
+    { category: 'Maintenance', amount: 45000 },
+    { category: 'Utilities', amount: 28000 },
+  ],
+  monthly: [
+    { period: '2026-04', expected: 15000, collected: 14200 },
+    { period: '2026-05', expected: 16000, collected: 16700 },
+  ],
+  arrears: [
+    {
+      unit: '10A',
+      owner: 'Carlos Mendoza',
+      email: 'carlos@example.com',
+      amount_due: 1250,
+      days_overdue: '90+ Days',
+      risk_level: 'High',
+    },
+  ],
+  risk_summary: { high: 1, medium: 0, low: 0 },
+  system: { active_owners: 1, active_apartments: 1, delinquent_units: 1 },
+};
+
 describe('AdminReportsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    reportService.getDashboardStats.mockResolvedValue(statsFixture);
+    reportService.downloadDelinquencyReport.mockResolvedValue(new Blob(['delinquency']));
+    reportService.downloadIncomeReport.mockResolvedValue(new Blob(['income']));
+    reportService.downloadBalanceReport.mockResolvedValue(new Blob(['balance']));
+    global.URL.createObjectURL = vi.fn(() => 'blob:test');
+    global.URL.revokeObjectURL = vi.fn();
   });
 
-  it('renderiza tarjetas de reportes con botones de descarga', () => {
+  it('renderiza el dashboard financiero con estadísticas reales del servicio', async () => {
     render(<AdminReportsPage />);
 
-    // Verificar que existen los reportes
-    expect(screen.getByText('Reporte de Morosidad')).toBeInTheDocument();
-    expect(screen.getByText('Reporte de Ingresos')).toBeInTheDocument();
-    expect(screen.getByText('Balance Ingresos / Egresos')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Reportes financieros/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Exportar PDF/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Exportar Excel/i })).toBeInTheDocument();
 
-    // Verificar que existen botones de descarga
-    const pdfButtons = screen.getAllByRole('button', { name: /Descargar PDF/i });
-    const excelButtons = screen.getAllByRole('button', { name: /Descargar Excel/i });
+    await waitFor(() => {
+      expect(screen.getByText('$124.500')).toBeInTheDocument();
+      expect(screen.getByText('$98.200')).toBeInTheDocument();
+      expect(screen.getByText('$26.300')).toBeInTheDocument();
+    });
 
-    expect(pdfButtons.length).toBeGreaterThan(0);
-    expect(excelButtons.length).toBeGreaterThan(0);
+    expect(screen.getByText('Categorías de gastos')).toBeInTheDocument();
+    expect(screen.getByText('Emitido vs cobrado')).toBeInTheDocument();
+    expect(screen.getByText('Mora y saldos pendientes')).toBeInTheDocument();
+    expect(screen.getByText('Carlos Mendoza')).toBeInTheDocument();
   });
 
-  it('descarga reporte de morosidad en PDF', async () => {
+  it('consulta estadísticas con rango de fechas', async () => {
+    render(<AdminReportsPage />);
+
+    await waitFor(() => {
+      expect(reportService.getDashboardStats).toHaveBeenCalledWith(
+        'test-token',
+        expect.objectContaining({
+          start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          end_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        })
+      );
+    });
+  });
+
+  it('exporta todos los reportes en PDF', async () => {
     const user = userEvent.setup();
-    const blob = new Blob(['test'], { type: 'application/pdf' });
-    reportService.downloadDelinquencyReport.mockResolvedValue(blob);
-
     render(<AdminReportsPage />);
 
-    // Buscar el botón de descargar PDF para morosidad
-    const pdfButtons = screen.getAllByRole('button', { name: /Descargar PDF/i });
-    await user.click(pdfButtons[0]); // Primer PDF es morosidad
+    await user.click(screen.getByRole('button', { name: /Exportar PDF/i }));
 
     await waitFor(() => {
       expect(reportService.downloadDelinquencyReport).toHaveBeenCalledWith(
         'test-token',
-        expect.objectContaining({
-          format: 'pdf',
-        })
+        { format: 'pdf' }
       );
-    });
-  });
-
-  it('descarga reporte de ingresos en Excel', async () => {
-    const user = userEvent.setup();
-    const blob = new Blob(['test'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    reportService.downloadIncomeReport.mockResolvedValue(blob);
-
-    render(<AdminReportsPage />);
-
-    // Buscar el botón de descargar Excel
-    const excelButtons = screen.getAllByRole('button', { name: /Descargar Excel/i });
-    await user.click(excelButtons[0]); // Primer Excel es ingresos
-
-    await waitFor(() => {
       expect(reportService.downloadIncomeReport).toHaveBeenCalledWith(
         'test-token',
-        expect.objectContaining({
-          format: 'excel',
-        })
+        expect.objectContaining({ format: 'pdf' })
+      );
+      expect(reportService.downloadBalanceReport).toHaveBeenCalledWith(
+        'test-token',
+        expect.objectContaining({ format: 'pdf' })
       );
     });
   });
 
-  it('muestra estado de carga mientras descarga', async () => {
+  it('exporta todos los reportes en Excel', async () => {
     const user = userEvent.setup();
-    const blob = new Blob(['test'], { type: 'application/pdf' });
-    reportService.downloadDelinquencyReport.mockImplementationOnce(
-      () => new Promise(resolve => setTimeout(() => resolve(blob), 100))
-    );
-
     render(<AdminReportsPage />);
 
-    const pdfButtons = screen.getAllByRole('button', { name: /Descargar PDF/i });
-    await user.click(pdfButtons[0]);
+    await user.click(screen.getByRole('button', { name: /Exportar Excel/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Generando...')).toBeInTheDocument();
+      expect(reportService.downloadDelinquencyReport).toHaveBeenCalledWith(
+        'test-token',
+        { format: 'excel' }
+      );
+      expect(reportService.downloadIncomeReport).toHaveBeenCalledWith(
+        'test-token',
+        expect.objectContaining({ format: 'excel' })
+      );
+      expect(reportService.downloadBalanceReport).toHaveBeenCalledWith(
+        'test-token',
+        expect.objectContaining({ format: 'excel' })
+      );
+    });
+  });
+
+  it('actualiza estadísticas al cambiar fecha de inicio', async () => {
+    const user = userEvent.setup();
+    render(<AdminReportsPage />);
+
+    await user.clear(screen.getByLabelText('Inicio'));
+    await user.type(screen.getByLabelText('Inicio'), '2026-03-01');
+
+    await waitFor(() => {
+      expect(reportService.getDashboardStats).toHaveBeenLastCalledWith(
+        'test-token',
+        expect.objectContaining({ start_date: '2026-03-01' })
+      );
     });
   });
 
@@ -99,41 +153,10 @@ describe('AdminReportsPage', () => {
 
     render(<AdminReportsPage />);
 
-    const pdfButtons = screen.getAllByRole('button', { name: /Descargar PDF/i });
-    await user.click(pdfButtons[0]);
+    await user.click(screen.getByRole('button', { name: /Exportar PDF/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Error al generar el reporte/i)).toBeInTheDocument();
-    });
-  });
-
-  it('permite cambiar el período para filtrar reportes', async () => {
-    const user = userEvent.setup();
-    const blob = new Blob(['test'], { type: 'application/pdf' });
-    reportService.downloadDelinquencyReport.mockResolvedValue(blob);
-
-    render(<AdminReportsPage />);
-
-    // Buscar el selector de período
-    const monthInput = screen.getByDisplayValue(
-      new Date().toISOString().slice(0, 7)
-    );
-
-    // Cambiar el período
-    await user.clear(monthInput);
-    await user.type(monthInput, '2026-03');
-
-    // Descargar un reporte
-    const pdfButtons = screen.getAllByRole('button', { name: /Descargar PDF/i });
-    await user.click(pdfButtons[0]);
-
-    await waitFor(() => {
-      expect(reportService.downloadDelinquencyReport).toHaveBeenCalledWith(
-        'test-token',
-        expect.objectContaining({
-          period: '2026-03',
-        })
-      );
+      expect(screen.getByText(/Error al generar la descarga/i)).toBeInTheDocument();
     });
   });
 });

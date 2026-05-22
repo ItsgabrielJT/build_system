@@ -8,7 +8,6 @@ import AdminFeesPage from './pages/admin/AdminFeesPage';
 import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
 import AdminFinesPage from './pages/admin/AdminFinesPage';
 import AdminExpensesPage from './pages/admin/AdminExpensesPage';
-import AdminDelinquencyPage from './pages/admin/AdminDelinquencyPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import OwnersDirectoryPage from './pages/admin/OwnersDirectoryPage';
@@ -18,7 +17,7 @@ import OwnerAccountStatementPage from './pages/owner/OwnerAccountStatementPage';
 function RootRedirect() {
   const { role, loading } = useAuth();
   if (loading) return null;
-  if (role === 'ADMIN') return <Navigate to="/admin/owners" replace />;
+  if (role === 'ADMIN') return <Navigate to="/admin/reports" replace />;
   if (role === 'PROPIETARIO') return <Navigate to="/owner/apartments" replace />;
   return <Navigate to="/login" replace />;
 }
@@ -36,15 +35,14 @@ export default function App() {
           </ProtectedRoute>
         }
       >
+        <Route path="reports" element={<AdminReportsPage />} />
         <Route path="owners" element={<OwnersDirectoryPage />} />
         <Route path="apartments" element={<DepartmentsPage />} />
         <Route path="fees" element={<AdminFeesPage />} />
         <Route path="payments" element={<AdminPaymentsPage />} />
         <Route path="fines" element={<AdminFinesPage />} />
         <Route path="expenses" element={<AdminExpensesPage />} />
-        <Route path="delinquency" element={<AdminDelinquencyPage />} />
-        <Route path="reports" element={<AdminReportsPage />} />
-        <Route index element={<Navigate to="owners" replace />} />
+        <Route index element={<Navigate to="reports" replace />} />
       </Route>
 
       <Route

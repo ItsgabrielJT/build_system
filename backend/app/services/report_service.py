@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -30,6 +30,222 @@ class ReportService:
         self._payment_repo = payment_repo
         self._expense_repo = expense_repo
 
+    async def _payments(
+        self,
+        period: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> list[dict]:
+        if not start_date and not end_date:
+            return await self._payment_repo.get_all(period=period, status="REGISTRADO")
+
+        conditions = ["p.status = 'REGISTRADO'"]
+        params: list = []
+        idx = 1
+        if period:
+            conditions.append(f"p.period = ${idx}")
+            params.append(period)
+            idx += 1
+        if start_date:
+            conditions.append(f"p.paid_at >= ${idx}")
+            params.append(start_date)
+            idx += 1
+        if end_date:
+            conditions.append(f"p.paid_at <= ${idx}")
+            params.append(end_date)
+
+        rows = await self._payment_repo._conn.fetch(
+            f"""
+            SELECT p.*, a.code AS apartment_code, o.full_name AS owner_name
+            FROM payments p
+            JOIN apartments a ON p.apartment_id = a.id
+            JOIN owners o ON p.owner_id = o.id
+            WHERE {' AND '.join(conditions)}
+            ORDER BY p.paid_at DESC, p.created_at DESC
+            """,
+            *params,
+        )
+        return [dict(row) for row in rows]
+
+    async def _expenses(
+        self,
+        period: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> list[dict]:
+        if not start_date and not end_date:
+            return await self._expense_repo.get_by_month(period)
+
+        conditions = ["status = 'REGISTRADO'"]
+        params: list = []
+        idx = 1
+        if period:
+            conditions.append(f"TO_CHAR(date, 'YYYY-MM') = ${idx}")
+            params.append(period)
+            idx += 1
+        if start_date:
+            conditions.append(f"date >= ${idx}")
+            params.append(start_date)
+            idx += 1
+        if end_date:
+            conditions.append(f"date <= ${idx}")
+            params.append(end_date)
+
+        rows = await self._expense_repo._conn.fetch(
+            f"""
+            SELECT *
+            FROM expenses
+            WHERE {' AND '.join(conditions)}
+            ORDER BY date DESC, created_at DESC
+            """,
+            *params,
+        )
+        return [dict(row) for row in rows]
+
+    async def dashboard_stats(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> dict:
+        payments = await self._payments(start_date=start_date, end_date=end_date)
+        expenses = await self._expenses(start_date=start_date, end_date=end_date)
+        delinquency = await self._delinquency.get_stats()
+
+        total_revenue = sum(Decimal(str(p.get("amount", 0))) for p in payments)
+        total_expenses = sum(Decimal(str(e.get("amount", 0))) for e in expenses)
+        net_income = total_revenue - total_expenses
+
+        previous_revenue = Decimal("0")
+        previous_expenses = Decimal("0")
+        if start_date and end_date:
+            days = (end_date - start_date).days + 1
+            previous_end = start_date - timedelta(days=1)
+            previous_start = previous_end - timedelta(days=days - 1)
+            prev_payments = await self._payments(
+                start_date=previous_start,
+                end_date=previous_end,
+            )
+            prev_expenses = await self._expenses(
+                start_date=previous_start,
+                end_date=previous_end,
+            )
+            previous_revenue = sum(Decimal(str(p.get("amount", 0))) for p in prev_payments)
+            previous_expenses = sum(Decimal(str(e.get("amount", 0))) for e in prev_expenses)
+
+        def change(current: Decimal, previous: Decimal) -> Optional[float]:
+            if previous <= 0:
+                return None
+            return round(float((current - previous) / previous * 100), 2)
+
+        category_totals: dict[str, Decimal] = {}
+        for expense in expenses:
+            category = expense.get("category") or "Sin categoría"
+            category_totals[category] = category_totals.get(category, Decimal("0")) + Decimal(
+                str(expense.get("amount", 0))
+            )
+
+        start_period = start_date.strftime("%Y-%m") if start_date else None
+        end_period = end_date.strftime("%Y-%m") if end_date else None
+        period_conditions = []
+        period_params = []
+        if start_period:
+            period_conditions.append(f"period >= ${len(period_params) + 1}")
+            period_params.append(start_period)
+        if end_period:
+            period_conditions.append(f"period <= ${len(period_params) + 1}")
+            period_params.append(end_period)
+        period_where = f"WHERE {' AND '.join(period_conditions)}" if period_conditions else ""
+        fee_rows = await self._payment_repo._conn.fetch(
+            f"""
+            SELECT period, COALESCE(SUM(amount), 0) AS total
+            FROM apartment_fees
+            {period_where}
+            GROUP BY period
+            ORDER BY period ASC
+            """,
+            *period_params,
+        )
+
+        expected_by_period = {row["period"]: float(row["total"]) for row in fee_rows}
+        collected_by_period: dict[str, float] = {}
+        for payment in payments:
+            period_key = payment.get("period") or (
+                payment.get("paid_at").strftime("%Y-%m") if payment.get("paid_at") else ""
+            )
+            if not period_key:
+                continue
+            collected_by_period[period_key] = collected_by_period.get(period_key, 0.0) + float(
+                payment.get("amount", 0)
+            )
+
+        periods = sorted(set(expected_by_period) | set(collected_by_period))
+        monthly = [
+            {
+                "period": period_key,
+                "expected": expected_by_period.get(period_key, 0.0),
+                "collected": collected_by_period.get(period_key, 0.0),
+            }
+            for period_key in periods[-6:]
+        ]
+
+        owner_count = await self._payment_repo._conn.fetchval(
+            "SELECT COUNT(*) FROM owners WHERE status = 'ACTIVO'"
+        )
+        apartment_count = await self._payment_repo._conn.fetchval(
+            "SELECT COUNT(*) FROM apartments WHERE status = 'ACTIVO'"
+        )
+
+        arrears = []
+        for unit in delinquency.get("units", [])[:8]:
+            if unit.get("90_plus_days", 0) > 0:
+                days_overdue = "90+ Days"
+                risk_level = "High"
+            elif unit.get("60_days", 0) > 0:
+                days_overdue = "60 Days"
+                risk_level = "Medium"
+            else:
+                days_overdue = "30 Days"
+                risk_level = "Low"
+            arrears.append({
+                "unit": unit.get("unit"),
+                "owner": unit.get("owner_name"),
+                "email": unit.get("email"),
+                "amount_due": unit.get("total_debt", 0),
+                "days_overdue": days_overdue,
+                "risk_level": risk_level,
+            })
+
+        return {
+            "summary": {
+                "total_revenue": float(total_revenue),
+                "total_expenses": float(total_expenses),
+                "net_income": float(net_income),
+                "revenue_change_percent": change(total_revenue, previous_revenue),
+                "expense_change_percent": change(total_expenses, previous_expenses),
+                "net_income_change_percent": change(
+                    net_income, previous_revenue - previous_expenses
+                ),
+            },
+            "expense_categories": [
+                {"category": category, "amount": float(amount)}
+                for category, amount in sorted(
+                    category_totals.items(), key=lambda item: item[1], reverse=True
+                )
+            ],
+            "monthly": monthly,
+            "arrears": arrears,
+            "risk_summary": {
+                "high": sum(1 for row in arrears if row["risk_level"] == "High"),
+                "medium": sum(1 for row in arrears if row["risk_level"] == "Medium"),
+                "low": sum(1 for row in arrears if row["risk_level"] == "Low"),
+            },
+            "system": {
+                "active_owners": int(owner_count or 0),
+                "active_apartments": int(apartment_count or 0),
+                "delinquent_units": delinquency.get("summary", {}).get("delinquent_units", 0),
+            },
+        }
+
     async def delinquency_csv(self) -> bytes:
         owners = await self._delinquency.list_owners()
         output = io.StringIO()
@@ -50,8 +266,13 @@ class ReportService:
             )
         return output.getvalue().encode("utf-8-sig")
 
-    async def income_csv(self, period: Optional[str]) -> bytes:
-        payments = await self._payment_repo.get_all(period=period, status="REGISTRADO")
+    async def income_csv(
+        self,
+        period: Optional[str],
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> bytes:
+        payments = await self._payments(period, start_date, end_date)
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(
@@ -71,9 +292,14 @@ class ReportService:
             )
         return output.getvalue().encode("utf-8-sig")
 
-    async def balance_csv(self, period: Optional[str]) -> bytes:
-        payments = await self._payment_repo.get_all(period=period, status="REGISTRADO")
-        expenses = await self._expense_repo.get_by_month(period)
+    async def balance_csv(
+        self,
+        period: Optional[str],
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> bytes:
+        payments = await self._payments(period, start_date, end_date)
+        expenses = await self._expenses(period, start_date, end_date)
 
         total_income = sum(Decimal(str(p.get("amount", 0))) for p in payments)
         total_expenses = sum(Decimal(str(e.get("amount", 0))) for e in expenses)
@@ -89,8 +315,13 @@ class ReportService:
 
     # ─── PDF REPORTS ─────────────────────────────────────────────────────────
 
-    async def income_pdf(self, period: Optional[str]) -> bytes:
-        payments = await self._payment_repo.get_all(period=period, status="REGISTRADO")
+    async def income_pdf(
+        self,
+        period: Optional[str],
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> bytes:
+        payments = await self._payments(period, start_date, end_date)
         
         output = io.BytesIO()
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -141,9 +372,14 @@ class ReportService:
         doc.build(story)
         return output.getvalue()
 
-    async def balance_pdf(self, period: Optional[str]) -> bytes:
-        payments = await self._payment_repo.get_all(period=period, status="REGISTRADO")
-        expenses = await self._expense_repo.get_by_month(period)
+    async def balance_pdf(
+        self,
+        period: Optional[str],
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> bytes:
+        payments = await self._payments(period, start_date, end_date)
+        expenses = await self._expenses(period, start_date, end_date)
 
         total_income = sum(Decimal(str(p.get("amount", 0))) for p in payments)
         total_expenses = sum(Decimal(str(e.get("amount", 0))) for e in expenses)
@@ -242,8 +478,13 @@ class ReportService:
 
     # ─── EXCEL REPORTS ───────────────────────────────────────────────────────
 
-    async def income_excel(self, period: Optional[str]) -> bytes:
-        payments = await self._payment_repo.get_all(period=period, status="REGISTRADO")
+    async def income_excel(
+        self,
+        period: Optional[str],
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> bytes:
+        payments = await self._payments(period, start_date, end_date)
         
         wb = Workbook()
         ws = wb.active
@@ -284,9 +525,14 @@ class ReportService:
         wb.save(output)
         return output.getvalue()
 
-    async def balance_excel(self, period: Optional[str]) -> bytes:
-        payments = await self._payment_repo.get_all(period=period, status="REGISTRADO")
-        expenses = await self._expense_repo.get_by_month(period)
+    async def balance_excel(
+        self,
+        period: Optional[str],
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> bytes:
+        payments = await self._payments(period, start_date, end_date)
+        expenses = await self._expenses(period, start_date, end_date)
 
         total_income = sum(Decimal(str(p.get("amount", 0))) for p in payments)
         total_expenses = sum(Decimal(str(e.get("amount", 0))) for e in expenses)

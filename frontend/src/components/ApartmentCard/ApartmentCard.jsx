@@ -32,26 +32,17 @@ export default function ApartmentCard({ apartment, onClick }) {
 
   return (
     <div className={styles.apartmentCard} onClick={onClick}>
-      {/* Imagen */}
-      <div className={styles.imageContainer}>
-        {apartment.image_url ? (
-          <img src={apartment.image_url} alt={apartment.code} />
-        ) : (
-          <span>Sin imagen</span>
-        )}
-      </div>
-
-      {/* Contenido */}
       <div className={styles.cardContent}>
-        {/* Encabezado con código y estado */}
         <div className={styles.cardHeader}>
-          <h3 className={styles.cardTitle}>{apartment.code}</h3>
+          <div className={styles.codeBlock}>
+            <span className={styles.codeLabel}>Unidad</span>
+            <h3 className={styles.cardTitle}>{apartment.code}</h3>
+          </div>
           <span className={`${styles.statusBadge} ${getStatusClass(apartment.status)}`}>
             {getStatusLabel(apartment.status)}
           </span>
         </div>
 
-        {/* Metadatos */}
         <div className={styles.cardMeta}>
           <div className={styles.metaItem}>
             <div className={styles.metaLabel}>Ubicación</div>
@@ -61,6 +52,11 @@ export default function ApartmentCard({ apartment, onClick }) {
             <div className={styles.metaLabel}>Propietario</div>
             <div className={styles.metaValue}>{apartment.owner_name || '—'}</div>
           </div>
+        </div>
+
+        <div className={styles.cardFooter}>
+          <span>Alícuota</span>
+          <strong>{Number(apartment.allocated_quota_percent || 0).toFixed(2)}%</strong>
         </div>
       </div>
     </div>

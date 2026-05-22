@@ -5,6 +5,8 @@ import * as fineService from '../services/fineService';
 export function useFines() {
   const { token } = useAuth();
   const [fines, setFines] = useState([]);
+  const [fineStats, setFineStats] = useState(null);
+  const [pagination, setPagination] = useState({ page: 1, page_size: 10, total: 0, total_pages: 1 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -14,11 +16,36 @@ export function useFines() {
       setError(null);
       try {
         const data = await fineService.getFines(token, params);
-        setFines(data);
+        if (Array.isArray(data)) {
+          setFines(data);
+          setPagination({ page: 1, page_size: data.length || 10, total: data.length, total_pages: 1 });
+        } else {
+          setFines(data.items || []);
+          setPagination({
+            page: data.page || 1,
+            page_size: data.page_size || params.page_size || 10,
+            total: data.total || 0,
+            total_pages: data.total_pages || 1,
+          });
+        }
       } catch (err) {
         setError(err.response?.data?.detail || 'Error al cargar multas');
       } finally {
         setLoading(false);
+      }
+    },
+    [token]
+  );
+
+  const fetchFineStats = useCallback(
+    async (params = {}) => {
+      try {
+        const data = await fineService.getFineStats(token, params);
+        setFineStats(data);
+        return data;
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Error al cargar estadísticas de multas');
+        return null;
       }
     },
     [token]
@@ -42,5 +69,5 @@ export function useFines() {
     [token]
   );
 
-  return { fines, loading, error, fetchFines, createFine, annulFine };
+  return { fines, fineStats, pagination, loading, error, fetchFines, fetchFineStats, createFine, annulFine };
 }

@@ -1,57 +1,92 @@
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+}
+
 .statCard {
   display: flex;
-  flex-direction: column;
+  min-height: 156px;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 26px;
+  background: #fff;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.statIcon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  min-height: 140px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .statCard h3 {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #555;
+  margin: 0;
+  color: var(--color-gray-600);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .statValue {
-  font-size: 36px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
+  margin: 10px 0 0;
+  color: #050505;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 800;
 }
 
 .statSubtext {
-  font-size: 12px;
-  color: #999;
-  margin: 0;
+  margin: 16px 0 0;
+  color: var(--color-gray-500);
+  font-size: 14px;
+  font-weight: 700;
 }
 
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
+.occupied .statIcon {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
 }
 
-/* Variantes de color por estado */
-.occupied .statValue {
-  color: #27ae60;
+.vacant .statIcon {
+  background: var(--color-success-light);
+  color: var(--color-success);
 }
 
-.vacant .statValue {
-  color: #3498db;
+.maintenance .statIcon {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
 }
 
-.maintenance .statValue {
-  color: #e67e22;
+.total .statIcon {
+  background: var(--color-gray-100);
+  color: var(--color-gray-700);
 }
 
-.total .statValue {
-  color: #2c3e50;
+@media (max-width: 1180px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .statCard {
+    min-height: auto;
+    padding: 20px;
+  }
 }

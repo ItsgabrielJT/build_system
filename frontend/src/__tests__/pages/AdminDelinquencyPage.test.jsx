@@ -5,8 +5,9 @@ import { useDelinquency } from '../../hooks/useDelinquency';
 vi.mock('../../hooks/useDelinquency', () => ({ useDelinquency: vi.fn() }));
 
 describe('AdminDelinquencyPage', () => {
-  it('muestra badge de EN MORA para estados OVERDUE', async () => {
+  it('muestra el rediseño de morosidad con unidades y totales', async () => {
     const fetchDelinquentOwners = vi.fn();
+    const fetchDelinquencyStats = vi.fn();
 
     useDelinquency.mockReturnValue({
       delinquentOwners: [
@@ -23,6 +24,7 @@ describe('AdminDelinquencyPage', () => {
       loading: false,
       error: null,
       fetchDelinquentOwners,
+      fetchDelinquencyStats,
       fetchOwnerDetail: vi.fn(),
     });
 
@@ -33,6 +35,7 @@ describe('AdminDelinquencyPage', () => {
     });
 
     expect(screen.getByText('Carlos Ruiz')).toBeInTheDocument();
-    expect(screen.getByText('EN MORA')).toBeInTheDocument();
+    expect(screen.getByText('Detalle de Unidades Morosas')).toBeInTheDocument();
+    expect(screen.getAllByText('$1,200').length).toBeGreaterThan(0);
   });
 });

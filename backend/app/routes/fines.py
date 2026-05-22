@@ -18,11 +18,44 @@ router = APIRouter(tags=["fines"])
 async def list_fines(
     period: Optional[str] = None,
     status: Optional[str] = None,
+    owner_id: Optional[UUID] = None,
+    reason: Optional[str] = None,
+    search: Optional[str] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None,
     _user: dict = Depends(require_admin),
     db=Depends(get_db),
 ):
     service = FineService(FineRepository(db))
-    return await service.get_all(period=period, status_filter=status)
+    return await service.get_all(
+        period=period,
+        status_filter=status,
+        owner_id=owner_id,
+        reason=reason,
+        search=search,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/fines/stats")
+async def fine_stats(
+    period: Optional[str] = None,
+    status: Optional[str] = None,
+    owner_id: Optional[UUID] = None,
+    reason: Optional[str] = None,
+    search: Optional[str] = None,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = FineService(FineRepository(db))
+    return await service.get_stats(
+        period=period,
+        status_filter=status,
+        owner_id=owner_id,
+        reason=reason,
+        search=search,
+    )
 
 
 @router.post("/fines", status_code=status.HTTP_201_CREATED)

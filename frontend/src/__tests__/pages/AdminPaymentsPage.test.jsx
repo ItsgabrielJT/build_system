@@ -1,5 +1,4 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AdminPaymentsPage from '../../pages/admin/AdminPaymentsPage';
 import { usePayments } from '../../hooks/usePayments';
@@ -68,7 +67,6 @@ describe('AdminPaymentsPage', () => {
   });
 
   it('pre-carga el período con el mes actual al abrir formulario', async () => {
-    const user = userEvent.setup();
     const fetchPayments = vi.fn();
     const fetchApartments = vi.fn();
     const fetchOwners = vi.fn();
@@ -118,7 +116,6 @@ describe('AdminPaymentsPage', () => {
   });
 
   it('auto-carga el propietario al seleccionar departamento con propietario', async () => {
-    const user = userEvent.setup();
     const fetchPayments = vi.fn();
     const fetchApartments = vi.fn();
     const fetchOwners = vi.fn();
@@ -159,16 +156,16 @@ describe('AdminPaymentsPage', () => {
 
     // Seleccionar apartamento con propietario
     await waitFor(() => {
-      const apartmentSelects = screen.queryAllByLabelText('Departamento');
+      const apartmentSelects = screen.queryAllByLabelText(/Departamento/i);
       expect(apartmentSelects.length).toBeGreaterThan(0);
     });
 
-    const apartmentSelect = screen.getByLabelText('Departamento');
-    await user.selectOption(apartmentSelect, 'apt1');
+    const apartmentSelect = screen.getByLabelText(/Departamento/i);
+    fireEvent.change(apartmentSelect, { target: { value: 'apt1' } });
 
     // Verificar que el propietario se auto-cargó
     await waitFor(() => {
-      const ownerSelect = screen.getByLabelText('Propietario');
+      const ownerSelect = screen.getByLabelText(/Propietario/i);
       expect(ownerSelect).toHaveValue('owner1');
     });
   });

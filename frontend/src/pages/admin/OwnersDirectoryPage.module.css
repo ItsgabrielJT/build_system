@@ -1,50 +1,203 @@
-.ownersDirectoryPage {
-  padding: 24px;
-}
-
-.pageHeader {
+.page {
   display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-  flex-wrap: wrap;
-  gap: 16px;
+  gap: 20px;
 }
 
-.pageTitle {
-  font-size: 28px;
+.breadcrumb {
+  margin-bottom: 6px;
+  color: var(--color-gray-500);
+  font-size: 13px;
   font-weight: 700;
-  color: #2c3e50;
-  margin: 0;
 }
 
-.pageSubtitle {
+.title {
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #050505;
+  letter-spacing: 0;
+}
+
+.subtitle {
+  max-width: 660px;
+  margin-top: 8px;
+  color: var(--color-gray-500);
   font-size: 14px;
-  color: #999;
-  margin: 4px 0 0 0;
 }
 
-.addButton {
-  padding: 12px 20px;
-  background: #27ae60;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
+.btnPrimary {
+  min-height: 42px;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius);
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.18);
   font-size: 14px;
-  transition: background 0.2s;
+  font-weight: 700;
+  transition: background 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
 }
 
-.addButton:hover {
-  background: #229954;
+.btnPrimary:hover {
+  background: var(--color-primary-dark);
 }
 
-.errorContainer {
-  padding: 20px;
-  background: #fef5f5;
-  border: 1px solid #e74c3c;
-  border-radius: 6px;
-  color: #c0392b;
-  margin-bottom: 20px;
+.errorBanner {
+  padding: 12px 16px;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  border: 1px solid #fecaca;
+  border-radius: var(--border-radius-sm);
+  font-size: 14px;
+}
+
+.metricsGrid,
+.dashboardGrid {
+  display: grid;
+  gap: 22px;
+}
+
+.metricsGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboardGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metricCard,
+.panel {
+  background: #fff;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.metricCard {
+  min-height: 166px;
+  padding: 26px 28px;
+}
+
+.warningCard {
+  border-color: #f2b705;
+  box-shadow: 0 12px 24px rgba(217, 119, 6, 0.08);
+}
+
+.metricLabel {
+  display: block;
+  color: var(--color-gray-600);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.metricValue {
+  display: block;
+  margin-top: 12px;
+  color: #050505;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.metricFoot {
+  display: block;
+  margin-top: 18px;
+  color: var(--color-gray-500);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.panel {
+  padding: 26px 30px;
+}
+
+.panel h2 {
+  color: #050505;
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.panel p {
+  margin-top: 4px;
+  color: var(--color-gray-500);
+}
+
+.panelHeader,
+.tableHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.tableHeader {
+  align-items: center;
+}
+
+.select {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--border-radius-sm);
+  background: #fff;
+  color: var(--color-gray-800);
+  font-size: 14px;
+}
+
+.chartBox {
+  width: 100%;
+  min-height: 230px;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  border: 1px dashed var(--color-gray-300);
+  border-radius: var(--border-radius);
+  color: var(--color-gray-500);
+  background: var(--color-gray-50);
+  font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+  .metricsGrid,
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero,
+  .tableHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .title {
+    font-size: 28px;
+  }
+
+  .panel,
+  .metricCard {
+    padding: 20px;
+  }
+
+  .select,
+  .btnPrimary {
+    width: 100%;
+  }
 }

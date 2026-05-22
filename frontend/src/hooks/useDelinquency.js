@@ -5,6 +5,7 @@ import * as delinquencyService from '../services/delinquencyService';
 export function useDelinquency() {
   const { token } = useAuth();
   const [delinquentOwners, setDelinquentOwners] = useState([]);
+  const [delinquencyStats, setDelinquencyStats] = useState(null);
   const [ownerDetail, setOwnerDetail] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -42,5 +43,28 @@ export function useDelinquency() {
     [token]
   );
 
-  return { delinquentOwners, ownerDetail, loading, error, fetchDelinquentOwners, fetchOwnerDetail };
+  const fetchDelinquencyStats = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await delinquencyService.getDelinquencyStats(token);
+      setDelinquencyStats(data);
+      return data;
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al cargar estadísticas de morosidad');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  return {
+    delinquentOwners,
+    delinquencyStats,
+    ownerDetail,
+    loading,
+    error,
+    fetchDelinquentOwners,
+    fetchOwnerDetail,
+    fetchDelinquencyStats,
+  };
 }

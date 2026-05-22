@@ -16,3 +16,10 @@ export async function getOwnerDelinquencyDetail(token, ownerId) {
   });
   return res.data;
 }
+
+export async function getDelinquencyStats(token) {
+  const res = await axios.get(`${API_BASE}/api/v1/delinquency/stats`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}

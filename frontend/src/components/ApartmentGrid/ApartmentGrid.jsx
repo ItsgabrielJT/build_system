@@ -81,7 +81,6 @@ export default function ApartmentGrid({
 
   return (
     <div className={styles.apartmentGrid}>
-      {/* Barra de filtros */}
       <div className={styles.filterBar}>
         {FILTER_OPTIONS.map((option) => (
           <button
@@ -94,7 +93,6 @@ export default function ApartmentGrid({
         ))}
       </div>
 
-      {/* Grid de departamentos */}
       {apartments.length > 0 ? (
         <>
           <div className={styles.gridContainer}>
@@ -107,7 +105,6 @@ export default function ApartmentGrid({
             ))}
           </div>
 
-          {/* Paginación */}
           <div className={styles.pagination}>
             {renderPaginationButtons()}
             <span className={styles.pageInfo}>

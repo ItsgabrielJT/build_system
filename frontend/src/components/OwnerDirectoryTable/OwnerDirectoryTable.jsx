@@ -101,7 +101,6 @@ export default function OwnerDirectoryTable({
 
   return (
     <div className={styles.ownerTable}>
-      {/* Búsqueda */}
       <div className={styles.searchContainer}>
         <input
           type="text"
@@ -112,79 +111,74 @@ export default function OwnerDirectoryTable({
         />
       </div>
 
-      {/* Tabla */}
       {owners.length > 0 ? (
         <>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Propietario</th>
-                <th>Unidad</th>
-                <th>Contacto</th>
-                <th>Ingreso</th>
-                <th>Balance</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {owners.map((owner) => (
-                <tr key={owner.id}>
-                  {/* Nombre */}
-                  <td>
-                    <div className={styles.ownerName}>{owner.full_name}</div>
-                  </td>
-
-                  {/* Unidades */}
-                  <td>
-                    <div className={styles.units}>
-                      {owner.units && owner.units.length > 0 ? (
-                        owner.units.map((unit) => (
-                          <div key={unit.id} className={styles.unitBadge}>
-                            {unit.code}
-                          </div>
-                        ))
-                      ) : (
-                        <span>—</span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Contacto */}
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <ContactCopy type="email" value={owner.email} />
-                      <ContactCopy type="phone" value={owner.phone} />
-                    </div>
-                  </td>
-
-                  {/* Fecha de ingreso */}
-                  <td className={styles.ingressDate}>{formatDate(owner.ingress_date)}</td>
-
-                  {/* Balance */}
-                  <td>
-                    <span className={`${styles.balance} ${getBalanceClass(owner.balance)}`}>
-                      {owner.balance < 0 ? '-' : ''}
-                      {formatBalance(owner.balance)}
-                    </span>
-                  </td>
-
-                  {/* Acciones */}
-                  <td>
-                    <div className={styles.actions}>
-                      <button
-                        className={styles.actionButton}
-                        onClick={() => onSelectOwner(owner)}
-                      >
-                        Ver
-                      </button>
-                    </div>
-                  </td>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Propietario</th>
+                  <th>Unidad</th>
+                  <th>Contacto</th>
+                  <th>Ingreso</th>
+                  <th>Balance</th>
+                  <th>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {owners.map((owner) => (
+                  <tr key={owner.id}>
+                    <td>
+                      <div className={styles.ownerName}>{owner.full_name}</div>
+                      <span className={styles.ownerDoc}>{owner.document_id}</span>
+                    </td>
 
-          {/* Paginación */}
+                    <td>
+                      <div className={styles.units}>
+                        {owner.units && owner.units.length > 0 ? (
+                          owner.units.map((unit) => (
+                            <div key={unit.id} className={styles.unitBadge}>
+                              {unit.code}
+                            </div>
+                          ))
+                        ) : (
+                          <span className={styles.muted}>Sin unidad</span>
+                        )}
+                      </div>
+                    </td>
+
+                    <td>
+                      <div className={styles.contactStack}>
+                        <ContactCopy type="email" value={owner.email} />
+                        <ContactCopy type="phone" value={owner.phone} />
+                      </div>
+                    </td>
+
+                    <td className={styles.ingressDate}>{formatDate(owner.ingress_date)}</td>
+
+                    <td>
+                      <span className={`${styles.balance} ${getBalanceClass(owner.balance)}`}>
+                        {owner.balance < 0 ? '-' : ''}
+                        {formatBalance(owner.balance)}
+                      </span>
+                    </td>
+
+                    <td>
+                      <div className={styles.actions}>
+                        <button
+                          className={styles.actionButton}
+                          onClick={() => onSelectOwner(owner)}
+                        >
+                          Ver
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
           <div className={styles.pagination}>
             {renderPaginationButtons()}
             <span className={styles.pageInfo}>

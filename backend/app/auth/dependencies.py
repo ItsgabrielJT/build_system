@@ -71,6 +71,16 @@ def require_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+def require_owner(user: dict = Depends(get_current_user)) -> dict:
+    """Verificar que usuario tiene rol PROPIETARIO."""
+    if user.get("role") != "PROPIETARIO":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para esta acción",
+        )
+    return user
+
+
 def require_authenticated(user: dict = Depends(get_current_user)) -> dict:
     """Verificar que usuario está autenticado."""
     return user

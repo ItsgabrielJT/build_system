@@ -13,6 +13,7 @@ import DepartmentsPage from './pages/admin/DepartmentsPage';
 import OwnersDirectoryPage from './pages/admin/OwnersDirectoryPage';
 import OwnerApartmentsPage from './pages/owner/OwnerApartmentsPage';
 import OwnerAccountStatementPage from './pages/owner/OwnerAccountStatementPage';
+import OwnerPaymentsPage from './pages/owner/OwnerPaymentsPage';
 
 function RootRedirect() {
   const { role, loading } = useAuth();
@@ -55,6 +56,7 @@ export default function App() {
       >
         <Route path="apartments" element={<OwnerApartmentsPage />} />
         <Route path="account-statement" element={<OwnerAccountStatementPage />} />
+        <Route path="payments" element={<OwnerPaymentsPage />} />
         <Route index element={<Navigate to="apartments" replace />} />
       </Route>
 

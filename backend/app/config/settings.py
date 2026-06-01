@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
 
+    # Payment proof uploads (SPEC-008)
+    allowed_proof_types: str = "image/jpeg,image/png,application/pdf"
+    max_proof_size_mb: int = 5
+    upload_dir: str = "/tmp/edificios_uploads"
+
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE), env_file_encoding="utf-8"
     )

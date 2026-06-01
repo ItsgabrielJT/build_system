@@ -114,6 +114,38 @@
   border: 1px solid #fecaca;
 }
 
+.pendingSection {
+  background: #fff;
+  border: 1px solid #f2b705;
+  border-radius: var(--border-radius-lg);
+  padding: 24px 28px;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08);
+}
+
+.pendingSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #050505;
+}
+
+.pendingBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: #d97706;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .metricsGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

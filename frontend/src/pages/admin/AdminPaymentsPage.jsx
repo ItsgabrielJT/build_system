@@ -9,10 +9,12 @@ import {
   YAxis,
 } from 'recharts';
 import { usePayments } from '../../hooks/usePayments';
+import { useAdminPaymentReview } from '../../hooks/useAdminPaymentReview';
 import { useApartments } from '../../hooks/useApartments';
 import { useOwners } from '../../hooks/useOwners';
 import FormModal from '../../components/FormModal/FormModal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
+import PaymentReviewModal from '../../components/PaymentReviewModal/PaymentReviewModal';
 import PeriodSelector from '../../components/PeriodSelector/PeriodSelector';
 import styles from './AdminPaymentsPage.module.css';
 
@@ -68,10 +70,12 @@ const getPeriodLabel = (period) => {
 
 export default function AdminPaymentsPage() {
   const { payments, loading, error, fetchPayments, createPayment, annulPayment } = usePayments();
+  const { pendingPayments, loading: loadingPending, error: errorPending, fetchPending, approvePayment, rejectPayment } = useAdminPaymentReview();
   const { apartments, fetchApartments } = useApartments();
   const { owners, fetchOwners } = useOwners();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [annulTarget, setAnnulTarget] = useState(null);
+  const [reviewTarget, setReviewTarget] = useState(null);
   const [filterPeriod, setFilterPeriod] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [query, setQuery] = useState('');
@@ -81,7 +85,8 @@ export default function AdminPaymentsPage() {
   useEffect(() => {
     fetchApartments();
     fetchOwners();
-  }, [fetchApartments, fetchOwners]);
+    fetchPending();
+  }, [fetchApartments, fetchOwners, fetchPending]);
 
   useEffect(() => {
     const params = {};
@@ -282,8 +287,57 @@ export default function AdminPaymentsPage() {
         </div>
       </section>
 
-      {(error || actionError) && (
-        <div className={styles.errorBanner}>{error || actionError}</div>
+      {(error || actionError || errorPending) && (
+        <div className={styles.errorBanner}>{error || actionError || errorPending}</div>
+      )}
+
+      {(loadingPending || pendingPayments.length > 0) && (
+        <section className={styles.pendingSection}>
+          <h2 className={styles.pendingSectionTitle}>
+            Pendientes de aprobación
+            {pendingPayments.length > 0 && (
+              <span className={styles.pendingBadge}>{pendingPayments.length}</span>
+            )}
+          </h2>
+          {loadingPending ? (
+            <div className={styles.emptyState}>Cargando pendientes...</div>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.paymentsTable}>
+                <thead>
+                  <tr>
+                    <th>Departamento / Propietario</th>
+                    <th>Período</th>
+                    <th>Monto</th>
+                    <th>Comprobante</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingPayments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td>
+                        <strong>Unidad {payment.apartment_code || 'N/D'}</strong>
+                        <span>{payment.owner_name || 'Sin propietario'}</span>
+                      </td>
+                      <td>{payment.period}</td>
+                      <td className={styles.amountCell}>{formatCurrency(payment.amount)}</td>
+                      <td>{payment.proof_file_name || '—'}</td>
+                      <td>
+                        <button
+                          className={styles.btnPrimary}
+                          onClick={() => setReviewTarget(payment)}
+                        >
+                          Revisar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       )}
 
       <section className={styles.metricsGrid}>
@@ -483,6 +537,13 @@ export default function AdminPaymentsPage() {
         confirmLabel="Anular"
         onConfirm={handleAnnul}
         onCancel={() => setAnnulTarget(null)}
+      />
+
+      <PaymentReviewModal
+        payment={reviewTarget}
+        onApprove={async (id) => { await approvePayment(id); setReviewTarget(null); }}
+        onReject={async (id, reason) => { await rejectPayment(id, reason); setReviewTarget(null); }}
+        onClose={() => setReviewTarget(null)}
       />
     </div>
   );

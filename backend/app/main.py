@@ -9,6 +9,7 @@ from app.config.database import close_db, init_db
 from app.config.settings import settings
 from app.routes import (
     account_statement,
+    admin_payment_review,
     apartment_fees,
     apartments,
     auth,
@@ -16,6 +17,7 @@ from app.routes import (
     delinquency,
     expenses,
     fines,
+    owner_payments,
     owners,
     payments,
     reports,
@@ -63,6 +65,8 @@ app.include_router(expenses.router, prefix=PREFIX)
 app.include_router(delinquency.router, prefix=PREFIX)
 app.include_router(account_statement.router, prefix=PREFIX)
 app.include_router(reports.router, prefix=PREFIX)
+app.include_router(owner_payments.router, prefix=PREFIX)
+app.include_router(admin_payment_review.router, prefix=PREFIX)
 
 
 @app.get("/health", tags=["health"])

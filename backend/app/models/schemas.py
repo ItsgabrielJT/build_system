@@ -146,6 +146,33 @@ class ApartmentFeeResponse(BaseModel):
     created_at: datetime
 
 
+# ─── OWNER PAYMENT (SPEC-008) ─────────────────────────────────────────────────
+
+class OwnerPaymentCreate(BaseModel):
+    apartment_id: UUID
+    period: str
+    paid_at: date
+    amount: Decimal
+    method: Optional[str] = None
+    reference: Optional[str] = None
+
+    @field_validator("period")
+    @classmethod
+    def validate_period(cls, v: str) -> str:
+        return _validate_period(v)
+
+
+class PaymentRejectRequest(BaseModel):
+    reason: str
+
+    @field_validator("reason")
+    @classmethod
+    def reason_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("El motivo del rechazo es obligatorio")
+        return v
+
+
 # ─── PAYMENT ──────────────────────────────────────────────────────────────────
 
 class PaymentCreate(BaseModel):

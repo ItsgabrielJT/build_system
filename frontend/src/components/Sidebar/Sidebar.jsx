@@ -102,6 +102,7 @@ const ADMIN_LINKS = [
 const OWNER_LINKS = [
   { to: '/owner/apartments', label: 'Mis Departamentos', Icon: IconApartments },
   { to: '/owner/account-statement', label: 'Estado de Cuenta', Icon: IconStatement },
+  { to: '/owner/payments', label: 'Mis Pagos', Icon: IconPayments },
 ];
 
 export default function Sidebar({ role, collapsed }) {

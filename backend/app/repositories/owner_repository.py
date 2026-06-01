@@ -52,6 +52,14 @@ class OwnerRepository:
         )
         return dict(row) if row else None
 
+    async def get_by_user_id(self, user_id: UUID) -> dict | None:
+        """Retorna el owner vinculado al user_id (almacenado en firebase_uid)."""
+        row = await self._conn.fetchrow(
+            "SELECT * FROM owners WHERE firebase_uid = $1 AND status = 'ACTIVO'",
+            str(user_id),
+        )
+        return dict(row) if row else None
+
     async def document_id_exists(
         self, document_id: str, exclude_id: Optional[UUID] = None
     ) -> bool:

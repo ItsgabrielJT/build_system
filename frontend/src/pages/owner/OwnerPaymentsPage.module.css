@@ -1,0 +1,237 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.breadcrumb {
+  color: var(--color-gray-500);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #050505;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  color: var(--color-gray-500);
+  font-size: 14px;
+  max-width: 580px;
+}
+
+/* ── Sections ──────────────────────────────────────────────────── */
+
+.formSection,
+.historySection {
+  background: #fff;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--border-radius-lg);
+  padding: 28px 32px;
+  box-shadow: var(--shadow);
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-gray-900);
+  margin-bottom: 20px;
+}
+
+/* ── Form ──────────────────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+}
+
+.label span {
+  color: var(--color-danger);
+}
+
+.input {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--border-radius-sm);
+  background: #fff;
+  color: var(--color-gray-900);
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #0b5bd3;
+  box-shadow: 0 0 0 3px rgba(11, 91, 211, 0.1);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btnPrimary {
+  padding: 10px 24px;
+  background: #0b5bd3;
+  color: #fff;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 18px rgba(11, 91, 211, 0.18);
+  transition: background 0.15s;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: #084cab;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.errorMsg {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid #fecaca;
+  font-size: 13px;
+}
+
+.successMsg {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--color-success-light);
+  color: var(--color-success);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid #bbf7d0;
+  font-size: 13px;
+}
+
+/* ── History Table ─────────────────────────────────────────────── */
+
+.loading,
+.empty {
+  color: var(--color-gray-500);
+  font-size: 14px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table thead tr {
+  border-bottom: 2px solid var(--color-gray-200);
+}
+
+.table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-gray-500);
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-gray-100);
+  color: var(--color-gray-800);
+  vertical-align: middle;
+}
+
+.table tbody tr:hover {
+  background: var(--color-gray-50);
+}
+
+.amountCell {
+  font-weight: 700;
+  color: #050505;
+}
+
+.rejectionReason {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+/* ── Action buttons ────────────────────────────────────────────── */
+
+.actionCell {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btnAction {
+  padding: 6px 12px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--border-radius-sm);
+  background: #fff;
+  color: var(--color-gray-700);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.btnAction:hover:not(:disabled) {
+  background: var(--color-gray-100);
+}
+
+.btnAction:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btnActionPrimary {
+  background: #eef4ff;
+  color: #0b5bd3;
+  border-color: #0b5bd3;
+}
+
+.btnActionPrimary:hover:not(:disabled) {
+  background: #0b5bd3;
+  color: #fff;
+}

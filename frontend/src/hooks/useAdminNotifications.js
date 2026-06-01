@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from './useAuth';
-import { getAdminPaymentNotifications } from '../services/notificationService';
+import {
+  getAdminPaymentNotifications,
+  getOwnerPaymentNotifications,
+} from '../services/notificationService';
 
 export function useAdminNotifications() {
   const { token, role } = useAuth();
@@ -10,7 +13,7 @@ export function useAdminNotifications() {
   const [error, setError] = useState(null);
 
   const fetchNotifications = useCallback(async () => {
-    if (role !== 'ADMIN' || !token) {
+    if (!token || !['ADMIN', 'PROPIETARIO'].includes(role)) {
       setNotifications([]);
       setTotal(0);
       setError(null);
@@ -22,7 +25,9 @@ export function useAdminNotifications() {
     setError(null);
 
     try {
-      const response = await getAdminPaymentNotifications(token);
+      const response = role === 'ADMIN'
+        ? await getAdminPaymentNotifications(token)
+        : await getOwnerPaymentNotifications(token);
       setNotifications(response.data || []);
       setTotal(response.total || 0);
     } catch (err) {
@@ -42,6 +47,6 @@ export function useAdminNotifications() {
     loading,
     error,
     fetchNotifications,
-    enabled: role === 'ADMIN',
+    enabled: ['ADMIN', 'PROPIETARIO'].includes(role),
   };
 }

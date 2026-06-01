@@ -82,7 +82,7 @@ export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSi
 
   const handleNotificationClick = () => {
     setIsNotificationsOpen(false);
-    navigate('/admin/payments');
+    navigate(role === 'ADMIN' ? '/admin/payments' : '/owner/payments');
   };
 
   const formatNotificationDate = (value) => {

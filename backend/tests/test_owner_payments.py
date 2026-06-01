@@ -89,7 +89,7 @@ def ensure_spec_008_schema_models():
 def register_spec_008_routers(ensure_spec_008_schema_models):
     """Monta routers de SPEC-008 en el app de tests si aún no están registrados."""
     from app.main import PREFIX, app
-    from app.routes import admin_payment_review, owner_payments
+    from app.routes import admin_payment_review, owner_notifications, owner_payments
 
     existing_paths = {route.path for route in app.router.routes}
 
@@ -98,6 +98,9 @@ def register_spec_008_routers(ensure_spec_008_schema_models):
 
     if f"{PREFIX}/admin/payments/pending" not in existing_paths:
         app.include_router(admin_payment_review.router, prefix=PREFIX)
+
+    if f"{PREFIX}/owner/notifications/payments" not in existing_paths:
+        app.include_router(owner_notifications.router, prefix=PREFIX)
 
 # ── IDs fijos para tests SPEC-008 ─────────────────────────────────────────────
 PAYMENT_ID = UUID("660e8400-e29b-41d4-a716-446655440001")
@@ -476,6 +479,30 @@ class TestAdminApproveRejectPayment:
         assert response.headers["content-type"] == "application/pdf"
         assert "transferencia.pdf" in response.headers["content-disposition"]
 
+    @pytest.mark.asyncio
+    async def test_list_owner_notifications_owner_only(
+        self,
+        async_client: AsyncClient,
+        admin_headers: dict,
+        propietario_headers: dict,
+    ):
+        with patch(
+            "app.services.owner_payment_service.OwnerPaymentService.list_notifications",
+            new=AsyncMock(return_value={"data": [], "total": 0, "page": 1, "page_size": 20}),
+        ):
+            owner_response = await async_client.get(
+                "/api/v1/owner/notifications/payments",
+                headers=propietario_headers,
+            )
+
+        assert owner_response.status_code == 200
+
+        admin_response = await async_client.get(
+            "/api/v1/owner/notifications/payments",
+            headers=admin_headers,
+        )
+        assert admin_response.status_code == 403
+
 
 # ─── HU-03: Descarga de constancia y recibo ───────────────────────────────────
 
@@ -724,6 +751,55 @@ class TestOwnerPaymentServiceLogic:
         assert "Transición inválida" in exc_info.value.detail
 
     @pytest.mark.asyncio
+    async def test_admin_approve_creates_owner_notification(self):
+        from app.services.admin_payment_review_service import AdminPaymentReviewService
+
+        payment_repo = AsyncMock()
+        proof_repo = AsyncMock()
+        notification_repo = AsyncMock()
+
+        payment_repo.get_by_id = AsyncMock(return_value=_make_payment())
+        payment_repo.approve = AsyncMock(return_value=_make_payment(status="APROBADO"))
+
+        service = AdminPaymentReviewService(
+            payment_repo, proof_repo, notification_repo
+        )
+
+        await service.approve(
+            payment_id=PAYMENT_ID,
+            admin_id=str(ADMIN_USER_ID),
+        )
+
+        notification_repo.create.assert_awaited_once()
+        assert notification_repo.create.await_args.kwargs["notification_type"] == "PAGO_APROBADO"
+        assert notification_repo.create.await_args.kwargs["recipient"] == str(PROPIETARIO_USER_ID)
+
+    @pytest.mark.asyncio
+    async def test_admin_reject_creates_owner_notification(self):
+        from app.services.admin_payment_review_service import AdminPaymentReviewService
+
+        payment_repo = AsyncMock()
+        proof_repo = AsyncMock()
+        notification_repo = AsyncMock()
+
+        payment_repo.get_by_id = AsyncMock(return_value=_make_payment())
+        payment_repo.reject = AsyncMock(return_value=_make_payment(status="RECHAZADO"))
+
+        service = AdminPaymentReviewService(
+            payment_repo, proof_repo, notification_repo
+        )
+
+        await service.reject(
+            payment_id=PAYMENT_ID,
+            admin_id=str(ADMIN_USER_ID),
+            reason="Comprobante ilegible",
+        )
+
+        notification_repo.create.assert_awaited_once()
+        assert notification_repo.create.await_args.kwargs["notification_type"] == "PAGO_RECHAZADO"
+        assert notification_repo.create.await_args.kwargs["recipient"] == str(PROPIETARIO_USER_ID)
+
+    @pytest.mark.asyncio
     async def test_admin_list_pending_includes_latest_proof_metadata(self):
         """El listado de pendientes expone nombre y tipo del último comprobante."""
         from app.services.admin_payment_review_service import AdminPaymentReviewService
@@ -924,6 +1000,83 @@ class TestNotificationRepositoryContracts:
         assert result["body"] == "Detalle"
         assert result["metadata"] == {"payment_id": str(PAYMENT_ID)}
         assert result["recipient"] == "ADMIN"
+
+    @pytest.mark.asyncio
+    async def test_list_for_user_filters_target_user_and_owner_role(self):
+        from app.repositories.notification_repository import NotificationRepository
+
+        conn = AsyncMock()
+        conn.fetch = AsyncMock(
+            return_value=[
+                {
+                    "id": uuid4(),
+                    "type": "PAGO_APROBADO",
+                    "payload": {
+                        "title": "Pago aprobado",
+                        "body": "Detalle owner",
+                        "metadata": {"payment_id": str(PAYMENT_ID)},
+                    },
+                    "target_role": None,
+                    "target_user_id": str(PROPIETARIO_USER_ID),
+                    "reference_id": PAYMENT_ID,
+                    "created_at": datetime(2026, 5, 31, 10, 0, 0, tzinfo=timezone.utc),
+                }
+            ]
+        )
+        conn.fetchval = AsyncMock(return_value=1)
+        repo = NotificationRepository(conn)
+
+        rows, total = await repo.list_for_user(
+            user_id=str(PROPIETARIO_USER_ID),
+            page=1,
+            page_size=10,
+        )
+
+        query = conn.fetch.await_args.args[0]
+        params = conn.fetch.await_args.args[1:]
+
+        assert "target_user_id = $1 OR target_role = 'PROPIETARIO'" in query
+        assert list(params) == [str(PROPIETARIO_USER_ID), 10, 0]
+        assert total == 1
+        assert rows[0]["recipient"] == str(PROPIETARIO_USER_ID)
+
+    @pytest.mark.asyncio
+    async def test_create_owner_notification_sets_role_and_user(self):
+        from app.repositories.notification_repository import NotificationRepository
+
+        conn = AsyncMock()
+        conn.fetchrow = AsyncMock(
+            return_value={
+                "id": uuid4(),
+                "type": "PAGO_APROBADO",
+                "payload": {
+                    "title": "Pago aprobado",
+                    "body": "Detalle owner",
+                    "metadata": {"payment_id": str(PAYMENT_ID)},
+                },
+                "target_role": "PROPIETARIO",
+                "target_user_id": str(PROPIETARIO_USER_ID),
+                "reference_id": PAYMENT_ID,
+                "created_at": datetime(2026, 5, 31, 10, 0, 0, tzinfo=timezone.utc),
+            }
+        )
+        repo = NotificationRepository(conn)
+
+        result = await repo.create(
+            notification_type="PAGO_APROBADO",
+            title="Pago aprobado",
+            body="Detalle owner",
+            recipient=str(PROPIETARIO_USER_ID),
+            metadata={"payment_id": str(PAYMENT_ID)},
+        )
+
+        params = conn.fetchrow.await_args.args[1:]
+
+        assert params[0] == "PAGO_APROBADO"
+        assert params[2] == "PROPIETARIO"
+        assert params[3] == str(PROPIETARIO_USER_ID)
+        assert params[4] == str(PAYMENT_ID)
+        assert result["recipient"] == str(PROPIETARIO_USER_ID)
 
     @pytest.mark.asyncio
     async def test_admin_reject_invalid_transition_raises_422(self):

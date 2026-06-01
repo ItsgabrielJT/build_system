@@ -128,6 +128,21 @@ class OwnerPaymentService:
             for r in rows
         ]
 
+    async def list_notifications(
+        self, user_id: UUID, page: int = 1, page_size: int = 20
+    ) -> dict:
+        data, total = await self._notification_repo.list_for_user(
+            user_id=str(user_id),
+            page=page,
+            page_size=page_size,
+        )
+        return {
+            "data": data,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+
     async def get_payment_for_owner(self, payment_id: UUID, user_id: UUID) -> dict:
         owner = await self._resolve_owner(user_id)
         payment = await self._payment_repo.get_by_id_for_owner(

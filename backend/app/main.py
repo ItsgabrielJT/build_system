@@ -17,6 +17,7 @@ from app.routes import (
     delinquency,
     expenses,
     fines,
+    owner_notifications,
     owner_payments,
     owners,
     payments,
@@ -66,6 +67,7 @@ app.include_router(delinquency.router, prefix=PREFIX)
 app.include_router(account_statement.router, prefix=PREFIX)
 app.include_router(reports.router, prefix=PREFIX)
 app.include_router(owner_payments.router, prefix=PREFIX)
+app.include_router(owner_notifications.router, prefix=PREFIX)
 app.include_router(admin_payment_review.router, prefix=PREFIX)
 
 

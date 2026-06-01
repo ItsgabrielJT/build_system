@@ -6,8 +6,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin, require_owner
 from app.config.database import get_db
+from app.models.schemas import MonthlyBalanceResponse
 from app.repositories.delinquency_repository import DelinquencyRepository
 from app.repositories.expense_repository import ExpenseRepository
 from app.repositories.payment_repository import PaymentRepository
@@ -41,6 +42,27 @@ def _excel_response(content: bytes, filename: str) -> Response:
     )
 
 
+def _get_report_service(db) -> ReportService:
+    return ReportService(
+        DelinquencyService(DelinquencyRepository(db)),
+        PaymentRepository(db),
+        ExpenseRepository(db),
+    )
+
+
+def _validate_month_period_or_400(period: Optional[str]) -> Optional[str]:
+    if period is None:
+        return None
+    try:
+        ReportService(None, None, None)._validate_month_period(period)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return period
+
+
 @router.get("/reports/delinquency")
 async def report_delinquency(
     format: str = "csv",
@@ -53,11 +75,7 @@ async def report_delinquency(
             detail='Format debe ser: csv, pdf o excel'
         )
     
-    service = ReportService(
-        DelinquencyService(DelinquencyRepository(db)),
-        PaymentRepository(db),
-        ExpenseRepository(db),
-    )
+    service = _get_report_service(db)
     
     if format == "csv":
         content = await service.delinquency_csv()
@@ -83,11 +101,7 @@ async def report_dashboard_stats(
             detail="start_date no puede ser mayor que end_date",
         )
 
-    service = ReportService(
-        DelinquencyService(DelinquencyRepository(db)),
-        PaymentRepository(db),
-        ExpenseRepository(db),
-    )
+    service = _get_report_service(db)
     return await service.dashboard_stats(start_date=start_date, end_date=end_date)
 
 
@@ -106,11 +120,7 @@ async def report_income(
             detail='Format debe ser: csv, pdf o excel'
         )
     
-    service = ReportService(
-        DelinquencyService(DelinquencyRepository(db)),
-        PaymentRepository(db),
-        ExpenseRepository(db),
-    )
+    service = _get_report_service(db)
     
     filename_base = f"reporte-ingresos{'-' + period if period else ''}"
     
@@ -140,11 +150,7 @@ async def report_balance(
             detail='Format debe ser: csv, pdf o excel'
         )
     
-    service = ReportService(
-        DelinquencyService(DelinquencyRepository(db)),
-        PaymentRepository(db),
-        ExpenseRepository(db),
-    )
+    service = _get_report_service(db)
     
     filename_base = f"balance{'-' + period if period else ''}"
     
@@ -157,3 +163,25 @@ async def report_balance(
     else:  # excel
         content = await service.balance_excel(period, start_date, end_date)
         return _excel_response(content, f"{filename_base}.xlsx")
+
+
+@router.get("/reports/monthly-balance", response_model=MonthlyBalanceResponse)
+async def report_monthly_balance(
+    period: Optional[str] = None,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    validated_period = _validate_month_period_or_400(period)
+    service = _get_report_service(db)
+    return await service.monthly_balance_summary(validated_period)
+
+
+@router.get("/owner/monthly-balance", response_model=MonthlyBalanceResponse)
+async def owner_monthly_balance(
+    period: Optional[str] = None,
+    _user: dict = Depends(require_owner),
+    db=Depends(get_db),
+):
+    validated_period = _validate_month_period_or_400(period)
+    service = _get_report_service(db)
+    return await service.monthly_balance_summary(validated_period)

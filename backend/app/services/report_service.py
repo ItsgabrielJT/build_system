@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
@@ -18,6 +19,10 @@ from app.repositories.expense_repository import ExpenseRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.services.delinquency_service import DelinquencyService
 
+_MONTH_PERIOD_RE = re.compile(r"^\d{4}-\d{2}$")
+_CONFIRMED_PAYMENT_STATUSES = {"REGISTRADO", "APROBADO"}
+_EXCLUDED_EXPENSE_STATUSES = {"ANULADO", "ANULADA"}
+
 
 class ReportService:
     def __init__(
@@ -30,16 +35,78 @@ class ReportService:
         self._payment_repo = payment_repo
         self._expense_repo = expense_repo
 
+    def _validate_month_period(self, period: str) -> str:
+        if not _MONTH_PERIOD_RE.match(period):
+            raise ValueError("Período debe tener formato YYYY-MM")
+        return period
+
+    def _previous_period(self, period: str) -> str:
+        month_start = datetime.strptime(f"{period}-01", "%Y-%m-%d").date()
+        previous_month_last_day = month_start - timedelta(days=1)
+        return previous_month_last_day.strftime("%Y-%m")
+
+    def _is_confirmed_payment(self, payment: dict) -> bool:
+        return (payment.get("status") or "").upper() in _CONFIRMED_PAYMENT_STATUSES
+
+    def _is_valid_expense(self, expense: dict) -> bool:
+        return (expense.get("status") or "REGISTRADO").upper() not in _EXCLUDED_EXPENSE_STATUSES
+
+    async def _monthly_payments(self, period: str) -> list[dict]:
+        period = self._validate_month_period(period)
+        historical = await self._payment_repo.get_all(period=period, status="REGISTRADO")
+        approved = await self._payment_repo.get_all(period=period, status="APROBADO")
+        payments_by_id: dict[str, dict] = {}
+        for payment in [*historical, *approved]:
+            payment_id = str(payment.get("id") or "")
+            payments_by_id[payment_id] = payment
+        return [
+            payment
+            for payment in payments_by_id.values()
+            if self._is_confirmed_payment(payment)
+        ]
+
+    async def _monthly_expenses(self, period: str) -> list[dict]:
+        period = self._validate_month_period(period)
+        expenses_payload = await self._expense_repo.get_by_month(period)
+        expenses = expenses_payload.get("data", []) if isinstance(expenses_payload, dict) else expenses_payload
+        return [expense for expense in expenses if self._is_valid_expense(expense)]
+
+    def _sum_amount(self, rows: list[dict]) -> Decimal:
+        return sum(Decimal(str(row.get("amount", 0) or 0)) for row in rows)
+
+    def _build_breakdown(self, rows: list[dict], key: str, fallback: str) -> list[dict]:
+        totals: dict[str, Decimal] = {}
+        for row in rows:
+            label = row.get(key) or fallback
+            totals[label] = totals.get(label, Decimal("0")) + Decimal(str(row.get("amount", 0) or 0))
+        return [
+            {"label": label, "amount": amount}
+            for label, amount in sorted(totals.items(), key=lambda item: item[1], reverse=True)
+        ]
+
+    def _variation_percent(self, current: Decimal, previous: Decimal) -> Optional[float]:
+        if previous <= 0:
+            return None
+        return round(float((current - previous) / previous * 100), 2)
+
     async def _payments(
         self,
         period: Optional[str] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> list[dict]:
+        if period and not start_date and not end_date:
+            return await self._monthly_payments(period)
         if not start_date and not end_date:
-            return await self._payment_repo.get_all(period=period, status="REGISTRADO")
+            payments = await self._payment_repo.get_all(period=period, status="REGISTRADO")
+            approved = await self._payment_repo.get_all(period=period, status="APROBADO")
+            return [
+                payment
+                for payment in [*payments, *approved]
+                if self._is_confirmed_payment(payment)
+            ]
 
-        conditions = ["p.status = 'REGISTRADO'"]
+        conditions = ["p.status IN ('REGISTRADO', 'APROBADO')"]
         params: list = []
         idx = 1
         if period:
@@ -73,10 +140,14 @@ class ReportService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> list[dict]:
+        if period and not start_date and not end_date:
+            return await self._monthly_expenses(period)
         if not start_date and not end_date:
-            return await self._expense_repo.get_by_month(period)
+            expenses_payload = await self._expense_repo.get_by_month(period)
+            expenses = expenses_payload.get("data", []) if isinstance(expenses_payload, dict) else expenses_payload
+            return [expense for expense in expenses if self._is_valid_expense(expense)]
 
-        conditions = ["status = 'REGISTRADO'"]
+        conditions = ["status NOT IN ('ANULADO', 'ANULADA')"]
         params: list = []
         idx = 1
         if period:
@@ -101,6 +172,37 @@ class ReportService:
             *params,
         )
         return [dict(row) for row in rows]
+
+    async def monthly_balance_summary(self, period: Optional[str] = None) -> dict:
+        target_period = self._validate_month_period(period or date.today().strftime("%Y-%m"))
+        previous_period = self._previous_period(target_period)
+
+        payments = await self._monthly_payments(target_period)
+        expenses = await self._monthly_expenses(target_period)
+        previous_payments = await self._monthly_payments(previous_period)
+        previous_expenses = await self._monthly_expenses(previous_period)
+
+        income_total = self._sum_amount(payments)
+        expense_total = self._sum_amount(expenses)
+        net_balance = income_total - expense_total
+
+        previous_income_total = self._sum_amount(previous_payments)
+        previous_expense_total = self._sum_amount(previous_expenses)
+        previous_net_balance = previous_income_total - previous_expense_total
+
+        return {
+            "period": target_period,
+            "income_total": income_total,
+            "expense_total": expense_total,
+            "net_balance": net_balance,
+            "income_breakdown": self._build_breakdown(payments, "method", "Otros ingresos"),
+            "expense_breakdown": self._build_breakdown(expenses, "category", "Sin categoría"),
+            "previous_period_variation": {
+                "income_pct": self._variation_percent(income_total, previous_income_total),
+                "expense_pct": self._variation_percent(expense_total, previous_expense_total),
+                "net_balance_pct": self._variation_percent(net_balance, previous_net_balance),
+            },
+        }
 
     async def dashboard_stats(
         self,

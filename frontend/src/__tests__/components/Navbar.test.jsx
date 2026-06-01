@@ -64,12 +64,19 @@ describe('Navbar', () => {
     });
 
     useAdminNotifications.mockReturnValue({
-      notifications: [],
-      total: 0,
+      notifications: [
+        {
+          id: 'notif-owner-1',
+          title: 'Pago aprobado — 2026-05',
+          body: 'Tu comprobante fue aprobado por administración.',
+          created_at: '2026-05-31T12:00:00Z',
+        },
+      ],
+      total: 1,
       loading: false,
       error: null,
       fetchNotifications,
-      enabled: false,
+      enabled: true,
     });
 
     render(
@@ -80,7 +87,7 @@ describe('Navbar', () => {
 
     await user.click(screen.getByRole('button', { name: /Notificaciones/i }));
 
-    expect(fetchNotifications).not.toHaveBeenCalled();
-    expect(screen.queryByText(/No hay notificaciones pendientes/i)).not.toBeInTheDocument();
+    expect(fetchNotifications).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Pago aprobado/i)).toBeInTheDocument();
   });
 });

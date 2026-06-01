@@ -76,6 +76,16 @@ class AdminPaymentReviewService:
                 detail=f"Transición inválida: el pago está en estado {payment['status']}",
             )
         updated = await self._payment_repo.approve(payment_id, admin_id)
+        await self._notification_repo.create(
+            notification_type="PAGO_APROBADO",
+            title=f"Pago aprobado — {payment['period']}",
+            body=(
+                f"Tu comprobante por ${payment['amount']} del período {payment['period']} "
+                "fue aprobado por administración."
+            ),
+            recipient=str(payment["created_by"]),
+            metadata={"payment_id": str(payment_id)},
+        )
         return updated
 
     async def reject(
@@ -93,6 +103,16 @@ class AdminPaymentReviewService:
                 detail=f"Transición inválida: el pago está en estado {payment['status']}",
             )
         updated = await self._payment_repo.reject(payment_id, admin_id, reason)
+        await self._notification_repo.create(
+            notification_type="PAGO_RECHAZADO",
+            title=f"Pago rechazado — {payment['period']}",
+            body=(
+                f"Tu comprobante por ${payment['amount']} del período {payment['period']} "
+                f"fue rechazado. Motivo: {reason}"
+            ),
+            recipient=str(payment["created_by"]),
+            metadata={"payment_id": str(payment_id)},
+        )
         return updated
 
     async def list_notifications(

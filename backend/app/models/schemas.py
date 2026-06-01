@@ -301,6 +301,27 @@ class ExpenseChartDataResponse(BaseModel):
     monthly_trend: List[ChartMonthData]
 
 
+class MonthlyBalanceBreakdownItem(BaseModel):
+    label: str
+    amount: Decimal
+
+
+class MonthlyBalanceVariation(BaseModel):
+    income_pct: Optional[float] = None
+    expense_pct: Optional[float] = None
+    net_balance_pct: Optional[float] = None
+
+
+class MonthlyBalanceResponse(BaseModel):
+    period: str
+    income_total: Decimal
+    expense_total: Decimal
+    net_balance: Decimal
+    income_breakdown: List[MonthlyBalanceBreakdownItem]
+    expense_breakdown: List[MonthlyBalanceBreakdownItem]
+    previous_period_variation: MonthlyBalanceVariation
+
+
 # ─── DELINQUENCY ──────────────────────────────────────────────────────────────
 
 class PeriodBalance(BaseModel):

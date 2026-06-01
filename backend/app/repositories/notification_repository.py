@@ -23,7 +23,7 @@ class NotificationRepository:
         data["title"] = payload.get("title")
         data["body"] = payload.get("body")
         data["metadata"] = payload.get("metadata")
-        data["recipient"] = data.get("target_role") or data.get("target_user_id")
+        data["recipient"] = data.get("target_user_id") or data.get("target_role")
         return data
 
     async def create(
@@ -39,8 +39,12 @@ class NotificationRepository:
             "body": body,
             "metadata": metadata,
         }
-        target_role = recipient if recipient in {"ADMIN", "PROPIETARIO"} else None
-        target_user_id = None if target_role else recipient
+        if recipient == "ADMIN":
+            target_role = "ADMIN"
+            target_user_id = None
+        else:
+            target_role = "PROPIETARIO"
+            target_user_id = None if recipient == "PROPIETARIO" else recipient
         reference_id = metadata.get("payment_id") if metadata else None
 
         row = await self._conn.fetchrow(
@@ -79,5 +83,29 @@ class NotificationRepository:
         )
         total = await self._conn.fetchval(
             "SELECT COUNT(*) FROM notifications WHERE target_role = 'ADMIN'"
+        )
+        return [self._map_notification_row(r) or {} for r in rows], int(total or 0)
+
+    async def list_for_user(
+        self, user_id: str, page: int = 1, page_size: int = 20
+    ) -> tuple[list[dict], int]:
+        offset = (page - 1) * page_size
+        rows = await self._conn.fetch(
+            """
+            SELECT * FROM notifications
+            WHERE target_user_id = $1 OR target_role = 'PROPIETARIO'
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            """,
+            user_id,
+            page_size,
+            offset,
+        )
+        total = await self._conn.fetchval(
+            """
+            SELECT COUNT(*) FROM notifications
+            WHERE target_user_id = $1 OR target_role = 'PROPIETARIO'
+            """,
+            user_id,
         )
         return [self._map_notification_row(r) or {} for r in rows], int(total or 0)

@@ -69,6 +69,14 @@ export async function getPendingPayments(token) {
   return res.data;
 }
 
+export async function downloadAdminPaymentProof(paymentId, token) {
+  const res = await axios.get(
+    `${API_BASE}/api/v1/admin/payments/${paymentId}/proof`,
+    { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' }
+  );
+  return res.data;
+}
+
 export async function approvePayment(paymentId, token) {
   const res = await axios.put(
     `${API_BASE}/api/v1/admin/payments/${paymentId}/approve`,

@@ -46,6 +46,7 @@ describe('AdminPaymentsPage', () => {
       fetchPending,
       approvePayment: vi.fn(),
       rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
     });
 
     useApartments.mockReturnValue({
@@ -102,6 +103,7 @@ describe('AdminPaymentsPage', () => {
       fetchPending,
       approvePayment: vi.fn(),
       rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
     });
 
     useApartments.mockReturnValue({
@@ -161,6 +163,7 @@ describe('AdminPaymentsPage', () => {
       fetchPending,
       approvePayment: vi.fn(),
       rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
     });
 
     useApartments.mockReturnValue({
@@ -234,6 +237,7 @@ describe('AdminPaymentsPage', () => {
       fetchPending,
       approvePayment: vi.fn(),
       rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
     });
 
     useApartments.mockReturnValue({ apartments: [], loading: false, error: null, fetchApartments: vi.fn() });
@@ -283,6 +287,7 @@ describe('AdminPaymentsPage', () => {
       fetchPending: vi.fn(),
       approvePayment,
       rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
     });
 
     useApartments.mockReturnValue({ apartments: [], loading: false, error: null, fetchApartments: vi.fn() });
@@ -330,6 +335,7 @@ describe('AdminPaymentsPage', () => {
       fetchPending: vi.fn(),
       approvePayment: vi.fn(),
       rejectPayment,
+      downloadProof: vi.fn(),
     });
 
     useApartments.mockReturnValue({ apartments: [], loading: false, error: null, fetchApartments: vi.fn() });
@@ -345,5 +351,73 @@ describe('AdminPaymentsPage', () => {
     await waitFor(() => {
       expect(rejectPayment).toHaveBeenCalledWith('pending-3', 'Comprobante ilegible');
     });
+  });
+
+  it('permite descargar el comprobante desde la revisión', async () => {
+    const user = userEvent.setup();
+    const downloadProof = vi.fn().mockResolvedValue(new Blob(['pdf']));
+
+    usePayments.mockReturnValue({
+      payments: [],
+      loading: false,
+      error: null,
+      fetchPayments: vi.fn(),
+      createPayment: vi.fn(),
+      annulPayment: vi.fn(),
+    });
+
+    useAdminPaymentReview.mockReturnValue({
+      pendingPayments: [
+        {
+          id: 'pending-4',
+          apartment_code: 'D-404',
+          owner_name: 'Lucia Mora',
+          period: '2026-05',
+          amount: 640,
+          paid_at: '2026-05-25',
+          proof_file_name: 'pago.pdf',
+        },
+      ],
+      loading: false,
+      error: null,
+      fetchPending: vi.fn(),
+      approvePayment: vi.fn(),
+      rejectPayment: vi.fn(),
+      downloadProof,
+    });
+
+    useApartments.mockReturnValue({ apartments: [], loading: false, error: null, fetchApartments: vi.fn() });
+    useOwners.mockReturnValue({ owners: [], loading: false, error: null, fetchOwners: vi.fn() });
+
+    const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+    const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const clickSpy = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
+      if (tagName === 'a') {
+        return {
+          click: clickSpy,
+          set href(value) { this._href = value; },
+          get href() { return this._href; },
+          set download(value) { this._download = value; },
+          get download() { return this._download; },
+        };
+      }
+      return originalCreateElement(tagName);
+    });
+
+    render(<AdminPaymentsPage />);
+
+    await user.click(screen.getByRole('button', { name: /Revisar/i }));
+    await user.click(screen.getByRole('button', { name: /Descargar comprobante/i }));
+
+    await waitFor(() => {
+      expect(downloadProof).toHaveBeenCalledWith('pending-4');
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    createObjectURLSpy.mockRestore();
+    revokeObjectURLSpy.mockRestore();
+    createElementSpy.mockRestore();
   });
 });

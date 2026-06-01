@@ -17,13 +17,14 @@ const formatDate = (value) => {
 };
 
 /**
- * @param {{ payment: object|null, onApprove: (id: string) => Promise<void>, onReject: (id: string, reason: string) => Promise<void>, onClose: () => void }} props
+ * @param {{ payment: object|null, onDownloadProof: (payment: object) => Promise<void>, onApprove: (id: string) => Promise<void>, onReject: (id: string, reason: string) => Promise<void>, onClose: () => void }} props
  */
-export default function PaymentReviewModal({ payment, onApprove, onReject, onClose }) {
+export default function PaymentReviewModal({ payment, onDownloadProof, onApprove, onReject, onClose }) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   if (!payment) return null;
 
@@ -61,6 +62,18 @@ export default function PaymentReviewModal({ payment, onApprove, onReject, onClo
     setActionError(null);
   };
 
+  const handleDownloadProof = async () => {
+    setDownloading(true);
+    setActionError(null);
+    try {
+      await onDownloadProof(payment);
+    } catch (err) {
+      setActionError(err.response?.data?.detail || 'Error al descargar el comprobante');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -94,7 +107,19 @@ export default function PaymentReviewModal({ payment, onApprove, onReject, onClo
           </div>
           <div className={styles.field}>
             <dt>Comprobante</dt>
-            <dd>{payment.proof_file_name || 'Sin nombre'}</dd>
+            <dd>
+              <span>{payment.proof_file_name || 'Sin nombre'}</span>
+              {payment.proof_file_name && (
+                <button
+                  type="button"
+                  className={styles.btnProof}
+                  onClick={handleDownloadProof}
+                  disabled={downloading || submitting}
+                >
+                  {downloading ? 'Descargando...' : 'Descargar comprobante'}
+                </button>
+              )}
+            </dd>
           </div>
           {payment.method && (
             <div className={styles.field}>

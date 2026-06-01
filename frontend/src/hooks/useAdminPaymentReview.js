@@ -39,5 +39,18 @@ export function useAdminPaymentReview() {
     [token]
   );
 
-  return { pendingPayments, loading, error, fetchPending, approvePayment, rejectPayment };
+  const downloadProof = useCallback(
+    async (paymentId) => paymentService.downloadAdminPaymentProof(paymentId, token),
+    [token]
+  );
+
+  return {
+    pendingPayments,
+    loading,
+    error,
+    fetchPending,
+    approvePayment,
+    rejectPayment,
+    downloadProof,
+  };
 }

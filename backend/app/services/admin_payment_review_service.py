@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
+from app.config.storage import read_proof_bytes
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.payment_proof_repository import PaymentProofRepository
 from app.repositories.payment_repository import PaymentRepository
@@ -27,9 +28,40 @@ class AdminPaymentReviewService:
     async def list_pending(
         self, page: int = 1, page_size: int = 20
     ) -> list[dict]:
-        return await self._payment_repo.get_pending_for_admin(
+        payments = await self._payment_repo.get_pending_for_admin(
             page=page, page_size=page_size
         )
+        enriched_payments: list[dict] = []
+        for payment in payments:
+            proof = await self._proof_repo.get_latest_by_payment(payment["id"])
+            enriched_payment = dict(payment)
+            enriched_payment["proof_file_name"] = proof["file_name"] if proof else None
+            enriched_payment["proof_content_type"] = proof["content_type"] if proof else None
+            enriched_payment["has_proof"] = proof is not None
+            enriched_payments.append(enriched_payment)
+
+        return enriched_payments
+
+    async def download_proof(self, payment_id: UUID) -> dict:
+        payment = await self._payment_repo.get_by_id(payment_id)
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Pago no encontrado",
+            )
+
+        proof = await self._proof_repo.get_latest_by_payment(payment_id)
+        if not proof:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="El pago no tiene comprobante adjunto",
+            )
+
+        return {
+            "content": read_proof_bytes(proof["storage_path"]),
+            "file_name": proof["file_name"],
+            "content_type": proof["content_type"],
+        }
 
     async def approve(self, payment_id: UUID, admin_id: str) -> dict:
         payment = await self._payment_repo.get_by_id(payment_id)

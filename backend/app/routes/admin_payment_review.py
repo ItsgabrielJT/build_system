@@ -2,6 +2,7 @@
 
 Rutas:
   GET  /api/v1/admin/payments/pending              — listar pendientes
+    GET  /api/v1/admin/payments/{payment_id}/proof   — descargar comprobante
   PUT  /api/v1/admin/payments/{payment_id}/approve — aprobar
   PUT  /api/v1/admin/payments/{payment_id}/reject  — rechazar
   GET  /api/v1/admin/notifications/payments        — notificaciones internas
@@ -12,6 +13,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import Response
 
 from app.auth.dependencies import require_admin
 from app.config.database import get_db
@@ -42,6 +44,24 @@ async def list_pending_payments(
     """Lista todos los pagos pendientes de revisión para el ADMIN."""
     service = _build_service(db)
     return await service.list_pending(page=page, page_size=page_size)
+
+
+@router.get("/payments/{payment_id}/proof")
+async def download_payment_proof(
+    payment_id: UUID,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Descarga el comprobante adjunto de un pago para revisión administrativa."""
+    service = _build_service(db)
+    proof = await service.download_proof(payment_id)
+    return Response(
+        content=proof["content"],
+        media_type=proof["content_type"],
+        headers={
+            "Content-Disposition": f'attachment; filename="{proof["file_name"]}"'
+        },
+    )
 
 
 @router.put("/payments/{payment_id}/approve")

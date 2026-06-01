@@ -450,6 +450,32 @@ class TestAdminApproveRejectPayment:
         )
         assert owner_response.status_code == 403
 
+    @pytest.mark.asyncio
+    async def test_download_payment_proof_returns_binary_file(
+        self,
+        async_client: AsyncClient,
+        admin_headers: dict,
+    ):
+        """ADMIN puede descargar el comprobante cargado por el propietario."""
+        with patch(
+            "app.services.admin_payment_review_service.AdminPaymentReviewService.download_proof",
+            new=AsyncMock(
+                return_value={
+                    "content": b"%PDF-1.4 proof",
+                    "file_name": "transferencia.pdf",
+                    "content_type": "application/pdf",
+                }
+            ),
+        ):
+            response = await async_client.get(
+                f"/api/v1/admin/payments/{PAYMENT_ID}/proof",
+                headers=admin_headers,
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert "transferencia.pdf" in response.headers["content-disposition"]
+
 
 # ─── HU-03: Descarga de constancia y recibo ───────────────────────────────────
 
@@ -696,6 +722,54 @@ class TestOwnerPaymentServiceLogic:
 
         assert exc_info.value.status_code == 422
         assert "Transición inválida" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_admin_list_pending_includes_latest_proof_metadata(self):
+        """El listado de pendientes expone nombre y tipo del último comprobante."""
+        from app.services.admin_payment_review_service import AdminPaymentReviewService
+
+        payment_repo = AsyncMock()
+        proof_repo = AsyncMock()
+        notification_repo = AsyncMock()
+
+        payment_repo.get_pending_for_admin = AsyncMock(return_value=[_make_payment()])
+        proof_repo.get_latest_by_payment = AsyncMock(return_value=_make_proof())
+
+        service = AdminPaymentReviewService(
+            payment_repo, proof_repo, notification_repo
+        )
+
+        result = await service.list_pending()
+
+        assert result[0]["proof_file_name"] == "transferencia.pdf"
+        assert result[0]["proof_content_type"] == "application/pdf"
+        assert result[0]["has_proof"] is True
+
+    @pytest.mark.asyncio
+    async def test_admin_download_proof_returns_latest_file_metadata_and_bytes(self):
+        """La descarga usa el último comprobante persistido y devuelve bytes."""
+        from app.services.admin_payment_review_service import AdminPaymentReviewService
+
+        payment_repo = AsyncMock()
+        proof_repo = AsyncMock()
+        notification_repo = AsyncMock()
+
+        payment_repo.get_by_id = AsyncMock(return_value=_make_payment())
+        proof_repo.get_latest_by_payment = AsyncMock(return_value=_make_proof())
+
+        service = AdminPaymentReviewService(
+            payment_repo, proof_repo, notification_repo
+        )
+
+        with patch(
+            "app.services.admin_payment_review_service.read_proof_bytes",
+            return_value=b"%PDF proof bytes",
+        ):
+            result = await service.download_proof(PAYMENT_ID)
+
+        assert result["file_name"] == "transferencia.pdf"
+        assert result["content_type"] == "application/pdf"
+        assert result["content"] == b"%PDF proof bytes"
 
 
 class TestPaymentRepositoryContracts:

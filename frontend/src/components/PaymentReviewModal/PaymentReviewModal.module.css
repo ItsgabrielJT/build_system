@@ -80,6 +80,26 @@
   font-weight: 500;
   color: var(--color-gray-900);
   word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.btnProof {
+  padding: 8px 12px;
+  background: #eef4ff;
+  color: #0b5bd3;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnProof:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .rejectForm {

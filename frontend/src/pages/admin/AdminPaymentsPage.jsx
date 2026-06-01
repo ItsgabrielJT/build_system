@@ -70,7 +70,15 @@ const getPeriodLabel = (period) => {
 
 export default function AdminPaymentsPage() {
   const { payments, loading, error, fetchPayments, createPayment, annulPayment } = usePayments();
-  const { pendingPayments, loading: loadingPending, error: errorPending, fetchPending, approvePayment, rejectPayment } = useAdminPaymentReview();
+  const {
+    pendingPayments,
+    loading: loadingPending,
+    error: errorPending,
+    fetchPending,
+    approvePayment,
+    rejectPayment,
+    downloadProof,
+  } = useAdminPaymentReview();
   const { apartments, fetchApartments } = useApartments();
   const { owners, fetchOwners } = useOwners();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -255,6 +263,16 @@ export default function AdminPaymentsPage() {
     const link = document.createElement('a');
     link.href = url;
     link.download = `pagos-${filterPeriod || 'todos'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadProof = async (payment) => {
+    const proofBlob = await downloadProof(payment.id);
+    const url = URL.createObjectURL(proofBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = payment.proof_file_name || `comprobante-${payment.id}`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -541,6 +559,7 @@ export default function AdminPaymentsPage() {
 
       <PaymentReviewModal
         payment={reviewTarget}
+        onDownloadProof={handleDownloadProof}
         onApprove={async (id) => { await approvePayment(id); setReviewTarget(null); }}
         onReject={async (id, reason) => { await rejectPayment(id, reason); setReviewTarget(null); }}
         onClose={() => setReviewTarget(null)}

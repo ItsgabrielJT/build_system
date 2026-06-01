@@ -36,3 +36,19 @@ export async function downloadBalanceReport(token, params = {}) {
   });
   return res.data;
 }
+
+export async function getAdminMonthlyBalance(period, token) {
+  const res = await axios.get(`${API_BASE}/api/v1/reports/monthly-balance`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: period ? { period } : {},
+  });
+  return res.data;
+}
+
+export async function getOwnerMonthlyBalance(period, token) {
+  const res = await axios.get(`${API_BASE}/api/v1/owner/monthly-balance`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: period ? { period } : {},
+  });
+  return res.data;
+}

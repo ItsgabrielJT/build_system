@@ -102,6 +102,59 @@
   gap: 18px;
 }
 
+.monthlySection {
+  background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+  border: 1px solid #e2e8f3;
+  border-radius: 24px;
+  padding: 22px;
+}
+
+.monthlyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.monthlyHeader h2 {
+  color: #070707;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.monthlyHeader p {
+  color: #596070;
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.monthField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #596070;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.monthField input {
+  height: 44px;
+  min-width: 156px;
+  border: 1px solid #dfe2e8;
+  border-radius: 10px;
+  padding: 0 12px;
+  color: #1f2430;
+  background: #fff;
+}
+
+.monthlyGrid {
+  display: grid;
+  gap: 18px;
+}
+
 .metricCard {
   min-height: 118px;
   background: #fff;
@@ -350,6 +403,10 @@
     flex-direction: column;
   }
 
+  .monthlyHeader {
+    flex-direction: column;
+  }
+
   .actions {
     justify-content: flex-start;
   }
@@ -375,7 +432,9 @@
 
   .actions,
   .dateField,
+  .monthField,
   .dateField input,
+  .monthField input,
   .btnPdf,
   .btnExcel {
     width: 100%;

@@ -11,7 +11,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import MonthlyBalanceCards from '../../components/MonthlyBalanceCards/MonthlyBalanceCards';
+import MonthlyBalanceChart from '../../components/MonthlyBalanceChart/MonthlyBalanceChart';
 import { useAuth } from '../../hooks/useAuth';
+import { useMonthlyBalance } from '../../hooks/useMonthlyBalance';
 import * as reportService from '../../services/reportService';
 import styles from './AdminReportsPage.module.css';
 
@@ -41,6 +44,10 @@ function getQuarterRange() {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
   };
+}
+
+function getCurrentMonthPeriod() {
+  return new Date().toISOString().slice(0, 7);
 }
 
 function formatCurrency(value) {
@@ -101,10 +108,16 @@ export default function AdminReportsPage() {
   const initialRange = useMemo(() => getQuarterRange(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
   const [endDate, setEndDate] = useState(initialRange.endDate);
+  const [monthlyPeriod, setMonthlyPeriod] = useState(getCurrentMonthPeriod());
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingExport, setLoadingExport] = useState({});
   const [error, setError] = useState(null);
+  const {
+    data: monthlyBalance,
+    loading: loadingMonthlyBalance,
+    error: monthlyBalanceError,
+  } = useMonthlyBalance('ADMIN', monthlyPeriod);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,6 +217,31 @@ export default function AdminReportsPage() {
             <strong>{formatCurrency(summary.net_income)}</strong>
           </div>
         </article>
+      </section>
+
+      <section className={styles.monthlySection} aria-busy={loadingMonthlyBalance}>
+        <div className={styles.monthlyHeader}>
+          <div>
+            <h2>Balance mensual del edificio</h2>
+            <p>Vista contable consolidada para contrastar el mes actual contra el anterior.</p>
+          </div>
+          <label className={styles.monthField}>
+            <span>Mes</span>
+            <input
+              type="month"
+              value={monthlyPeriod}
+              onChange={(event) => setMonthlyPeriod(event.target.value)}
+              aria-label="Mes"
+            />
+          </label>
+        </div>
+
+        {monthlyBalanceError ? <div className={styles.errorBanner}>{monthlyBalanceError}</div> : null}
+
+        <div className={styles.monthlyGrid}>
+          <MonthlyBalanceCards summary={monthlyBalance} loading={loadingMonthlyBalance} />
+          <MonthlyBalanceChart summary={monthlyBalance} loading={loadingMonthlyBalance} />
+        </div>
       </section>
 
       <section className={styles.chartGrid}>

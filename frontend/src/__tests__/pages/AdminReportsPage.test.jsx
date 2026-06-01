@@ -2,9 +2,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminReportsPage from '../../pages/admin/AdminReportsPage';
+import { useMonthlyBalance } from '../../hooks/useMonthlyBalance';
 import * as reportService from '../../services/reportService';
 
 vi.mock('../../services/reportService');
+vi.mock('../../hooks/useMonthlyBalance', () => ({
+  useMonthlyBalance: vi.fn(),
+}));
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
     token: 'test-token',
@@ -47,6 +51,24 @@ const statsFixture = {
 describe('AdminReportsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useMonthlyBalance.mockReturnValue({
+      data: {
+        period: '2026-05',
+        income_total: 2500,
+        expense_total: 1750,
+        net_balance: 750,
+        income_breakdown: [{ label: 'Cuotas', amount: 2300 }],
+        expense_breakdown: [{ label: 'Mantenimiento', amount: 900 }],
+        previous_period_variation: {
+          income_pct: 4.2,
+          expense_pct: -1.5,
+          net_balance_pct: 12.1,
+        },
+      },
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+    });
     reportService.getDashboardStats.mockResolvedValue(statsFixture);
     reportService.downloadDelinquencyReport.mockResolvedValue(new Blob(['delinquency']));
     reportService.downloadIncomeReport.mockResolvedValue(new Blob(['income']));
@@ -68,6 +90,9 @@ describe('AdminReportsPage', () => {
       expect(screen.getByText('$26.300')).toBeInTheDocument();
     });
 
+    expect(screen.getByText('Balance mensual del edificio')).toBeInTheDocument();
+    expect(screen.getByText('Ingresos del mes')).toBeInTheDocument();
+    expect(screen.getByText('Comparativo del mes')).toBeInTheDocument();
     expect(screen.getByText('Categorías de gastos')).toBeInTheDocument();
     expect(screen.getByText('Emitido vs cobrado')).toBeInTheDocument();
     expect(screen.getByText('Mora y saldos pendientes')).toBeInTheDocument();

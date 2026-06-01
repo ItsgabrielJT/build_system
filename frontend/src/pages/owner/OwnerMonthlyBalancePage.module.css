@@ -1,0 +1,89 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 12px 4px 28px;
+}
+
+.header {
+  align-items: flex-start;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4ff 100%);
+  border: 1px solid #d7e3ff;
+  border-radius: 24px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 22px;
+}
+
+.badge {
+  background: #111827;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  color: #0f172a;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.header p {
+  color: #475467;
+  font-size: 15px;
+  margin: 8px 0 0;
+  max-width: 600px;
+}
+
+.monthField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.monthField span {
+  color: #475467;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.monthField input {
+  background: #fff;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  color: #111827;
+  min-width: 180px;
+  padding: 12px 14px;
+}
+
+.errorBanner {
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  border-radius: 12px;
+  color: #b42318;
+  padding: 12px 14px;
+}
+
+@media (max-width: 900px) {
+  .header {
+    flex-direction: column;
+  }
+
+  .monthField {
+    width: 100%;
+  }
+
+  .monthField input {
+    width: 100%;
+  }
+}

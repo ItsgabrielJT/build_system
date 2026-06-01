@@ -30,6 +30,13 @@ const METHOD_OPTIONS = [
   { value: 'cheque', label: 'Cheque' },
 ];
 
+const VIEW_TABS = [
+  { value: 'overview', label: 'Resumen y pagos' },
+  { value: 'approvals', label: 'Aprobaciones' },
+];
+
+const PAGE_SIZE = 5;
+
 const STATUS_CONFIG = {
   REGISTRADO: { label: 'Pagado', className: 'statusPaid' },
   ANULADO: { label: 'Anulado', className: 'statusAnnulled' },
@@ -87,8 +94,11 @@ export default function AdminPaymentsPage() {
   const [filterPeriod, setFilterPeriod] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [query, setQuery] = useState('');
+  const [activeView, setActiveView] = useState('overview');
   const [actionError, setActionError] = useState(null);
   const [filteredApartments, setFilteredApartments] = useState([]);
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [pendingPage, setPendingPage] = useState(1);
 
   useEffect(() => {
     fetchApartments();
@@ -120,6 +130,19 @@ export default function AdminPaymentsPage() {
     () => visiblePayments.filter((payment) => payment.status === 'REGISTRADO'),
     [visiblePayments]
   );
+
+  const paginatedVisiblePayments = useMemo(() => {
+    const start = (paymentsPage - 1) * PAGE_SIZE;
+    return visiblePayments.slice(start, start + PAGE_SIZE);
+  }, [paymentsPage, visiblePayments]);
+
+  const paginatedPendingPayments = useMemo(() => {
+    const start = (pendingPage - 1) * PAGE_SIZE;
+    return pendingPayments.slice(start, start + PAGE_SIZE);
+  }, [pendingPage, pendingPayments]);
+
+  const paymentsTotalPages = Math.max(1, Math.ceil(visiblePayments.length / PAGE_SIZE));
+  const pendingTotalPages = Math.max(1, Math.ceil(pendingPayments.length / PAGE_SIZE));
 
   const annulledPayments = useMemo(
     () => visiblePayments.filter((payment) => payment.status === 'ANULADO'),
@@ -171,6 +194,22 @@ export default function AdminPaymentsPage() {
     () => visiblePayments.filter((payment) => Boolean(payment.reference)).slice(0, 4),
     [visiblePayments]
   );
+
+  useEffect(() => {
+    setPaymentsPage(1);
+  }, [filterPeriod, filterStatus, query]);
+
+  useEffect(() => {
+    if (paymentsPage > paymentsTotalPages) {
+      setPaymentsPage(paymentsTotalPages);
+    }
+  }, [paymentsPage, paymentsTotalPages]);
+
+  useEffect(() => {
+    if (pendingPage > pendingTotalPages) {
+      setPendingPage(pendingTotalPages);
+    }
+  }, [pendingPage, pendingTotalPages]);
 
   const completionRate = visiblePayments.length
     ? Math.round((registeredPayments.length / visiblePayments.length) * 100)
@@ -277,6 +316,32 @@ export default function AdminPaymentsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const renderPagination = (page, totalPages, onChange, label) => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className={styles.pagination} aria-label={`Paginación de ${label}`}>
+        <button
+          type="button"
+          className={styles.btnSecondary}
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+        >
+          Anterior
+        </button>
+        <span className={styles.paginationInfo}>Página {page} de {totalPages}</span>
+        <button
+          type="button"
+          className={styles.btnSecondary}
+          onClick={() => onChange(page + 1)}
+          disabled={page === totalPages}
+        >
+          Siguiente
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
@@ -309,7 +374,37 @@ export default function AdminPaymentsPage() {
         <div className={styles.errorBanner}>{error || actionError || errorPending}</div>
       )}
 
-      {(loadingPending || pendingPayments.length > 0) && (
+      <section className={styles.tabsSection}>
+        <div className={styles.tabsList} role="tablist" aria-label="Secciones de pagos">
+          {VIEW_TABS.map((tab) => {
+            const isActive = activeView === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`payments-panel-${tab.value}`}
+                id={`payments-tab-${tab.value}`}
+                className={`${styles.tabButton} ${isActive ? styles.tabButtonActive : ''}`}
+                onClick={() => setActiveView(tab.value)}
+              >
+                <span>{tab.label}</span>
+                {tab.value === 'approvals' && pendingPayments.length > 0 && (
+                  <span className={styles.pendingBadge}>{pendingPayments.length}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        id="payments-panel-approvals"
+        role="tabpanel"
+        aria-labelledby="payments-tab-approvals"
+        hidden={activeView !== 'approvals'}
+      >
         <section className={styles.pendingSection}>
           <h2 className={styles.pendingSectionTitle}>
             Pendientes de aprobación
@@ -319,7 +414,8 @@ export default function AdminPaymentsPage() {
           </h2>
           {loadingPending ? (
             <div className={styles.emptyState}>Cargando pendientes...</div>
-          ) : (
+          ) : pendingPayments.length ? (
+            <>
             <div className={styles.tableWrap}>
               <table className={styles.paymentsTable}>
                 <thead>
@@ -332,7 +428,7 @@ export default function AdminPaymentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pendingPayments.map((payment) => (
+                  {paginatedPendingPayments.map((payment) => (
                     <tr key={payment.id}>
                       <td>
                         <strong>Unidad {payment.apartment_code || 'N/D'}</strong>
@@ -354,10 +450,20 @@ export default function AdminPaymentsPage() {
                 </tbody>
               </table>
             </div>
+            {renderPagination(pendingPage, pendingTotalPages, setPendingPage, 'aprobaciones')}
+            </>
+          ) : (
+            <div className={styles.emptyState}>No hay pagos pendientes por aprobar.</div>
           )}
         </section>
-      )}
+      </section>
 
+      <section
+        id="payments-panel-overview"
+        role="tabpanel"
+        aria-labelledby="payments-tab-overview"
+        hidden={activeView !== 'overview'}
+      >
       <section className={styles.metricsGrid}>
         <article className={styles.metricCard}>
           <div className={styles.metricTopline}>
@@ -439,54 +545,57 @@ export default function AdminPaymentsPage() {
             {loading ? (
               <div className={styles.emptyState}>Cargando pagos...</div>
             ) : visiblePayments.length ? (
-              <div className={styles.tableWrap}>
-                <table className={styles.paymentsTable}>
-                  <thead>
-                    <tr>
-                      <th>Departamento / Propietario</th>
-                      <th>Fecha</th>
-                      <th>Monto</th>
-                      <th>Método</th>
-                      <th>Estado</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visiblePayments.map((payment) => {
-                      const status = STATUS_CONFIG[payment.status] || { label: payment.status, className: 'statusDefault' };
-                      return (
-                        <tr key={payment.id}>
-                          <td>
-                            <strong>Unidad {payment.apartment_code || 'N/D'}</strong>
-                            <span>{payment.owner_name || 'Sin propietario'}</span>
-                            {payment.reference && <small>Ref. {payment.reference}</small>}
-                          </td>
-                          <td>
-                            <strong>{formatDate(payment.paid_at)}</strong>
-                            <span>{payment.period}</span>
-                          </td>
-                          <td className={styles.amountCell}>{formatCurrency(payment.amount)}</td>
-                          <td><span className={styles.methodPill}>{formatMethod(payment.method)}</span></td>
-                          <td>
-                            <span className={`${styles.statusBadge} ${styles[status.className]}`}>
-                              {status.label}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className={styles.btnTable}
-                              disabled={payment.status !== 'REGISTRADO'}
-                              onClick={() => setAnnulTarget(payment)}
-                            >
-                              Anular
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className={styles.tableWrap}>
+                  <table className={styles.paymentsTable}>
+                    <thead>
+                      <tr>
+                        <th>Departamento / Propietario</th>
+                        <th>Fecha</th>
+                        <th>Monto</th>
+                        <th>Método</th>
+                        <th>Estado</th>
+                        <th>Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedVisiblePayments.map((payment) => {
+                        const status = STATUS_CONFIG[payment.status] || { label: payment.status, className: 'statusDefault' };
+                        return (
+                          <tr key={payment.id}>
+                            <td>
+                              <strong>Unidad {payment.apartment_code || 'N/D'}</strong>
+                              <span>{payment.owner_name || 'Sin propietario'}</span>
+                              {payment.reference && <small>Ref. {payment.reference}</small>}
+                            </td>
+                            <td>
+                              <strong>{formatDate(payment.paid_at)}</strong>
+                              <span>{payment.period}</span>
+                            </td>
+                            <td className={styles.amountCell}>{formatCurrency(payment.amount)}</td>
+                            <td><span className={styles.methodPill}>{formatMethod(payment.method)}</span></td>
+                            <td>
+                              <span className={`${styles.statusBadge} ${styles[status.className]}`}>
+                                {status.label}
+                              </span>
+                            </td>
+                            <td>
+                              <button
+                                className={styles.btnTable}
+                                disabled={payment.status !== 'REGISTRADO'}
+                                onClick={() => setAnnulTarget(payment)}
+                              >
+                                Anular
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {renderPagination(paymentsPage, paymentsTotalPages, setPaymentsPage, 'historial de pagos')}
+              </>
             ) : (
               <div className={styles.emptyState}>No hay pagos registrados.</div>
             )}
@@ -539,6 +648,7 @@ export default function AdminPaymentsPage() {
             </div>
           </article>
         </aside>
+      </section>
       </section>
 
       <FormModal

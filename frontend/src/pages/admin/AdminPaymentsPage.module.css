@@ -114,6 +114,40 @@
   border: 1px solid #fecaca;
 }
 
+.tabsSection {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.tabsList {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 18px;
+  background: #eef4ff;
+}
+
+.tabButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--color-gray-700);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tabButtonActive {
+  background: #fff;
+  color: #0b5bd3;
+  box-shadow: 0 10px 24px rgba(11, 91, 211, 0.12);
+}
+
 .pendingSection {
   background: #fff;
   border: 1px solid #f2b705;
@@ -507,6 +541,20 @@
   padding: 16px;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 18px 0 0;
+}
+
+.paginationInfo {
+  color: var(--color-gray-600);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 @media (max-width: 1100px) {
   .metricsGrid,
   .dashboardGrid {
@@ -540,6 +588,11 @@
 
   .panelHeader {
     flex-direction: column;
+  }
+
+  .pagination {
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   .tableWrap {

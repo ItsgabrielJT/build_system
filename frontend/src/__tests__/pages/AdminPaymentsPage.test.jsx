@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AdminPaymentsPage from '../../pages/admin/AdminPaymentsPage';
@@ -249,11 +249,84 @@ describe('AdminPaymentsPage', () => {
       expect(fetchPending).toHaveBeenCalledTimes(1);
     });
 
+    await userEvent.click(screen.getByRole('tab', { name: /Aprobaciones/i }));
+
     expect(screen.getByRole('heading', { name: /Pendientes de aprobación/i })).toBeInTheDocument();
     expect(screen.getByText(/Unidad A-101/i)).toBeInTheDocument();
     expect(screen.getByText(/Ana Lopez/i)).toBeInTheDocument();
     expect(screen.getByText(/transferencia\.pdf/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Revisar/i })).toBeInTheDocument();
+  });
+
+  it('pagina los pagos pendientes y el historial de pagos', async () => {
+    const pendingPayments = Array.from({ length: 6 }, (_, index) => ({
+      id: `pending-${index + 1}`,
+      apartment_code: `A-10${index + 1}`,
+      owner_name: `Owner ${index + 1}`,
+      period: '2026-05',
+      amount: 100 + index,
+      proof_file_name: `proof-${index + 1}.pdf`,
+    }));
+    const payments = Array.from({ length: 6 }, (_, index) => ({
+      id: `payment-${index + 1}`,
+      apartment_code: `B-20${index + 1}`,
+      owner_name: `Resident ${index + 1}`,
+      period: '2026-05',
+      amount: 300 + index,
+      method: 'transferencia',
+      paid_at: '2026-05-20',
+      reference: `REF-${index + 1}`,
+      status: 'REGISTRADO',
+    }));
+
+    usePayments.mockReturnValue({
+      payments,
+      loading: false,
+      error: null,
+      fetchPayments: vi.fn(),
+      createPayment: vi.fn(),
+      annulPayment: vi.fn(),
+    });
+
+    useAdminPaymentReview.mockReturnValue({
+      pendingPayments,
+      loading: false,
+      error: null,
+      fetchPending: vi.fn(),
+      approvePayment: vi.fn(),
+      rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
+    });
+
+    useApartments.mockReturnValue({ apartments: [], loading: false, error: null, fetchApartments: vi.fn() });
+    useOwners.mockReturnValue({ owners: [], loading: false, error: null, fetchOwners: vi.fn() });
+
+    const user = userEvent.setup();
+    render(<AdminPaymentsPage />);
+
+    const overviewPanel = screen.getByRole('tabpanel', { name: /Resumen y pagos/i });
+    const historyTable = within(overviewPanel).getAllByRole('table')[0];
+
+    expect(within(historyTable).getByText(/Unidad B-201/i)).toBeInTheDocument();
+    expect(within(historyTable).queryByText(/Unidad B-206/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    expect(within(historyTable).getByText(/Unidad B-206/i)).toBeInTheDocument();
+    expect(within(historyTable).queryByText(/Unidad B-201/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /Aprobaciones/i }));
+
+    const approvalsPanel = screen.getByRole('tabpanel', { name: /Aprobaciones/i });
+    const approvalsTable = within(approvalsPanel).getByRole('table');
+
+    expect(within(approvalsTable).getByText(/Unidad A-101/i)).toBeInTheDocument();
+    expect(within(approvalsTable).queryByText(/Unidad A-106/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    expect(within(approvalsTable).getByText(/Unidad A-106/i)).toBeInTheDocument();
+    expect(within(approvalsTable).queryByText(/Unidad A-101/i)).not.toBeInTheDocument();
   });
 
   it('abre revisión y aprueba un pago pendiente', async () => {
@@ -295,6 +368,7 @@ describe('AdminPaymentsPage', () => {
 
     render(<AdminPaymentsPage />);
 
+    await user.click(screen.getByRole('tab', { name: /Aprobaciones/i }));
     await user.click(screen.getByRole('button', { name: /Revisar/i }));
     expect(screen.getByRole('heading', { name: /Revisar Pago Pendiente/i })).toBeInTheDocument();
 
@@ -343,6 +417,7 @@ describe('AdminPaymentsPage', () => {
 
     render(<AdminPaymentsPage />);
 
+    await user.click(screen.getByRole('tab', { name: /Aprobaciones/i }));
     await user.click(screen.getByRole('button', { name: /Revisar/i }));
     await user.click(screen.getByRole('button', { name: 'Rechazar' }));
     await user.type(screen.getByLabelText(/Motivo de rechazo/i), 'Comprobante ilegible');
@@ -408,6 +483,7 @@ describe('AdminPaymentsPage', () => {
 
     render(<AdminPaymentsPage />);
 
+  await user.click(screen.getByRole('tab', { name: /Aprobaciones/i }));
     await user.click(screen.getByRole('button', { name: /Revisar/i }));
     await user.click(screen.getByRole('button', { name: /Descargar comprobante/i }));
 

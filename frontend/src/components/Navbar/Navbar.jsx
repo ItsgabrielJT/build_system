@@ -1,5 +1,7 @@
-import { useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useAdminNotifications } from '../../hooks/useAdminNotifications';
 import styles from './Navbar.module.css';
 
 const IconBell = () => (
@@ -39,10 +41,59 @@ const ROLE_LABELS = {
 export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSidebar }) {
   const { user, role } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationRef = useRef(null);
+  const {
+    notifications,
+    total,
+    loading,
+    error,
+    fetchNotifications,
+    enabled: notificationsEnabled,
+  } = useAdminNotifications();
   const isReports = pathname === '/admin/reports';
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
   const displayName = user?.email?.split('@')[0] || 'Usuario';
   const roleLabel = ROLE_LABELS[role] || role || '';
+
+  useEffect(() => {
+    if (!isNotificationsOpen) return undefined;
+
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setIsNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isNotificationsOpen]);
+
+  const handleNotificationToggle = async () => {
+    if (!notificationsEnabled) return;
+
+    if (!isNotificationsOpen) {
+      await fetchNotifications();
+    }
+
+    setIsNotificationsOpen((current) => !current);
+  };
+
+  const handleNotificationClick = () => {
+    setIsNotificationsOpen(false);
+    navigate('/admin/payments');
+  };
+
+  const formatNotificationDate = (value) => {
+    if (!value) return 'Sin fecha';
+    return new Intl.DateTimeFormat('es', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value));
+  };
 
   return (
     <header className={`${styles.navbar} ${isReports ? styles.reportsNavbar : ''}`}>
@@ -68,9 +119,51 @@ export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSi
 
       <div className={styles.right}>
         {isReports && <span className={styles.reportBuildingName}>{buildingName}</span>}
-        <button className={styles.iconBtn} aria-label="Notificaciones">
-          <IconBell />
-        </button>
+        <div className={styles.notificationWrap} ref={notificationRef}>
+          <button className={styles.iconBtn} aria-label="Notificaciones" onClick={handleNotificationToggle}>
+            <IconBell />
+            {notificationsEnabled && total > 0 && (
+              <span className={styles.notificationBadge}>{total > 99 ? '99+' : total}</span>
+            )}
+          </button>
+
+          {notificationsEnabled && isNotificationsOpen && (
+            <div className={styles.notificationPanel}>
+              <div className={styles.notificationPanelHeader}>
+                <div>
+                  <strong>Notificaciones</strong>
+                  <span>{total} activas</span>
+                </div>
+                <button type="button" className={styles.notificationRefreshBtn} onClick={fetchNotifications}>
+                  Actualizar
+                </button>
+              </div>
+
+              {loading ? (
+                <div className={styles.notificationState}>Cargando notificaciones...</div>
+              ) : error ? (
+                <div className={styles.notificationError}>{error}</div>
+              ) : notifications.length ? (
+                <div className={styles.notificationList}>
+                  {notifications.map((notification) => (
+                    <button
+                      key={notification.id}
+                      type="button"
+                      className={styles.notificationItem}
+                      onClick={handleNotificationClick}
+                    >
+                      <strong>{notification.title || 'Notificación del sistema'}</strong>
+                      <span>{notification.body || 'Sin detalle adicional.'}</span>
+                      <small>{formatNotificationDate(notification.created_at)}</small>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.notificationState}>No hay notificaciones pendientes.</div>
+              )}
+            </div>
+          )}
+        </div>
         <button className={styles.iconBtn} aria-label="Configuración">
           <IconSettings />
         </button>

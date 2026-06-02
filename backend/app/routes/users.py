@@ -16,6 +16,7 @@ from app.models.schemas import (
     UserCreate,
     UserResponse,
     UserUpdate,
+    RoleResponse,
 )
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
@@ -117,6 +118,26 @@ async def list_users(
     user_service = UserService(user_repo, role_repo, auth_service)
 
     return await user_service.list_users(role_filter=role)
+
+
+@router.get(
+    "/roles",
+    response_model=List[RoleResponse],
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_admin)],
+)
+async def list_roles(
+    db: asyncpg.Connection = Depends(get_db),
+) -> list:
+    """
+    Listar todos los roles disponibles — SOLO para ADMIN.
+    """
+    user_repo = UserRepository(db)
+    role_repo = RoleRepository(db)
+    auth_service = AuthService(user_repo, role_repo)
+    user_service = UserService(user_repo, role_repo, auth_service)
+
+    return await user_service.get_all_roles()
 
 
 @router.get(

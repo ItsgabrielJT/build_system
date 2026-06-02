@@ -115,6 +115,11 @@ class UserService:
 
         return result
 
+    async def get_all_roles(self) -> list[dict]:
+        """Obtener todos los roles disponibles."""
+        roles = await self.role_repo.list_all_roles()
+        return [dict(r) for r in roles]
+
     async def update_user(
         self,
         user_id: UUID,

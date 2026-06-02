@@ -100,6 +100,7 @@ const IconBalance = () => (
 
 const ADMIN_LINKS = [
   { to: '/admin/reports', label: 'Reportes', Icon: IconReports },
+  { to: '/admin/users', label: 'Usuarios', Icon: IconProfile },
   { to: '/admin/owners', label: 'Propietarios', Icon: IconOwners },
   { to: '/admin/apartments', label: 'Departamentos', Icon: IconApartments },
   { to: '/admin/fees', label: 'Cuotas', Icon: IconFees },

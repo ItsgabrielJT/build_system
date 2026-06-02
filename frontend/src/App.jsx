@@ -15,6 +15,7 @@ import OwnerApartmentsPage from './pages/owner/OwnerApartmentsPage';
 import OwnerAccountStatementPage from './pages/owner/OwnerAccountStatementPage';
 import OwnerMonthlyBalancePage from './pages/owner/OwnerMonthlyBalancePage';
 import OwnerPaymentsPage from './pages/owner/OwnerPaymentsPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
 
 function RootRedirect() {
   const { role, loading } = useAuth();
@@ -38,6 +39,7 @@ export default function App() {
         }
       >
         <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="users" element={<AdminUsersPage />} />
         <Route path="owners" element={<OwnersDirectoryPage />} />
         <Route path="apartments" element={<DepartmentsPage />} />
         <Route path="fees" element={<AdminFeesPage />} />

@@ -723,6 +723,66 @@ class TestOwnerPaymentServiceLogic:
         assert exc_info.value.status_code == 409
 
     @pytest.mark.asyncio
+    async def test_generate_acknowledgement_pdf_contains_redesigned_sections(self):
+        """La constancia PDF incluye el nuevo layout con encabezados visibles."""
+        from app.services.owner_payment_service import OwnerPaymentService
+
+        payment_repo = AsyncMock()
+        proof_repo = AsyncMock()
+        owner_repo = AsyncMock()
+        notification_repo = AsyncMock()
+
+        owner_repo.get_by_user_id = AsyncMock(return_value=_make_owner())
+        payment_repo.get_by_id_for_owner = AsyncMock(return_value=_make_payment())
+        proof_repo.get_latest_by_payment = AsyncMock(return_value=_make_proof())
+
+        service = OwnerPaymentService(
+            payment_repo, proof_repo, owner_repo, notification_repo
+        )
+
+        pdf_bytes = await service.generate_acknowledgement_pdf(
+            payment_id=PAYMENT_ID,
+            user_id=PROPIETARIO_USER_ID,
+        )
+
+        assert pdf_bytes.startswith(b"%PDF")
+        assert b"CONSTANCIA DE PAGO" in pdf_bytes
+        assert b"DATOS DEL PROPIETARIO | DETALLE DEL PAGO | CONSTANCIA" in pdf_bytes
+
+    @pytest.mark.asyncio
+    async def test_generate_receipt_pdf_contains_redesigned_sections(self):
+        """El recibo PDF incluye el nuevo layout con estado aprobado visible."""
+        from app.services.owner_payment_service import OwnerPaymentService
+
+        payment_repo = AsyncMock()
+        proof_repo = AsyncMock()
+        owner_repo = AsyncMock()
+        notification_repo = AsyncMock()
+
+        owner_repo.get_by_user_id = AsyncMock(return_value=_make_owner())
+        payment_repo.get_by_id_for_owner = AsyncMock(
+            return_value=_make_payment(
+                payment_id=PAYMENT_ID_APPROVED,
+                status="APROBADO",
+                approved_by="Franz Guzman",
+                approved_at=datetime(2026, 5, 31, 15, 30, tzinfo=timezone.utc),
+            )
+        )
+
+        service = OwnerPaymentService(
+            payment_repo, proof_repo, owner_repo, notification_repo
+        )
+
+        pdf_bytes = await service.generate_receipt_pdf(
+            payment_id=PAYMENT_ID_APPROVED,
+            user_id=PROPIETARIO_USER_ID,
+        )
+
+        assert pdf_bytes.startswith(b"%PDF")
+        assert b"RECIBO DE PAGO" in pdf_bytes
+        assert b"DATOS DEL PROPIETARIO | DETALLE DEL PAGO | RECIBO APROBADO" in pdf_bytes
+
+    @pytest.mark.asyncio
     async def test_admin_approve_invalid_transition_raises_422(self):
         """Aprobar pago ya resuelto lanza 422."""
         from fastapi import HTTPException

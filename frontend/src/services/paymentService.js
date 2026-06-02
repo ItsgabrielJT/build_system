@@ -77,6 +77,23 @@ export async function downloadAdminPaymentProof(paymentId, token) {
   return res.data;
 }
 
+export async function downloadAdminPaymentReceipt(paymentId, token) {
+  const res = await axios.get(
+    `${API_BASE}/api/v1/payments/${paymentId}/receipt`,
+    { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' }
+  );
+  return res.data;
+}
+
+export async function downloadAdminPaymentAcknowledgement(paymentId, token) {
+  const res = await axios.get(
+    `${API_BASE}/api/v1/payments/${paymentId}/acknowledgement`,
+    { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' }
+  );
+  return res.data;
+}
+
+
 export async function approvePayment(paymentId, token) {
   const res = await axios.put(
     `${API_BASE}/api/v1/admin/payments/${paymentId}/approve`,

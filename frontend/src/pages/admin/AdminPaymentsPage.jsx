@@ -76,7 +76,7 @@ const getPeriodLabel = (period) => {
 };
 
 export default function AdminPaymentsPage() {
-  const { payments, loading, error, fetchPayments, createPayment, annulPayment } = usePayments();
+  const { payments, loading, error, fetchPayments, createPayment, annulPayment, downloadAdminReceipt } = usePayments();
   const {
     pendingPayments,
     loading: loadingPending,
@@ -579,7 +579,26 @@ export default function AdminPaymentsPage() {
                                 {status.label}
                               </span>
                             </td>
-                            <td>
+                            <td className={styles.actionCell}>
+                              <button
+                                className={styles.btnAction}
+                                onClick={async () => {
+                                  try {
+                                    const blob = await downloadAdminReceipt(payment.id);
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `recibo_${payment.id}.pdf`;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                  } catch (e) {
+                                    alert('El recibo oficial solo está disponible para pagos aprobados/registrados');
+                                  }
+                                }}
+                                title="Descargar recibo oficial"
+                              >
+                                Recibo
+                              </button>
                               <button
                                 className={styles.btnTable}
                                 disabled={payment.status !== 'REGISTRADO'}

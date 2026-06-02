@@ -42,5 +42,30 @@ export function usePayments() {
     [token]
   );
 
-  return { payments, loading, error, fetchPayments, createPayment, annulPayment };
+  const downloadAdminProof = useCallback(
+    async (paymentId) => paymentService.downloadAdminPaymentProof(paymentId, token),
+    [token]
+  );
+
+  const downloadAdminReceipt = useCallback(
+    async (paymentId) => paymentService.downloadAdminPaymentReceipt(paymentId, token),
+    [token]
+  );
+
+  const downloadAdminAcknowledgement = useCallback(
+    async (paymentId) => paymentService.downloadAdminPaymentAcknowledgement(paymentId, token),
+    [token]
+  );
+
+  return { 
+    payments, 
+    loading, 
+    error, 
+    fetchPayments, 
+    createPayment, 
+    annulPayment,
+    downloadAdminProof,
+    downloadAdminReceipt,
+    downloadAdminAcknowledgement
+  };
 }

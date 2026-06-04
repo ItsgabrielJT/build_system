@@ -114,6 +114,16 @@ class UserRepository:
         await self.db.execute(query, new_password_hash, user_id)
         return True
 
+    async def set_temporary_password(self, user_id: UUID, temp_password_hash: str) -> bool:
+        """Establecer contraseña temporal para usuario."""
+        query = """
+            UPDATE users
+            SET password = $1, password_is_temp = TRUE, updated_at = NOW()
+            WHERE id = $2
+        """
+        await self.db.execute(query, temp_password_hash, user_id)
+        return True
+
     async def list_all(self) -> list[dict]:
         """Listar todos los usuarios con sus roles."""
         query = """

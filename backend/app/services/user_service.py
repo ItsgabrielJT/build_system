@@ -206,3 +206,23 @@ class UserService:
         await self.user_repo.update_password(user_id, new_password_hash)
 
         return {"message": "Contraseña actualizada exitosamente"}
+
+    async def recover_password(self, email: str) -> dict:
+        """Solicita la recuperación de contraseña (genera password temporal y envía correo)."""
+        user = await self.user_repo.get_by_email(email)
+        if not user:
+            # Por seguridad no lanzamos error, simulamos que todo salió bien
+            return {"message": "Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña."}
+
+        # Generar contraseña temporal
+        import random
+        temp_password = "".join(random.choices("0123456789", k=8))
+        temp_password_hash = self.auth_service.hash_password(temp_password)
+
+        # Actualizar en BD y marcar como temporal
+        await self.user_repo.set_temporary_password(user["id"], temp_password_hash)
+
+        # Enviar correo
+        await EmailService.send_password_recovery_email(email, temp_password)
+
+        return {"message": "Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña."}

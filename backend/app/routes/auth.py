@@ -20,6 +20,7 @@ from app.models.schemas import (
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import AuthService
+from app.services.user_service import UserService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ async def login(
                 "description": user["role_description"],
             },
             "status": user["status"],
+            "password_is_temp": user.get("password_is_temp", False),
             "created_at": user["created_at"],
             "updated_at": user["updated_at"],
         },
@@ -87,29 +89,15 @@ async def forgot_password(
     Solicita recuperación de contraseña.
 
     La respuesta es siempre genérica para no revelar si un correo existe.
-    Mientras no haya proveedor SMTP configurado, se registra la solicitud para
-    que soporte/admin pueda continuar el proceso interno.
     """
     user_repo = UserRepository(db)
-    user = await user_repo.get_by_email(request.email)
+    role_repo = RoleRepository(db)
+    auth_service = AuthService(user_repo, role_repo)
+    user_service = UserService(user_repo, role_repo, auth_service)
 
-    if user:
-        logger.info(
-            "Solicitud de recuperación de contraseña para usuario %s",
-            request.email,
-        )
-    else:
-        logger.info(
-            "Solicitud de recuperación de contraseña para correo no registrado %s",
-            request.email,
-        )
-
-    return {
-        "message": (
-            "Si el correo está registrado, recibirás instrucciones para recuperar "
-            "tu contraseña."
-        )
-    }
+    logger.info("Solicitud de recuperación de contraseña para correo %s", request.email)
+    
+    return await user_service.recover_password(request.email)
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)

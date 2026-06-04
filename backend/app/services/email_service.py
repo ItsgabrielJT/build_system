@@ -103,6 +103,33 @@ class EmailService:
         return await EmailService.send_email(user_email, subject, text_content, html_content)
 
     @staticmethod
+    async def send_password_recovery_email(user_email: str, temp_password: str) -> bool:
+        """Envía correo con código temporal para recuperación de contraseña."""
+        subject = "Recuperación de contraseña - HabitaUIO"
+        text_content = (
+            f"Hola,\n\n"
+            f"Hemos recibido una solicitud para recuperar tu contraseña en HabitaUIO.\n\n"
+            f"Tu nueva contraseña temporal es:\n"
+            f"  {temp_password}\n\n"
+            f"Al iniciar sesión con esta contraseña, se te pedirá que crees una nueva contraseña definitiva.\n\n"
+            f"Si no solicitaste este cambio, por favor contacta a la administración de inmediato.\n\n"
+            f"Saludos,\nEl equipo de HabitaUIO"
+        )
+        html_content = (
+            f"<h3>Recuperación de contraseña</h3>"
+            f"<p>Hola,</p>"
+            f"<p>Hemos recibido una solicitud para recuperar tu contraseña en HabitaUIO.</p>"
+            f"<p>Tu nueva contraseña temporal es:</p>"
+            f"<ul>"
+            f"  <li><strong>Contraseña Temporal:</strong> {temp_password}</li>"
+            f"</ul>"
+            f"<p>Al iniciar sesión con esta contraseña, se te pedirá que crees una nueva contraseña definitiva.</p>"
+            f"<p>Si no solicitaste este cambio, por favor contacta a la administración de inmediato.</p>"
+            f"<br/><p>Saludos,<br/>El equipo de HabitaUIO</p>"
+        )
+        return await EmailService.send_email(user_email, subject, text_content, html_content)
+
+    @staticmethod
     async def send_payment_uploaded_emails(
         owner_email: str | None,
         owner_name: str,

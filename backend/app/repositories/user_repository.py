@@ -17,7 +17,7 @@ class UserRepository:
     async def get_by_email(self, email: str) -> dict | None:
         """Obtener usuario por email."""
         query = """
-            SELECT u.id, u.email, u.password, u.status, u.created_at, u.updated_at
+            SELECT u.id, u.email, u.password, u.status, u.password_is_temp, u.created_at, u.updated_at
             FROM users u
             WHERE u.email = $1
         """
@@ -26,7 +26,7 @@ class UserRepository:
     async def get_by_id(self, user_id: UUID) -> dict | None:
         """Obtener usuario por ID."""
         query = """
-            SELECT u.id, u.email, u.password, u.status, u.created_at, u.updated_at
+            SELECT u.id, u.email, u.password, u.status, u.password_is_temp, u.created_at, u.updated_at
             FROM users u
             WHERE u.id = $1
         """
@@ -36,7 +36,7 @@ class UserRepository:
         """Obtener usuario con su rol."""
         query = """
             SELECT 
-                u.id, u.email, u.password, u.status, u.created_at, u.updated_at,
+                u.id, u.email, u.password, u.status, u.password_is_temp, u.created_at, u.updated_at,
                 r.id as role_id, r.name as role_name, r.description as role_description
             FROM users u
             LEFT JOIN user_roles ur ON u.id = ur.user_id
@@ -46,16 +46,16 @@ class UserRepository:
         return await self.db.fetchrow(query, user_id)
 
     async def create(
-        self, email: str, password_hash: str, role_id: UUID
+        self, email: str, password_hash: str, role_id: UUID, password_is_temp: bool = False
     ) -> UUID:
         """Crear nuevo usuario y asignar rol."""
         async with self.db.transaction():
             query = """
-                INSERT INTO users (email, password, status)
-                VALUES ($1, $2, 'ACTIVO')
+                INSERT INTO users (email, password, status, password_is_temp)
+                VALUES ($1, $2, 'ACTIVO', $3)
                 RETURNING id
             """
-            user_id = await self.db.fetchval(query, email, password_hash)
+            user_id = await self.db.fetchval(query, email, password_hash, password_is_temp)
 
             # Asignar rol al usuario
             role_query = """
@@ -108,7 +108,7 @@ class UserRepository:
         """Actualizar contraseña de usuario."""
         query = """
             UPDATE users
-            SET password = $1, updated_at = NOW()
+            SET password = $1, password_is_temp = FALSE, updated_at = NOW()
             WHERE id = $2
         """
         await self.db.execute(query, new_password_hash, user_id)

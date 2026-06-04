@@ -429,8 +429,9 @@ class PermissionResponse(BaseModel):
 
 class UserCreate(BaseModel):
     email: str
-    password: str
+    password: Optional[str] = None
     role_id: UUID
+    owner_id: Optional[UUID] = None
 
     @field_validator("email")
     @classmethod
@@ -441,7 +442,9 @@ class UserCreate(BaseModel):
 
     @field_validator("password")
     @classmethod
-    def validate_password(cls, v: str) -> str:
+    def validate_password(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
         if len(v) < 8:
             raise ValueError("Contraseña debe tener al menos 8 caracteres")
         if not any(c.isupper() for c in v):
@@ -481,6 +484,7 @@ class UserResponse(BaseModel):
     email: str
     role: RoleResponse
     status: str
+    password_is_temp: bool = False
     created_at: datetime
     updated_at: datetime
 

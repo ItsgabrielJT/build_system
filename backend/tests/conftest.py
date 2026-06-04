@@ -142,7 +142,7 @@ async def db_with_users(mock_db: AsyncMock) -> AsyncMock:
             else:
                 return users_data.get(user_id)
                 
-        elif "FROM roles r" in query and "INNER JOIN user_roles" in query and "WHERE ur.user_id" in query:
+        elif "FROM roles" in query and "INNER JOIN user_roles" in query and "ur.user_id" in query:
             user_id = args[0]
             role_id = user_roles_map.get(user_id)
             if role_id and role_id in roles_data:
@@ -154,10 +154,10 @@ async def db_with_users(mock_db: AsyncMock) -> AsyncMock:
                 }
             return None
             
-        elif "FROM roles r" in query and "WHERE r.id" in query:
+        elif "FROM roles" in query and "id =" in query:
             role_id = args[0]
             return roles_data.get(role_id)
-        elif "FROM roles r" in query and "WHERE r.name" in query:
+        elif "FROM roles" in query and "name =" in query:
             role_name = args[0]
             for role in roles_data.values():
                 if role["name"] == role_name:
@@ -168,25 +168,42 @@ async def db_with_users(mock_db: AsyncMock) -> AsyncMock:
     # ─── Configurar fetchval (para inserts)
     async def fetchval_side_effect(query: str, *args):
         if "INSERT INTO users" in query:
-            return uuid4()
+            new_id = uuid4()
+            email = args[0]
+            password_hash = args[1]
+            password_is_temp = args[2] if len(args) > 2 else False
+            users_data[new_id] = {
+                "id": new_id,
+                "email": email,
+                "password": password_hash,
+                "status": "ACTIVO",
+                "password_is_temp": password_is_temp,
+                "created_at": "2026-05-20T10:00:00Z",
+                "updated_at": "2026-05-20T10:00:00Z",
+            }
+            return new_id
+        elif "SELECT 1 FROM users" in query:
+            email = args[0]
+            for user in users_data.values():
+                if user["email"] == email:
+                    return 1
+            return None
         return None
 
     # ─── Configurar execute (para inserts/updates/deletes)
     async def execute_side_effect(query: str, *args):
-        if "UPDATE users" in query and "WHERE u.id" in query:
-            # Manejar UPDATE de usuario
-            user_id = args[-1]  # El último argumento es el user_id en WHERE
-            if user_id in users_data:
-                # Actualizar campo según query
+        if "INSERT INTO user_roles" in query:
+            uid = args[0]
+            rid = args[1]
+            user_roles_map[uid] = rid
+        elif "UPDATE users" in query:
+            uid = args[-1] if len(args) > 0 else None
+            if uid in users_data:
                 if "status =" in query:
-                    idx = 1
-                    users_data[user_id]["status"] = args[idx]
-                if "role_id =" in query:
-                    # También actualizar role_id
-                    for i, arg in enumerate(args):
-                        if isinstance(arg, UUID) and arg in roles_data:
-                            user_roles_map[user_id] = arg
-                            break
+                    users_data[uid]["status"] = args[1]
+                if "password =" in query:
+                    users_data[uid]["password"] = args[0]
+                    users_data[uid]["password_is_temp"] = False
         return None
 
     # ─── Configurar fetch (para queries que retornan lista)

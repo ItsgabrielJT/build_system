@@ -21,6 +21,7 @@ from app.models.schemas import PaymentRejectRequest
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.payment_proof_repository import PaymentProofRepository
 from app.repositories.payment_repository import PaymentRepository
+from app.repositories.owner_repository import OwnerRepository
 from app.services.admin_payment_review_service import AdminPaymentReviewService
 
 router = APIRouter(prefix="/admin", tags=["admin-payment-review"])
@@ -31,6 +32,7 @@ def _build_service(db) -> AdminPaymentReviewService:
         payment_repo=PaymentRepository(db),
         proof_repo=PaymentProofRepository(db),
         notification_repo=NotificationRepository(db),
+        owner_repo=OwnerRepository(db),
     )
 
 

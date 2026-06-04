@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import HTTPException, status
+import random
+from fastapi import HTTPException, status as fastapi_status
 
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.owner_repository import OwnerRepository
 from app.services.auth_service import AuthService
+from app.services.email_service import EmailService
 
 
 class UserService:
@@ -19,19 +22,25 @@ class UserService:
         user_repo: UserRepository,
         role_repo: RoleRepository,
         auth_service: AuthService,
+        owner_repo: OwnerRepository | None = None,
     ):
         self.user_repo = user_repo
         self.role_repo = role_repo
         self.auth_service = auth_service
+        self.owner_repo = owner_repo
 
     async def create_user(
-        self, email: str, password: str, role_id: UUID
+        self,
+        email: str,
+        role_id: UUID,
+        password: str | None = None,
+        owner_id: UUID | None = None,
     ) -> dict:
         """Crear nuevo usuario."""
         # Validar email único
         if await self.user_repo.email_exists(email):
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
+                status_code=fastapi_status.HTTP_409_CONFLICT,
                 detail="Email ya registrado",
             )
 
@@ -39,15 +48,32 @@ class UserService:
         role = await self.role_repo.get_role_by_id(role_id)
         if not role:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=fastapi_status.HTTP_400_BAD_REQUEST,
                 detail="Rol no válido",
             )
+
+        # Generar contraseña temporal si no se proporciona
+        password_is_temp = False
+        if not password:
+            password = "".join(random.choices("0123456789", k=8))
+            password_is_temp = True
 
         # Hashear contraseña
         password_hash = self.auth_service.hash_password(password)
 
         # Crear usuario
-        user_id = await self.user_repo.create(email, password_hash, role_id)
+        user_id = await self.user_repo.create(
+            email, password_hash, role_id, password_is_temp=password_is_temp
+        )
+
+        # Vincular con propietario si se indica
+        if owner_id and self.owner_repo:
+            await self.owner_repo.link_user(owner_id, user_id)
+
+        # Enviar correo de bienvenida
+        await EmailService.send_user_created_email(
+            email, password, role["name"]
+        )
 
         # Obtener usuario creado
         user = await self.user_repo.get_by_id_with_role(user_id)
@@ -61,6 +87,7 @@ class UserService:
                 "description": user["role_description"],
             },
             "status": user["status"],
+            "password_is_temp": user.get("password_is_temp", False),
             "created_at": user["created_at"],
             "updated_at": user["updated_at"],
         }
@@ -70,7 +97,7 @@ class UserService:
         user = await self.user_repo.get_by_id_with_role(user_id)
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=fastapi_status.HTTP_404_NOT_FOUND,
                 detail="Usuario no encontrado",
             )
 
@@ -83,6 +110,7 @@ class UserService:
                 "description": user["role_description"],
             },
             "status": user["status"],
+            "password_is_temp": user.get("password_is_temp", False),
             "created_at": user["created_at"],
             "updated_at": user["updated_at"],
         }
@@ -131,7 +159,7 @@ class UserService:
         user = await self.user_repo.get_by_id(user_id)
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=fastapi_status.HTTP_404_NOT_FOUND,
                 detail="Usuario no encontrado",
             )
 
@@ -140,7 +168,7 @@ class UserService:
             role = await self.role_repo.get_role_by_id(role_id)
             if not role:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
+                    status_code=fastapi_status.HTTP_400_BAD_REQUEST,
                     detail="Rol no válido",
                 )
 
@@ -167,7 +195,7 @@ class UserService:
             current_password, user["password"]
         ):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=fastapi_status.HTTP_401_UNAUTHORIZED,
                 detail="Contraseña actual incorrecta",
             )
 

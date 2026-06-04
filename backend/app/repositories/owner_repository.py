@@ -282,3 +282,10 @@ class OwnerRepository:
             "balance_consolidated": balance,
             "recent_transactions": [dict(t) for t in transactions],
         }
+
+    async def link_user(self, owner_id: UUID, user_id: UUID) -> bool:
+        """Vincula el owner con un user_id local (guardándolo en firebase_uid)."""
+        query = "UPDATE owners SET firebase_uid = $1, updated_at = NOW() WHERE id = $2"
+        await self._conn.execute(query, str(user_id), owner_id)
+        return True
+

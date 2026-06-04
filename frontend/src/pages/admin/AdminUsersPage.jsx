@@ -15,7 +15,6 @@ export default function AdminUsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
     role_id: '',
     owner_id: ''
   });
@@ -45,7 +44,7 @@ export default function AdminUsersPage() {
 
   const handleOpenModal = () => {
     const defaultRole = roles.find(r => r.name === 'PROPIETARIO')?.id || roles[0]?.id || '';
-    setFormData({ email: '', password: '', role_id: defaultRole, owner_id: '' });
+    setFormData({ email: '', role_id: defaultRole, owner_id: '' });
     setIsModalOpen(true);
   };
 
@@ -78,13 +77,13 @@ export default function AdminUsersPage() {
     try {
       await createUser({
         email: formData.email,
-        password: formData.password,
-        role_id: formData.role_id
+        role_id: formData.role_id,
+        owner_id: formData.owner_id || undefined
       }, token);
       await fetchData();
       setIsModalOpen(false);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al crear usuario. Verifica los campos requeridos (ej. contraseña fuerte).');
+      setError(err.response?.data?.detail || 'Error al crear usuario.');
     }
   };
 
@@ -198,22 +197,6 @@ export default function AdminUsersPage() {
                   onChange={handleChange} 
                   required 
                 />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Contraseña</label>
-                <input 
-                  type="password" 
-                  name="password" 
-                  className={styles.input} 
-                  value={formData.password} 
-                  onChange={handleChange} 
-                  required 
-                  minLength="8"
-                />
-                <small style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                  Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número.
-                </small>
               </div>
 
               <div className={styles.formGroup}>

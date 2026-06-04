@@ -65,6 +65,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
+      setRole(currentUser.role?.name || null);
+    } catch (error) {
+      console.error('Error refreshing user:', error);
+    }
+  };
+
   const isAuthenticated = !!token && !!user;
 
   return (
@@ -77,6 +87,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         isAuthenticated,
+        refreshUser,
       }}
     >
       {children}

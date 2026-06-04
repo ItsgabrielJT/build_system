@@ -10,6 +10,7 @@ from app.config.storage import read_proof_bytes
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.payment_proof_repository import PaymentProofRepository
 from app.repositories.payment_repository import PaymentRepository
+from app.repositories.owner_repository import OwnerRepository
 
 _STATUS_PENDIENTE = "PENDIENTE_APROBACION"
 
@@ -20,10 +21,12 @@ class AdminPaymentReviewService:
         payment_repo: PaymentRepository,
         proof_repo: PaymentProofRepository,
         notification_repo: NotificationRepository,
+        owner_repo: OwnerRepository | None = None,
     ) -> None:
         self._payment_repo = payment_repo
         self._proof_repo = proof_repo
         self._notification_repo = notification_repo
+        self._owner_repo = owner_repo
 
     async def list_pending(
         self, page: int = 1, page_size: int = 20
@@ -86,6 +89,18 @@ class AdminPaymentReviewService:
             recipient=str(payment["created_by"]),
             metadata={"payment_id": str(payment_id)},
         )
+
+        if self._owner_repo:
+            owner = await self._owner_repo.get_by_id(payment["owner_id"])
+            if owner:
+                from app.services.email_service import EmailService
+                await EmailService.send_payment_approved_email(
+                    owner_email=owner.get("email"),
+                    owner_name=owner.get("full_name", "Propietario"),
+                    amount=float(payment["amount"]),
+                    period=payment["period"],
+                )
+
         return updated
 
     async def reject(

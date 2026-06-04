@@ -98,6 +98,15 @@ class OwnerPaymentService:
             metadata={"payment_id": str(payment["id"])},
         )
 
+        from app.services.email_service import EmailService
+        await EmailService.send_payment_uploaded_emails(
+            owner_email=owner.get("email"),
+            owner_name=owner.get("full_name", "Propietario"),
+            amount=float(data.amount),
+            period=data.period,
+            payment_id=payment["id"],
+        )
+
         return {
             "id": payment["id"],
             "status": payment["status"],

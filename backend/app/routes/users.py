@@ -20,6 +20,7 @@ from app.models.schemas import (
 )
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.owner_repository import OwnerRepository
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
 
@@ -47,10 +48,16 @@ async def create_user(
     """
     user_repo = UserRepository(db)
     role_repo = RoleRepository(db)
+    owner_repo = OwnerRepository(db)
     auth_service = AuthService(user_repo, role_repo)
-    user_service = UserService(user_repo, role_repo, auth_service)
+    user_service = UserService(user_repo, role_repo, auth_service, owner_repo=owner_repo)
 
-    return await user_service.create_user(request.email, request.password, request.role_id)
+    return await user_service.create_user(
+        email=request.email,
+        role_id=request.role_id,
+        password=request.password,
+        owner_id=request.owner_id,
+    )
 
 
 @router.get("/me", response_model=UserResponse, status_code=status.HTTP_200_OK)

@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     budget_monthly: float = 15000.0
     budget_maintenance: float = 3500.0
     
+    # Mailjet Configuration
+    mailjet_api_key: str = ""
+    mailjet_api_secret: str = ""
+    mailjet_from_email: str = "no-reply@edificios.com"
+    mailjet_from_name: str = "Build System"
+    admin_notification_email: str = "admin@edificios.com"
+
     # JWT Configuration
     jwt_secret: str = "your-secret-key-change-in-production"
     jwt_algorithm: str = "HS256"

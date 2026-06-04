@@ -1,8 +1,9 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import ForcePasswordChange from './ForcePasswordChange';
 
 export default function ProtectedRoute({ children, requiredRole }) {
-  const { isAuthenticated, role, loading } = useAuth();
+  const { isAuthenticated, user, role, loading } = useAuth();
 
   if (loading) {
     return (
@@ -21,6 +22,10 @@ export default function ProtectedRoute({ children, requiredRole }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user?.password_is_temp) {
+    return <ForcePasswordChange />;
   }
 
   if (requiredRole && role !== requiredRole) {

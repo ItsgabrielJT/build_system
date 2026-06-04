@@ -16,8 +16,21 @@ class ExpenseService:
         total = sum(Decimal(str(r.get("amount", 0))) for r in rows)
         return {"data": rows, "total": total}
 
-    async def create(self, data: ExpenseCreate, created_by: str) -> dict:
-        return await self._repo.create(data, created_by)
+    async def create(
+        self,
+        data: ExpenseCreate,
+        created_by: str,
+        receipt_file_name: Optional[str] = None,
+        receipt_content_type: Optional[str] = None,
+        receipt_storage_path: Optional[str] = None,
+    ) -> dict:
+        return await self._repo.create(
+            data,
+            created_by,
+            receipt_file_name=receipt_file_name,
+            receipt_content_type=receipt_content_type,
+            receipt_storage_path=receipt_storage_path,
+        )
 
     async def get_monthly_stats(self, month: str) -> dict:
         from app.config.settings import settings
@@ -60,3 +73,26 @@ class ExpenseService:
 
     async def get_recent(self, limit: int = 10) -> list[dict]:
         return await self._repo.get_recent(limit)
+
+    async def get_by_id(self, expense_id: UUID) -> dict | None:
+        return await self._repo.get_by_id(expense_id)
+
+    async def update(
+        self,
+        expense_id: UUID,
+        data: ExpenseCreate,
+        receipt_file_name: Optional[str] = None,
+        receipt_content_type: Optional[str] = None,
+        receipt_storage_path: Optional[str] = None,
+    ) -> dict | None:
+        return await self._repo.update(
+            expense_id,
+            data,
+            receipt_file_name=receipt_file_name,
+            receipt_content_type=receipt_content_type,
+            receipt_storage_path=receipt_storage_path,
+        )
+
+    async def delete(self, expense_id: UUID) -> bool:
+        return await self._repo.delete(expense_id)
+

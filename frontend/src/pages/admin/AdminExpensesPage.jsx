@@ -40,6 +40,8 @@ export default function AdminExpensesPage() {
   const [submitError, setSubmitError] = useState(null);
 
   const [dragOver, setDragOver] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptError, setReceiptError] = useState(null);
   const fileInputRef = useRef(null);
 
   const token = getToken(auth);
@@ -51,7 +53,7 @@ export default function AdminExpensesPage() {
       const data = await getMonthlyStats(token, currentMonth);
       setMonthlyStats(data);
     } catch {
-      setStatsError('Could not load stats');
+      setStatsError('No se pudieron cargar las estadísticas');
     } finally {
       setStatsLoading(false);
     }
@@ -90,9 +92,9 @@ export default function AdminExpensesPage() {
 
   function validateForm(f) {
     const errors = {};
-    if (!f.concept.trim()) errors.concept = 'Concept is required';
-    if (!f.date) errors.date = 'Date is required';
-    if (!f.amount || isNaN(Number(f.amount)) || Number(f.amount) <= 0) errors.amount = 'Enter a valid amount > 0';
+    if (!f.concept.trim()) errors.concept = 'El concepto es obligatorio';
+    if (!f.date) errors.date = 'La fecha es obligatoria';
+    if (!f.amount || isNaN(Number(f.amount)) || Number(f.amount) <= 0) errors.amount = 'Ingrese un monto válido mayor a 0';
     return errors;
   }
 
@@ -102,6 +104,28 @@ export default function AdminExpensesPage() {
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: undefined }));
   }
 
+  const handleFileChange = (file) => {
+    if (!file) {
+      setReceiptFile(null);
+      setReceiptError(null);
+      return;
+    }
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      setReceiptError('Tipo de archivo no soportado. Permite PDF, JPG, PNG.');
+      setReceiptFile(null);
+      return;
+    }
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setReceiptError('El archivo excede el tamaño máximo de 5MB.');
+      setReceiptFile(null);
+      return;
+    }
+    setReceiptFile(file);
+    setReceiptError(null);
+  };
+
   async function handleSubmit(e) {
     e.preventDefault();
     const errors = validateForm(form);
@@ -109,20 +133,25 @@ export default function AdminExpensesPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const payload = {
-        concept: form.concept.slice(0, 500),
-        date: form.date,
-        amount: parseFloat(form.amount),
-        provider: form.provider || undefined,
-        category: form.category || undefined,
-      };
-      await createExpense(payload, token);
+      const data = new FormData();
+      data.append('concept', form.concept.slice(0, 500));
+      data.append('date', form.date);
+      data.append('amount', form.amount);
+      if (form.provider) data.append('provider', form.provider);
+      if (form.category) data.append('category', form.category);
+      if (receiptFile) {
+        data.append('receipt_file', receiptFile);
+      }
+
+      await createExpense(data, token);
       success('Gasto registrado con éxito');
       setForm(EMPTY_FORM);
+      setReceiptFile(null);
+      setReceiptError(null);
       setFormErrors({});
       await Promise.all([fetchStats(), fetchRecent()]);
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to save expense. Please try again.';
+      const msg = err.response?.data?.detail || 'No se pudo guardar el gasto. Inténtelo de nuevo.';
       setSubmitError(msg);
       toastError(msg);
     } finally {
@@ -133,6 +162,9 @@ export default function AdminExpensesPage() {
   function handleDrop(e) {
     e.preventDefault();
     setDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileChange(e.dataTransfer.files[0]);
+    }
   }
 
   function handleDragOver(e) {
@@ -150,11 +182,11 @@ export default function AdminExpensesPage() {
       {/* HEADER */}
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Expense Registry</h1>
-          <p className={styles.subtitle}>Record, track, and manage all building expenses.</p>
+          <h1 className={styles.title}>Registro de Gastos</h1>
+          <p className={styles.subtitle}>Registre, realice el seguimiento y administre todos los gastos del edificio.</p>
         </div>
-        <button className={styles.btnReport} onClick={() => alert('Coming soon')}>
-          Generate Report
+        <button className={styles.btnReport} onClick={() => alert('Próximamente')}>
+          Generar Reporte
         </button>
       </div>
 
@@ -163,14 +195,14 @@ export default function AdminExpensesPage() {
       {/* STATS CARDS */}
       <div className={styles.statsRow}>
         <StatCardWithProgress
-          label="Current Month Spend"
+          label="Gasto del Mes Actual"
           amount={statsLoading ? 0 : (monthlyStats?.total_spend ?? 0)}
           budget={statsLoading ? 15000 : (monthlyStats?.budget ?? 15000)}
           percentage={statsLoading ? 0 : (monthlyStats?.percentage_used ?? 0)}
           overBudgetAmount={Math.max(0, (monthlyStats?.total_spend ?? 0) - (monthlyStats?.budget ?? 15000))}
         />
         <StatCardWithProgress
-          label="Maintenance & Repairs"
+          label="Mantenimiento y Reparaciones"
           amount={statsLoading ? 0 : maintenanceSpend}
           budget={statsLoading ? 3500 : maintenanceBudget}
           percentage={statsLoading ? 0 : maintenancePct}
@@ -182,16 +214,16 @@ export default function AdminExpensesPage() {
       <div className={styles.mainGrid}>
         {/* LEFT: FORM */}
         <div className={styles.formSection}>
-          <h2 className={styles.sectionTitle}>Record New Expense</h2>
+          <h2 className={styles.sectionTitle}>Registrar Nuevo Gasto</h2>
           <form onSubmit={handleSubmit} className={styles.form} noValidate>
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Payee / Vendor</label>
+                <label className={styles.label}>Proveedor / Beneficiario</label>
                 <input
                   className={styles.input}
                   type="text"
                   name="provider"
-                  placeholder="e.g., Acme Maintenance Co."
+                  placeholder="ej. Acme Mantenimiento Co."
                   value={form.provider}
                   onChange={handleChange}
                 />
@@ -199,21 +231,21 @@ export default function AdminExpensesPage() {
             </div>
 
             <div className={styles.formGroup}>
-              <label className={styles.label}>Category</label>
+              <label className={styles.label}>Categoría</label>
               <select
                 className={`${styles.input} ${styles.select}`}
                 name="category"
                 value={form.category}
                 onChange={handleChange}
               >
-                <option value="">Select Category</option>
+                <option value="">Seleccionar Categoría</option>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
             <div className={styles.formRowDouble}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Date {formErrors.date && <span className={styles.fieldError}>{formErrors.date}</span>}</label>
+                <label className={styles.label}>Fecha {formErrors.date && <span className={styles.fieldError}>{formErrors.date}</span>}</label>
                 <input
                   className={`${styles.input} ${formErrors.date ? styles.inputError : ''}`}
                   type="date"
@@ -223,7 +255,7 @@ export default function AdminExpensesPage() {
                 />
               </div>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Amount ($) {formErrors.amount && <span className={styles.fieldError}>{formErrors.amount}</span>}</label>
+                <label className={styles.label}>Monto ($) {formErrors.amount && <span className={styles.fieldError}>{formErrors.amount}</span>}</label>
                 <input
                   className={`${styles.input} ${formErrors.amount ? styles.inputError : ''}`}
                   type="number"
@@ -239,13 +271,13 @@ export default function AdminExpensesPage() {
 
             <div className={styles.formGroup}>
               <label className={styles.label}>
-                Concept / Description
+                Concepto / Descripción
                 {formErrors.concept && <span className={styles.fieldError}> {formErrors.concept}</span>}
               </label>
               <textarea
                 className={`${styles.input} ${styles.textarea} ${formErrors.concept ? styles.inputError : ''}`}
                 name="concept"
-                placeholder="Brief description of the expense..."
+                placeholder="Breve descripción del gasto..."
                 value={form.concept}
                 onChange={handleChange}
                 rows={3}
@@ -261,20 +293,46 @@ export default function AdminExpensesPage() {
               onDragLeave={() => setDragOver(false)}
               onClick={() => fileInputRef.current?.click()}
             >
-              <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className={styles.fileInput} />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                className={styles.fileInput}
+                onChange={(e) => handleFileChange(e.target.files[0])}
+              />
               <span className={styles.dropIcon}>☁️</span>
-              <p className={styles.dropText}>Drag & drop receipt here<br /><span>or click to browse files</span></p>
-              <p className={styles.dropHint}>Supports PDF, JPG, PNG (Max 5MB)</p>
+              {receiptFile ? (
+                <p className={styles.dropText}>
+                  <strong>Archivo seleccionado:</strong> {receiptFile.name}
+                </p>
+              ) : receiptError ? (
+                <p className={styles.dropText} style={{ color: 'var(--color-danger)' }}>
+                  {receiptError}
+                </p>
+              ) : (
+                <p className={styles.dropText}>Arrastre y suelte el comprobante aquí<br /><span>o haga clic para buscar archivos</span></p>
+              )}
+              <p className={styles.dropHint}>Soporta PDF, JPG, PNG (Máx 5MB)</p>
             </div>
 
             {submitError && <p className={styles.submitError}>{submitError}</p>}
 
             <div className={styles.formActions}>
-              <button type="button" className={styles.btnCancel} onClick={() => { setForm(EMPTY_FORM); setFormErrors({}); setSubmitError(null); }}>
-                Cancel
+              <button
+                type="button"
+                className={styles.btnCancel}
+                onClick={() => {
+                  setForm(EMPTY_FORM);
+                  setReceiptFile(null);
+                  setReceiptError(null);
+                  setFormErrors({});
+                  setSubmitError(null);
+                }}
+              >
+                Cancelar
               </button>
               <button type="submit" className={styles.btnSave} disabled={submitting}>
-                {submitting ? 'Saving...' : '💾 Save Expense'}
+                {submitting ? 'Guardando...' : '💾 Guardar Gasto'}
               </button>
             </div>
           </form>

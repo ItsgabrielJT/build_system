@@ -71,3 +71,51 @@ def read_proof_bytes(storage_path: str) -> bytes:
             detail="Archivo de comprobante no encontrado en el sistema",
         )
     return path.read_bytes()
+
+
+def _receipt_upload_dir() -> Path:
+    path = Path(settings.upload_dir) / "expense_receipts"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+async def validate_and_store_expense_receipt(file: UploadFile) -> dict:
+    """Valida y persiste un comprobante de gasto. Retorna dict con metadata del archivo."""
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Tipo de archivo no soportado: {file.content_type}. "
+                f"Tipos permitidos: {', '.join(sorted(_ALLOWED_CONTENT_TYPES))}"
+            ),
+        )
+
+    contents = await file.read()
+
+    if not contents:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El archivo adjunto está vacío",
+        )
+
+    if len(contents) > _MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"El archivo excede el tamaño máximo permitido "
+                f"de {settings.max_proof_size_mb} MB"
+            ),
+        )
+
+    original_name = file.filename or "comprobante"
+    ext = Path(original_name).suffix.lower()
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+    storage_path = _receipt_upload_dir() / stored_name
+    storage_path.write_bytes(contents)
+
+    return {
+        "file_name": original_name,
+        "content_type": file.content_type,
+        "storage_path": str(storage_path),
+    }
+

@@ -165,7 +165,12 @@ async def test_create_expense_with_user_id(mock_user, mock_db):
         MockService.return_value = mock_service
         
         result = await create_expense(
-            body=expense_data,
+            date="2026-05-21",
+            concept="Reparación de tuberías",
+            amount="800.00",
+            provider="Proveedora XYZ",
+            category="Servicios",
+            receipt_file=None,
             user=mock_user,
             db=mock_db,
         )

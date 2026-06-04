@@ -62,7 +62,7 @@ describe('LoginPage', () => {
       renderLoginPage();
 
       // Assert
-      expect(screen.getByText(/EdiGestion/i)).toBeInTheDocument();
+      expect(screen.getByText(/HabitaUIO/i)).toBeInTheDocument();
       expect(
         screen.getByText(/Enterprise Management Portal/i)
       ).toBeInTheDocument();

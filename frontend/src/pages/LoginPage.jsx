@@ -120,7 +120,7 @@ export default function LoginPage() {
           <div className={styles.logoWrap}>
             <IconBuilding />
           </div>
-          <h1 id="login-title" className={styles.brand}>EdiGestion</h1>
+          <h1 id="login-title" className={styles.brand}>HabitaUIO</h1>
           <p className={styles.subtitle}>
             {isRecoveryMode ? 'Password recovery' : 'Enterprise Management Portal'}
           </p>

@@ -137,7 +137,7 @@ export default function Sidebar({ role, collapsed }) {
         </div>
         {!collapsed && (
           <div className={styles.brandText}>
-            <span className={styles.brandName}>EdiGestion</span>
+            <span className={styles.brandName}>HabitaUIO</span>
             <span className={styles.brandSub}>
               {role === 'ADMIN' ? 'Portal Admin' : 'Portal Propietario'}
             </span>

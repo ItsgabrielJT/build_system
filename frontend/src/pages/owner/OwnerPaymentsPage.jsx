@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useOwnerPayments } from '../../hooks/useOwnerPayments';
 import { useApartments } from '../../hooks/useApartments';
+import { useAuth } from '../../hooks/useAuth';
+import { getApartmentPendingDebts } from '../../services/apartmentService';
 import PaymentProofUpload from '../../components/PaymentProofUpload/PaymentProofUpload';
 import PaymentStatusBadge from '../../components/PaymentStatusBadge/PaymentStatusBadge';
 import styles from './OwnerPaymentsPage.module.css';
@@ -38,6 +40,7 @@ const INITIAL_FORM = {
   amount: '',
   method: 'transferencia',
   reference: '',
+  fine_id: '',
 };
 
 export default function OwnerPaymentsPage() {
@@ -51,6 +54,7 @@ export default function OwnerPaymentsPage() {
     downloadReceipt,
   } = useOwnerPayments();
   const { apartments, fetchApartments } = useApartments();
+  const { token } = useAuth();
 
   const [form, setForm] = useState(INITIAL_FORM);
   const [proofFile, setProofFile] = useState(null);
@@ -60,10 +64,68 @@ export default function OwnerPaymentsPage() {
   const [successMsg, setSuccessMsg] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
 
+  const [pendingDebts, setPendingDebts] = useState({ cuotas: [], multas: [] });
+  const [selectedDebt, setSelectedDebt] = useState('');
+
   useEffect(() => {
     fetchApartments();
     reload();
   }, [fetchApartments, reload]);
+
+  useEffect(() => {
+    if (!form.apartment_id) {
+      setPendingDebts({ cuotas: [], multas: [] });
+      setSelectedDebt('');
+      return;
+    }
+
+    getApartmentPendingDebts(token, form.apartment_id)
+      .then((data) => {
+        setPendingDebts(data);
+        setSelectedDebt('');
+      })
+      .catch(() => {
+        setPendingDebts({ cuotas: [], multas: [] });
+        setSelectedDebt('');
+      });
+  }, [form.apartment_id, token]);
+
+  const handleDebtChange = (e) => {
+    const val = e.target.value;
+    setSelectedDebt(val);
+    if (!val) {
+      setForm((prev) => ({
+        ...prev,
+        period: getCurrentMonth(),
+        amount: '',
+        fine_id: '',
+      }));
+      return;
+    }
+
+    const [type, id] = val.split(':');
+    if (type === 'cuota') {
+      const selected = pendingDebts.cuotas.find((c) => c.id === id);
+      if (selected) {
+        setForm((prev) => ({
+          ...prev,
+          period: selected.period,
+          amount: selected.amount.toString(),
+          fine_id: '',
+        }));
+      }
+    } else if (type === 'multas') {
+      const selected = pendingDebts.multas.find((m) => m.id === id);
+      if (selected) {
+        setForm((prev) => ({
+          ...prev,
+          period: selected.period,
+          amount: selected.amount.toString(),
+          fine_id: selected.id,
+        }));
+      }
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -95,6 +157,7 @@ export default function OwnerPaymentsPage() {
       data.append('amount', form.amount);
       data.append('method', form.method);
       if (form.reference) data.append('reference', form.reference);
+      if (form.fine_id) data.append('fine_id', form.fine_id);
       data.append('proof_file', proofFile);
 
       await submitPayment(data);
@@ -163,6 +226,43 @@ export default function OwnerPaymentsPage() {
                 ))}
               </select>
             </div>
+
+            {form.apartment_id && (
+              <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="selected_debt">
+                  Concepto / Deuda Pendiente
+                </label>
+                <select
+                  id="selected_debt"
+                  className={styles.input}
+                  value={selectedDebt}
+                  onChange={handleDebtChange}
+                >
+                  <option value="">Otro / Pago personalizado</option>
+                  
+                  {pendingDebts.cuotas.length > 0 && (
+                    <optgroup label="Cuotas pendientes">
+                      {pendingDebts.cuotas.map((c) => (
+                        <option key={`cuota:${c.id}`} value={`cuota:${c.id}`}>
+                          {c.description} ({formatCurrency(c.amount)})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  
+                  {pendingDebts.multas.length > 0 && (
+                    <optgroup label="Multas activas">
+                      {pendingDebts.multas.map((m) => (
+                        <option key={`multas:${m.id}`} value={`multas:${m.id}`}>
+                          {m.description} ({formatCurrency(m.amount)})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            )}
+
 
             <div className={styles.fieldGroup}>
               <label className={styles.label} htmlFor="period">

@@ -22,7 +22,18 @@ class ApartmentFeeRepository:
 
     async def get_by_period(self, period: str) -> list[dict]:
         rows = await self._conn.fetch(
-            "SELECT * FROM apartment_fees WHERE period = $1 ORDER BY apartment_id",
+            """
+            SELECT f.*, 
+                   EXISTS (
+                       SELECT 1 FROM payments p 
+                       WHERE p.apartment_id = f.apartment_id 
+                         AND p.period = f.period 
+                         AND p.status = 'REGISTRADO'
+                   ) AS is_paid
+            FROM apartment_fees f
+            WHERE f.period = $1
+            ORDER BY f.apartment_id
+            """,
             period,
         )
         return [dict(r) for r in rows]
@@ -89,7 +100,7 @@ class ApartmentFeeRepository:
         total_emitido = Decimal(str(row["total"]))
 
         row = await self._conn.fetchrow(
-            "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE period = $1 AND status = 'REGISTRADO'",
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE period = $1 AND status = 'REGISTRADO' AND fine_id IS NULL",
             period,
         )
         total_recaudado = Decimal(str(row["total"]))
@@ -109,7 +120,7 @@ class ApartmentFeeRepository:
             LEFT JOIN (
                 SELECT apartment_id, period, COALESCE(SUM(amount), 0) AS pagado
                 FROM payments
-                WHERE status = 'REGISTRADO'
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             WHERE af.period < $1
@@ -176,6 +187,7 @@ class ApartmentFeeRepository:
                 ON p.apartment_id = af.apartment_id
                 AND p.period = af.period
                 AND p.status = 'REGISTRADO'
+                AND p.fine_id IS NULL
             WHERE ($1::int IS NULL OR SUBSTRING(af.period, 1, 4)::int = $1)
             GROUP BY af.period
             ORDER BY af.period DESC

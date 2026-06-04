@@ -62,3 +62,11 @@ export async function getApartmentDirectory(token, params = {}) {
   });
   return res.data;
 }
+
+export async function getApartmentPendingDebts(token, apartmentId) {
+  const res = await axios.get(`${API_BASE}/api/v1/apartments/${apartmentId}/pending-debts`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+

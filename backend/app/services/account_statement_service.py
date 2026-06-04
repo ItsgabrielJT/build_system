@@ -48,7 +48,7 @@ class AccountStatementService:
                 Decimal(str(row["multas"])),
                 Decimal(str(row["pagado"])),
             )
-            ps = _period_status(row["period"], s, settings.due_day)
+            ps = _period_status(row["period"], s, settings.due_day, Decimal(str(row["esperado"])))
             result.append(
                 {
                     "period": row["period"],

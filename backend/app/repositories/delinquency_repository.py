@@ -12,6 +12,24 @@ _PERIOD_DATA_QUERY = """
         SELECT apartment_id, period FROM payments
         UNION
         SELECT apartment_id, period FROM fines
+    ),
+    agg_fines AS (
+        SELECT 
+            apartment_id, 
+            period, 
+            COALESCE(SUM(amount), 0) AS total_fines
+        FROM fines
+        WHERE status != 'ANULADA' AND status != 'ANULADO'
+        GROUP BY apartment_id, period
+    ),
+    agg_payments AS (
+        SELECT 
+            apartment_id, 
+            period, 
+            COALESCE(SUM(amount), 0) AS total_payments
+        FROM payments
+        WHERE status = 'REGISTRADO'
+        GROUP BY apartment_id, period
     )
     SELECT
         o.id           AS owner_id,
@@ -22,16 +40,16 @@ _PERIOD_DATA_QUERY = """
         a.code         AS apartment_code,
         a.floor,
         ap.period,
-        COALESCE(af.amount, 0)                                                     AS esperado,
-        COALESCE(SUM(CASE WHEN f.status  = 'ACTIVA'     THEN f.amount ELSE 0 END), 0) AS multas,
-        COALESCE(SUM(CASE WHEN p.status  = 'REGISTRADO' THEN p.amount ELSE 0 END), 0) AS pagado
+        COALESCE(af.amount, 0) AS esperado,
+        COALESCE(f.total_fines, 0) AS multas,
+        COALESCE(p.total_payments, 0) AS pagado
     FROM owners o
     JOIN owner_apartments oa ON o.id = oa.owner_id
     JOIN apartments        a  ON oa.apartment_id = a.id
     JOIN all_periods       ap ON ap.apartment_id = a.id
     LEFT JOIN apartment_fees af ON af.apartment_id = a.id AND af.period = ap.period
-    LEFT JOIN fines          f  ON  f.apartment_id = a.id AND  f.period = ap.period
-    LEFT JOIN payments       p  ON  p.apartment_id = a.id AND  p.period = ap.period
+    LEFT JOIN agg_fines      f  ON  f.apartment_id = a.id AND  f.period = ap.period
+    LEFT JOIN agg_payments   p  ON  p.apartment_id = a.id AND  p.period = ap.period
     WHERE o.status = 'ACTIVO'
 """
 
@@ -40,10 +58,8 @@ class DelinquencyRepository:
     def __init__(self, conn: asyncpg.Connection) -> None:
         self._conn = conn
 
-    _GROUP_ALL = (
-        " GROUP BY o.id, o.full_name, o.email, o.document_id,"
-        " a.id, a.code, a.floor, ap.period, af.amount"
-    )
+    _GROUP_ALL = ""
+
 
     async def get_all_period_data(self) -> list[dict]:
         query = _PERIOD_DATA_QUERY + self._GROUP_ALL + " ORDER BY o.id, a.id, ap.period"

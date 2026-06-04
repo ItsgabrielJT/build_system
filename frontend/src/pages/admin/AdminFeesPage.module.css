@@ -353,6 +353,17 @@
   color: #6b7280;
 }
 
+.inlineBadge_PAGADO {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.inlineBadge_PENDIENTE {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+
 .statsSummaryGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

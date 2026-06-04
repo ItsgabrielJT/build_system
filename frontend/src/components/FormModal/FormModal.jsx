@@ -63,6 +63,15 @@ export default function FormModal({ isOpen, title, fields = [], initialData, def
         </div>
         <form className={styles.form} onSubmit={handleSubmit}>
           {fields.map((field) => {
+            if (field.type === 'hidden') {
+              return (
+                <input
+                  key={field.name}
+                  type="hidden"
+                  value={formData[field.name] ?? ''}
+                />
+              );
+            }
             const fieldId = `${formId}-${field.name}`;
             return (
               <div key={field.name} className={styles.field}>
@@ -79,11 +88,24 @@ export default function FormModal({ isOpen, title, fields = [], initialData, def
                     required={field.required}
                   >
                     <option value="">Seleccionar...</option>
-                    {(field.options || []).map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
+                    {(field.options || []).map((opt, idx) => {
+                      if (opt.options) {
+                        return (
+                          <optgroup key={opt.label || idx} label={opt.label}>
+                            {opt.options.map((subOpt) => (
+                              <option key={subOpt.value} value={subOpt.value}>
+                                {subOpt.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      }
+                      return (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      );
+                    })}
                   </select>
                 ) : field.type === 'textarea' ? (
                   <textarea

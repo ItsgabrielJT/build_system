@@ -73,23 +73,31 @@ class PaymentRepository:
         return dict(row) if row else None
 
     async def create(self, data: PaymentCreate, created_by: str) -> dict:
-        row = await self._conn.fetchrow(
-            """
-            INSERT INTO payments
-                (apartment_id, owner_id, period, paid_at, amount, method, reference, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING *
-            """,
-            data.apartment_id,
-            data.owner_id,
-            data.period,
-            data.paid_at,
-            data.amount,
-            data.method,
-            data.reference,
-            str(created_by),
-        )
-        return dict(row)
+        async with self._conn.transaction():
+            row = await self._conn.fetchrow(
+                """
+                INSERT INTO payments
+                    (apartment_id, owner_id, period, paid_at, amount, method, reference, created_by, fine_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING *
+                """,
+                data.apartment_id,
+                data.owner_id,
+                data.period,
+                data.paid_at,
+                data.amount,
+                data.method,
+                data.reference,
+                str(created_by),
+                data.fine_id,
+            )
+            if data.fine_id:
+                await self._conn.execute(
+                    "UPDATE fines SET status = 'PAGADA', updated_at = NOW() WHERE id = $1",
+                    data.fine_id,
+                )
+            return dict(row)
+
 
     async def create_owner_payment(
         self,
@@ -108,9 +116,10 @@ class PaymentRepository:
                 method,
                 reference,
                 status,
-                created_by
+                created_by,
+                fine_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
             """,
             data.apartment_id,
@@ -122,6 +131,7 @@ class PaymentRepository:
             data.reference,
             "PENDIENTE_APROBACION",
             str(created_by),
+            data.fine_id,
         )
         return dict(row)
 
@@ -201,36 +211,50 @@ class PaymentRepository:
         return [dict(r) for r in rows]
 
     async def update_status(self, payment_id: UUID, new_status: str) -> dict | None:
-        row = await self._conn.fetchrow(
-            """
-            UPDATE payments SET status = $2, updated_at = NOW()
-            WHERE id = $1
-            RETURNING *
-            """,
-            payment_id,
-            new_status,
-        )
-        return dict(row) if row else None
+        async with self._conn.transaction():
+            row = await self._conn.fetchrow(
+                """
+                UPDATE payments SET status = $2, updated_at = NOW()
+                WHERE id = $1
+                RETURNING *
+                """,
+                payment_id,
+                new_status,
+            )
+            if row and row.get("fine_id"):
+                fine_status = 'PAGADA' if new_status == 'REGISTRADO' else 'ACTIVA'
+                await self._conn.execute(
+                    "UPDATE fines SET status = $2, updated_at = NOW() WHERE id = $1",
+                    row["fine_id"],
+                    fine_status,
+                )
+            return dict(row) if row else None
 
     async def approve(self, payment_id: UUID, admin_id: str) -> dict | None:
-        row = await self._conn.fetchrow(
-            """
-            UPDATE payments
-            SET
-                status = 'REGISTRADO',
-                approved_by = $2,
-                approved_at = NOW(),
-                rejected_by = NULL,
-                rejected_at = NULL,
-                rejection_reason = NULL,
-                updated_at = NOW()
-            WHERE id = $1
-            RETURNING *
-            """,
-            payment_id,
-            admin_id,
-        )
-        return dict(row) if row else None
+        async with self._conn.transaction():
+            row = await self._conn.fetchrow(
+                """
+                UPDATE payments
+                SET
+                    status = 'REGISTRADO',
+                    approved_by = $2,
+                    approved_at = NOW(),
+                    rejected_by = NULL,
+                    rejected_at = NULL,
+                    rejection_reason = NULL,
+                    updated_at = NOW()
+                WHERE id = $1
+                RETURNING *
+                """,
+                payment_id,
+                admin_id,
+            )
+            if row and row.get("fine_id"):
+                await self._conn.execute(
+                    "UPDATE fines SET status = 'PAGADA', updated_at = NOW() WHERE id = $1",
+                    row["fine_id"],
+                )
+            return dict(row) if row else None
 
     async def reject(
         self,
@@ -238,22 +262,29 @@ class PaymentRepository:
         admin_id: str,
         reason: str,
     ) -> dict | None:
-        row = await self._conn.fetchrow(
-            """
-            UPDATE payments
-            SET
-                status = 'RECHAZADO',
-                rejected_by = $2,
-                rejected_at = NOW(),
-                rejection_reason = $3,
-                approved_by = NULL,
-                approved_at = NULL,
-                updated_at = NOW()
-            WHERE id = $1
-            RETURNING *
-            """,
-            payment_id,
-            admin_id,
-            reason,
-        )
-        return dict(row) if row else None
+        async with self._conn.transaction():
+            row = await self._conn.fetchrow(
+                """
+                UPDATE payments
+                SET
+                    status = 'RECHAZADO',
+                    rejected_by = $2,
+                    rejected_at = NOW(),
+                    rejection_reason = $3,
+                    approved_by = NULL,
+                    approved_at = NULL,
+                    updated_at = NOW()
+                WHERE id = $1
+                RETURNING *
+                """,
+                payment_id,
+                admin_id,
+                reason,
+            )
+            if row and row.get("fine_id"):
+                await self._conn.execute(
+                    "UPDATE fines SET status = 'ACTIVA', updated_at = NOW() WHERE id = $1",
+                    row["fine_id"],
+                )
+            return dict(row) if row else None
+

@@ -11,15 +11,17 @@ from app.repositories.delinquency_repository import DelinquencyRepository
 
 
 def _saldo(esperado: Decimal, multas: Decimal, pagado: Decimal) -> Decimal:
-    return max(Decimal("0"), esperado + multas - pagado)
+    return esperado + multas - pagado
 
 
-def _period_status(period: str, saldo: Decimal, due_day: int) -> str:
+def _period_status(period: str, saldo: Decimal, due_day: int, esperado: Decimal = Decimal("0")) -> str:
     if saldo <= 0:
         return "CURRENT"
     try:
         due_date = _period_due_date(period, due_day)
-        return "OVERDUE" if date.today() > due_date else "CURRENT"
+        if date.today() > due_date:
+            return "OVERDUE"
+        return "OVERDUE" if saldo > esperado else "CURRENT"
     except (ValueError, TypeError):
         return "CURRENT"
 
@@ -64,7 +66,7 @@ class DelinquencyService:
                 Decimal(str(row["multas"])),
                 Decimal(str(row["pagado"])),
             )
-            ps = _period_status(row["period"], s, settings.due_day)
+            ps = _period_status(row["period"], s, settings.due_day, Decimal(str(row["esperado"])))
 
             if oid not in owners:
                 owners[oid] = {
@@ -155,7 +157,7 @@ class DelinquencyService:
                 Decimal(str(row["multas"])),
                 Decimal(str(row["pagado"])),
             )
-            if _period_status(row["period"], s, settings.due_day) != "OVERDUE":
+            if _period_status(row["period"], s, settings.due_day, Decimal(str(row["esperado"]))) != "OVERDUE":
                 continue
 
             if row["period"] == latest_period:
@@ -241,7 +243,7 @@ class DelinquencyService:
                 Decimal(str(row["multas"])),
                 Decimal(str(row["pagado"])),
             )
-            ps = _period_status(row["period"], s, settings.due_day)
+            ps = _period_status(row["period"], s, settings.due_day, Decimal(str(row["esperado"])))
 
             if aid not in apartments:
                 apartments[aid] = {

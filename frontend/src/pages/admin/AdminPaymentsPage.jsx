@@ -12,6 +12,8 @@ import { usePayments } from '../../hooks/usePayments';
 import { useAdminPaymentReview } from '../../hooks/useAdminPaymentReview';
 import { useApartments } from '../../hooks/useApartments';
 import { useOwners } from '../../hooks/useOwners';
+import { useAuth } from '../../hooks/useAuth';
+import { getApartmentPendingDebts } from '../../services/apartmentService';
 import FormModal from '../../components/FormModal/FormModal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
 import PaymentReviewModal from '../../components/PaymentReviewModal/PaymentReviewModal';
@@ -91,6 +93,9 @@ export default function AdminPaymentsPage() {
   const { success, error: toastError } = useNotification();
   const { apartments, fetchApartments } = useApartments();
   const { owners, fetchOwners } = useOwners();
+  const { token } = useAuth();
+  const [formPendingDebts, setFormPendingDebts] = useState({ cuotas: [], multas: [] });
+  const [selectedApartmentId, setSelectedApartmentId] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [annulTarget, setAnnulTarget] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
@@ -220,48 +225,137 @@ export default function AdminPaymentsPage() {
 
   const handleApartmentChange = (apartmentId) => {
     const selectedApartment = apartments.find((a) => String(a.id) === String(apartmentId));
-    return { owner_id: selectedApartment?.owner_id || '' };
+    setSelectedApartmentId(apartmentId);
+    if (apartmentId) {
+      getApartmentPendingDebts(token, apartmentId)
+        .then((data) => setFormPendingDebts(data))
+        .catch(() => setFormPendingDebts({ cuotas: [], multas: [] }));
+    } else {
+      setFormPendingDebts({ cuotas: [], multas: [] });
+    }
+    return {
+      owner_id: selectedApartment?.owner_id || '',
+      selected_debt: '',
+      fine_id: '',
+    };
   };
 
   const handleOwnerChange = (ownerId) => {
     const filtered = apartments.filter((a) => String(a.owner_id) === String(ownerId));
     setFilteredApartments(filtered);
+    const hasSingleApartment = filtered.length === 1;
+    const aptId = hasSingleApartment ? filtered[0].id : '';
+    setSelectedApartmentId(aptId);
+    if (aptId) {
+      getApartmentPendingDebts(token, aptId)
+        .then((data) => setFormPendingDebts(data))
+        .catch(() => setFormPendingDebts({ cuotas: [], multas: [] }));
+    } else {
+      setFormPendingDebts({ cuotas: [], multas: [] });
+    }
     return {
       owner_id: ownerId,
-      apartment_id: filtered.length === 1 ? filtered[0].id : '',
+      apartment_id: aptId,
+      selected_debt: '',
+      fine_id: '',
     };
   };
 
-  const getPaymentFields = () => [
-    {
-      name: 'apartment_id',
-      label: 'Departamento',
-      type: 'select',
-      required: true,
-      options: filteredApartments.length > 0
-        ? filteredApartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` }))
-        : apartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` })),
-      onChange: handleApartmentChange,
-    },
-    {
-      name: 'owner_id',
-      label: 'Propietario',
-      type: 'select',
-      required: true,
-      options: owners.map((o) => ({ value: o.id, label: o.full_name })),
-      onChange: handleOwnerChange,
-    },
-    { name: 'period', label: 'Período (YYYY-MM)', type: 'month', required: true, defaultValue: getCurrentMonth() },
-    { name: 'amount', label: 'Monto', type: 'number', required: true, min: '0', step: '0.01' },
-    {
-      name: 'method',
-      label: 'Método de pago',
-      type: 'select',
-      options: METHOD_OPTIONS,
-    },
-    { name: 'reference', label: 'Referencia / Comprobante', type: 'text' },
-    { name: 'paid_at', label: 'Fecha de pago', type: 'date', required: true },
-  ];
+  const handleDebtChangeSelection = (selectedVal) => {
+    if (!selectedVal) {
+      return {
+        period: getCurrentMonth(),
+        amount: '',
+        fine_id: '',
+      };
+    }
+    const [type, id] = selectedVal.split(':');
+    if (type === 'cuota') {
+      const selected = formPendingDebts.cuotas.find((c) => c.id === id);
+      if (selected) {
+        return {
+          period: selected.period,
+          amount: selected.amount.toString(),
+          fine_id: '',
+        };
+      }
+    } else if (type === 'multas') {
+      const selected = formPendingDebts.multas.find((m) => m.id === id);
+      if (selected) {
+        return {
+          period: selected.period,
+          amount: selected.amount.toString(),
+          fine_id: selected.id,
+        };
+      }
+    }
+    return null;
+  };
+
+  const getPaymentFields = () => {
+    const debtOptions = [];
+    if (formPendingDebts.cuotas.length > 0) {
+      debtOptions.push({
+        label: 'Cuotas pendientes',
+        options: formPendingDebts.cuotas.map((c) => ({
+          value: `cuota:${c.id}`,
+          label: `${c.description} (${formatCurrency(c.amount)})`,
+        })),
+      });
+    }
+    if (formPendingDebts.multas.length > 0) {
+      debtOptions.push({
+        label: 'Multas activas',
+        options: formPendingDebts.multas.map((m) => ({
+          value: `multas:${m.id}`,
+          label: `${m.description} (${formatCurrency(m.amount)})`,
+        })),
+      });
+    }
+
+    return [
+      {
+        name: 'apartment_id',
+        label: 'Departamento',
+        type: 'select',
+        required: true,
+        options: filteredApartments.length > 0
+          ? filteredApartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` }))
+          : apartments.map((a) => ({ value: a.id, label: `Depto ${a.code}` })),
+        onChange: handleApartmentChange,
+      },
+      {
+        name: 'owner_id',
+        label: 'Propietario',
+        type: 'select',
+        required: true,
+        options: owners.map((o) => ({ value: o.id, label: o.full_name })),
+        onChange: handleOwnerChange,
+      },
+      ...(selectedApartmentId
+        ? [
+            {
+              name: 'selected_debt',
+              label: 'Concepto / Deuda Pendiente',
+              type: 'select',
+              options: debtOptions,
+              onChange: handleDebtChangeSelection,
+            },
+          ]
+        : []),
+      { name: 'fine_id', type: 'hidden' },
+      { name: 'period', label: 'Período (YYYY-MM)', type: 'month', required: true, defaultValue: getCurrentMonth() },
+      { name: 'amount', label: 'Monto', type: 'number', required: true, min: '0', step: '0.01' },
+      {
+        name: 'method',
+        label: 'Método de pago',
+        type: 'select',
+        options: METHOD_OPTIONS,
+      },
+      { name: 'reference', label: 'Referencia / Comprobante', type: 'text' },
+      { name: 'paid_at', label: 'Fecha de pago', type: 'date', required: true },
+    ];
+  };
 
   const handleCreate = async (data) => {
     try {
@@ -269,6 +363,8 @@ export default function AdminPaymentsPage() {
       success('Pago registrado con éxito');
       setIsFormOpen(false);
       setFilteredApartments([]);
+      setSelectedApartmentId('');
+      setFormPendingDebts({ cuotas: [], multas: [] });
     } catch (err) {
       toastError(err.response?.data?.detail || 'Error al registrar pago');
     }
@@ -277,6 +373,8 @@ export default function AdminPaymentsPage() {
   const handleFormClose = () => {
     setIsFormOpen(false);
     setFilteredApartments([]);
+    setSelectedApartmentId('');
+    setFormPendingDebts({ cuotas: [], multas: [] });
   };
 
   const handleAnnul = async () => {

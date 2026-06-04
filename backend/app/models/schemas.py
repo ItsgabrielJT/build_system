@@ -155,6 +155,7 @@ class OwnerPaymentCreate(BaseModel):
     amount: Decimal
     method: Optional[str] = None
     reference: Optional[str] = None
+    fine_id: Optional[UUID] = None
 
     @field_validator("period")
     @classmethod
@@ -183,6 +184,7 @@ class PaymentCreate(BaseModel):
     amount: Decimal
     method: Optional[str] = None
     reference: Optional[str] = None
+    fine_id: Optional[UUID] = None
 
     @field_validator("period")
     @classmethod
@@ -206,6 +208,7 @@ class PaymentResponse(BaseModel):
     status: str
     apartment_code: Optional[str] = None
     owner_name: Optional[str] = None
+    fine_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
 

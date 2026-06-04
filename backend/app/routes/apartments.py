@@ -185,3 +185,60 @@ def _map_apartment_status(db_status: str, owner_id: Optional[UUID]) -> str:
     elif db_status in ("ACTIVA", "ACTIVO"):
         return "OCUPADO" if owner_id else "VACANTE"
     return db_status
+
+
+@router.get("/apartments/{apartment_id}/pending-debts")
+async def get_apartment_pending_debts(
+    apartment_id: UUID,
+    _user: dict = Depends(require_authenticated),
+    db=Depends(get_db),
+):
+    """Retrieve unpaid fees and active fines for a specific apartment."""
+    fees = await db.fetch(
+        """
+        SELECT af.id, af.period, af.amount
+        FROM apartment_fees af
+        WHERE af.apartment_id = $1
+          AND NOT EXISTS (
+              SELECT 1 FROM payments p
+              WHERE p.apartment_id = af.apartment_id
+                AND p.period = af.period
+                AND p.status IN ('REGISTRADO', 'PENDIENTE_APROBACION')
+          )
+        ORDER BY af.period ASC
+        """,
+        apartment_id,
+    )
+    
+    fines = await db.fetch(
+        """
+        SELECT f.id, f.period, f.amount, f.reason
+        FROM fines f
+        WHERE f.apartment_id = $1
+          AND f.status = 'ACTIVA'
+        ORDER BY f.issued_at ASC
+        """,
+        apartment_id,
+    )
+    
+    return {
+        "cuotas": [
+            {
+                "id": str(r["id"]),
+                "period": r["period"],
+                "amount": float(r["amount"]),
+                "description": f"Cuota - Período {r['period']}",
+            }
+            for r in fees
+        ],
+        "multas": [
+            {
+                "id": str(r["id"]),
+                "period": r["period"],
+                "amount": float(r["amount"]),
+                "description": f"Multa - {r['reason'] or 'Sin concepto'} ({r['period']})",
+            }
+            for r in fines
+        ],
+    }
+

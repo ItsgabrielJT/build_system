@@ -283,12 +283,13 @@ export default function AdminFeesPage() {
                       <th className={styles.th}>Piso</th>
                       <th className={styles.th}>Torre</th>
                       <th className={styles.th}>Cuota</th>
+                      <th className={styles.th}>Estado</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detailFees.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
+                        <td colSpan={5} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
                           Sin cuotas registradas en este período
                         </td>
                       </tr>
@@ -301,6 +302,11 @@ export default function AdminFeesPage() {
                             <td className={styles.td}>{apt.floor ?? '—'}</td>
                             <td className={styles.td}>{apt.tower ?? '—'}</td>
                             <td className={styles.td}>{formatMoney(fee.amount)}</td>
+                            <td className={styles.td}>
+                              <span className={`${styles.inlineBadge} ${fee.is_paid ? styles.inlineBadge_PAGADO : styles.inlineBadge_PENDIENTE}`}>
+                                {fee.is_paid ? 'Pagado' : 'Pendiente'}
+                              </span>
+                            </td>
                           </tr>
                         );
                       })

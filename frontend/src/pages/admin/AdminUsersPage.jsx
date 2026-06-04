@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../context/NotificationContext';
 import { getUsers, createUser, updateUser, getRoles } from '../../services/userService';
 import { getOwnerDirectory } from '../../services/ownerService';
 import styles from './AdminUsersPage.module.css';
 
 export default function AdminUsersPage() {
   const { token } = useAuth();
+  const { success, error: toastError } = useNotification();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [owners, setOwners] = useState([]);
@@ -80,10 +82,13 @@ export default function AdminUsersPage() {
         role_id: formData.role_id,
         owner_id: formData.owner_id || undefined
       }, token);
+      success('Usuario creado con éxito');
       await fetchData();
       setIsModalOpen(false);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al crear usuario.');
+      const msg = err.response?.data?.detail || 'Error al crear usuario.';
+      setError(msg);
+      toastError(msg);
     }
   };
 
@@ -91,10 +96,11 @@ export default function AdminUsersPage() {
     try {
       const newStatus = user.status === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
       await updateUser(user.id, { status: newStatus }, token);
+      success(`Usuario ${newStatus === 'ACTIVO' ? 'activado' : 'desactivado'} con éxito`);
       await fetchData();
     } catch (err) {
       console.error(err);
-      alert('Error al actualizar estado del usuario');
+      toastError('Error al actualizar estado del usuario');
     }
   };
 

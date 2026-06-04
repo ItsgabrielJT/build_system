@@ -79,18 +79,18 @@ class EmailService:
     @staticmethod
     async def send_user_created_email(user_email: str, temp_password: str, role_name: str) -> bool:
         """Envía correo de bienvenida con la contraseña temporal."""
-        subject = "Bienvenido a Build System - Tu cuenta ha sido creada"
+        subject = "Bienvenido a HabitaUIO - Tu cuenta ha sido creada"
         text_content = (
             f"Hola,\n\n"
-            f"Tu cuenta ha sido creada en Build System con el rol de {role_name}.\n\n"
+            f"Tu cuenta ha sido creada en HabitaUIO con el rol de {role_name}.\n\n"
             f"Tus credenciales de acceso temporal son:\n"
             f"  Usuario: {user_email}\n"
             f"  Contraseña Temporal: {temp_password}\n\n"
             f"Por seguridad, se te solicitará cambiar tu contraseña en tu primer inicio de sesión.\n\n"
-            f"Saludos,\nEl equipo de Build System"
+            f"Saludos,\nEl equipo de HabitaUIO"
         )
         html_content = (
-            f"<h3>Bienvenido a Build System</h3>"
+            f"<h3>Bienvenido a HabitaUIO</h3>"
             f"<p>Tu cuenta ha sido creada con el rol de <strong>{role_name}</strong>.</p>"
             f"<p>Tus credenciales de acceso temporal son:</p>"
             f"<ul>"
@@ -98,7 +98,7 @@ class EmailService:
             f"  <li><strong>Contraseña Temporal:</strong> {temp_password}</li>"
             f"</ul>"
             f"<p>Por seguridad, deberás cambiar tu contraseña al ingresar por primera vez.</p>"
-            f"<br/><p>Saludos,<br/>El equipo de Build System</p>"
+            f"<br/><p>Saludos,<br/>El equipo de HabitaUIO</p>"
         )
         return await EmailService.send_email(user_email, subject, text_content, html_content)
 
@@ -143,14 +143,14 @@ class EmailService:
                 f"Hola {owner_name},\n\n"
                 f"Hemos recibido tu comprobante de pago por un monto de USD {amount} para el período {period}.\n\n"
                 f"El pago se encuentra actualmente en revisión por la administración. Te notificaremos una vez sea aprobado.\n\n"
-                f"Saludos,\nAdministración de Build System"
+                f"Saludos,\nAdministración de HabitaUIO"
             )
             owner_html = (
                 f"<h3>Comprobante de pago recibido</h3>"
                 f"<p>Hola {owner_name},</p>"
                 f"<p>Hemos recibido el comprobante de pago cargado para el período <strong>{period}</strong> por un monto de <strong>USD {amount}</strong>.</p>"
                 f"<p>Tu pago está pendiente de revisión por parte de la administración. Te enviaremos un correo tan pronto sea aprobado.</p>"
-                f"<br/><p>Saludos,<br/>Administración de Build System</p>"
+                f"<br/><p>Saludos,<br/>Administración de HabitaUIO</p>"
             )
             await EmailService.send_email(owner_email, owner_subject, owner_text, owner_html, owner_name)
 
@@ -169,13 +169,13 @@ class EmailService:
             f"Hola {owner_name},\n\n"
             f"Te informamos que tu pago por un monto de USD {amount} para el período {period} ha sido APROBADO por la administración.\n\n"
             f"Ya puedes descargar tu recibo de pago oficial desde el portal en el módulo 'Mis Pagos'.\n\n"
-            f"Saludos,\nAdministración de Build System"
+            f"Saludos,\nAdministración de HabitaUIO"
         )
         html_content = (
             f"<h3>Tu pago ha sido aprobado</h3>"
             f"<p>Hola {owner_name},</p>"
             f"<p>Te notificamos que tu pago por un monto de <strong>USD {amount}</strong> para el período <strong>{period}</strong> fue aprobado con éxito.</p>"
             f"<p>Tu recibo oficial ya se encuentra disponible para su descarga en el portal dentro del módulo 'Mis Pagos'.</p>"
-            f"<br/><p>Saludos,<br/>Administración de Build System</p>"
+            f"<br/><p>Saludos,<br/>Administración de HabitaUIO</p>"
         )
         return await EmailService.send_email(owner_email, subject, text_content, html_content, owner_name)

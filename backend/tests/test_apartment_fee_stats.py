@@ -42,7 +42,7 @@ def _setup_stats_db(
         if (
             "SUM(amount)" in query
             and "FROM payments" in query
-            and "status = 'CONFIRMED'" in query
+            and "status = 'REGISTRADO'" in query
         ):
             return {"total": total_recaudado}
 

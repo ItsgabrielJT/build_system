@@ -22,7 +22,7 @@ from app.repositories.owner_repository import OwnerRepository
 from app.repositories.payment_proof_repository import PaymentProofRepository
 from app.repositories.payment_repository import PaymentRepository
 
-_STATUS_APROBADO = "APROBADO"
+_STATUS_APROBADO = "REGISTRADO"
 _PRIMARY_BLUE = colors.HexColor("#123c7a")
 _ACCENT_BLUE = colors.HexColor("#dbe7f7")
 _SUCCESS_GREEN = colors.HexColor("#1f8f4d")

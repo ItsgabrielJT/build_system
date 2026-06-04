@@ -235,7 +235,7 @@ class OwnerRepository:
                 p.paid_at as date,
                 COALESCE(p.reference, 'Pago de cuota') as reference
             FROM payments p
-            WHERE p.owner_id = $1 AND p.status = 'PAGADO'
+            WHERE p.owner_id = $1 AND p.status = 'REGISTRADO'
             
             UNION ALL
             

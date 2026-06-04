@@ -89,7 +89,7 @@ class ApartmentFeeRepository:
         total_emitido = Decimal(str(row["total"]))
 
         row = await self._conn.fetchrow(
-            "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE period = $1 AND status = 'CONFIRMED'",
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE period = $1 AND status = 'REGISTRADO'",
             period,
         )
         total_recaudado = Decimal(str(row["total"]))
@@ -109,7 +109,7 @@ class ApartmentFeeRepository:
             LEFT JOIN (
                 SELECT apartment_id, period, COALESCE(SUM(amount), 0) AS pagado
                 FROM payments
-                WHERE status = 'CONFIRMED'
+                WHERE status = 'REGISTRADO'
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             WHERE af.period < $1
@@ -175,7 +175,7 @@ class ApartmentFeeRepository:
             LEFT JOIN payments p
                 ON p.apartment_id = af.apartment_id
                 AND p.period = af.period
-                AND p.status = 'CONFIRMED'
+                AND p.status = 'REGISTRADO'
             WHERE ($1::int IS NULL OR SUBSTRING(af.period, 1, 4)::int = $1)
             GROUP BY af.period
             ORDER BY af.period DESC

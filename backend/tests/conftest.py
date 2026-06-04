@@ -163,6 +163,29 @@ async def db_with_users(mock_db: AsyncMock) -> AsyncMock:
                 if role["name"] == role_name:
                     return role
             return None
+        elif "INSERT INTO owners" in query:
+            return {
+                "id": uuid4(),
+                "full_name": args[0],
+                "document_id": args[1],
+                "phone": args[2] if len(args) > 2 else None,
+                "email": args[3] if len(args) > 3 else None,
+                "firebase_uid": None,
+                "status": "ACTIVO",
+                "created_at": "2026-05-20T10:00:00Z",
+                "updated_at": "2026-05-20T10:00:00Z",
+            }
+        elif "INSERT INTO apartments" in query:
+            return {
+                "id": uuid4(),
+                "code": args[0],
+                "floor": args[1] if len(args) > 1 else None,
+                "tower": args[2] if len(args) > 2 else None,
+                "status": "ACTIVO",
+                "building_id": args[3] if len(args) > 3 else None,
+                "created_at": "2026-05-20T10:00:00Z",
+                "updated_at": "2026-05-20T10:00:00Z",
+            }
         return None
 
     # ─── Configurar fetchval (para inserts)

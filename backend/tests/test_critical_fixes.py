@@ -212,7 +212,7 @@ async def test_get_apartments_with_owner_info(mock_user, mock_db):
         ])
         MockService.return_value = mock_service
         
-        result = await list_apartments(_user=mock_user, db=mock_db)
+        result = await list_apartments(user=mock_user, db=mock_db)
         
         # Validar estructura de respuesta
         assert len(result) == 2
@@ -291,7 +291,7 @@ async def test_report_income_pdf(mock_user, mock_db):
         # Validar que es Response con PDF
         assert result.media_type == "application/pdf"
         assert b"mock pdf content" in result.body
-        mock_service.income_pdf.assert_called_once_with("2026-05")
+        mock_service.income_pdf.assert_called_once_with("2026-05", None, None)
 
 
 @pytest.mark.asyncio
@@ -316,7 +316,7 @@ async def test_report_income_excel(mock_user, mock_db):
         
         # Validar que es Response con Excel
         assert "spreadsheetml.sheet" in result.media_type
-        mock_service.income_excel.assert_called_once_with("2026-05")
+        mock_service.income_excel.assert_called_once_with("2026-05", None, None)
 
 
 @pytest.mark.asyncio

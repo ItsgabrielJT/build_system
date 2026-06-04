@@ -344,9 +344,9 @@ class TestAdminApproveRejectPayment:
         async_client: AsyncClient,
         admin_headers: dict,
     ):
-        """CRITERIO-2.1: Aprobar pago pendiente retorna 200 con estado APROBADO."""
+        """CRITERIO-2.1: Aprobar pago pendiente retorna 200 con estado REGISTRADO."""
         approved_payment = _make_payment(
-            status="APROBADO",
+            status="REGISTRADO",
             approved_by=str(ADMIN_USER_ID),
             approved_at=datetime(2026, 5, 31, 12, 0, 0, tzinfo=timezone.utc),
         )
@@ -361,7 +361,7 @@ class TestAdminApproveRejectPayment:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "APROBADO"
+        assert data["status"] == "REGISTRADO"
         assert data["approved_by"] == str(ADMIN_USER_ID)
 
     @pytest.mark.asyncio
@@ -596,7 +596,7 @@ class TestOwnerPaymentServiceLogic:
         notification_repo = AsyncMock()
 
         owner_repo.get_by_user_id = AsyncMock(return_value=_make_owner())
-        approved_payment = _make_payment(status="APROBADO")
+        approved_payment = _make_payment(status="REGISTRADO")
         rejected_payment = _make_payment(
             payment_id=uuid4(),
             status="RECHAZADO",
@@ -612,14 +612,14 @@ class TestOwnerPaymentServiceLogic:
 
         result = await service.list_payments(
             user_id=PROPIETARIO_USER_ID,
-            status_filter="APROBADO",
+            status_filter="REGISTRADO",
             period="2026-05",
             apartment_id=APARTMENT_ID,
         )
 
         payment_repo.get_owner_payments.assert_awaited_once_with(
             owner_id=OWNER_ID,
-            status="APROBADO",
+            status="REGISTRADO",
             period="2026-05",
             apartment_id=APARTMENT_ID,
         )
@@ -763,7 +763,7 @@ class TestOwnerPaymentServiceLogic:
         payment_repo.get_by_id_for_owner = AsyncMock(
             return_value=_make_payment(
                 payment_id=PAYMENT_ID_APPROVED,
-                status="APROBADO",
+                status="REGISTRADO",
                 approved_by="Franz Guzman",
                 approved_at=datetime(2026, 5, 31, 15, 30, tzinfo=timezone.utc),
             )

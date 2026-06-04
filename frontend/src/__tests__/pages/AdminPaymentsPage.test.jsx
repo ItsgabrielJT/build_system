@@ -17,6 +17,11 @@ vi.mock('../../hooks/useAuth', () => ({
     user: { id: 'user1' },
     role: 'ADMIN',
   }),
+}));vi.mock('../../context/NotificationContext', () => ({
+  useNotification: () => ({
+    success: vi.fn(),
+    error: vi.fn(),
+  }),
 }));
 
 describe('AdminPaymentsPage', () => {

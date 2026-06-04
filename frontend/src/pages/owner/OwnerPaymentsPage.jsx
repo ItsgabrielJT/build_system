@@ -317,15 +317,15 @@ export default function OwnerPaymentsPage() {
                       <button
                         type="button"
                         className={`${styles.btnAction} ${
-                          payment.status === 'APROBADO' ? styles.btnActionPrimary : ''
+                          payment.status === 'REGISTRADO' ? styles.btnActionPrimary : ''
                         }`}
                         onClick={() => handleDownloadReceipt(payment)}
                         disabled={
-                          payment.status !== 'APROBADO' ||
+                          payment.status !== 'REGISTRADO' ||
                           downloadingId === `rec-${payment.id}`
                         }
                         title={
-                          payment.status !== 'APROBADO'
+                          payment.status !== 'REGISTRADO'
                             ? 'El recibo oficial solo está disponible para pagos aprobados'
                             : 'Descargar recibo oficial'
                         }

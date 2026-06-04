@@ -217,7 +217,7 @@ class PaymentRepository:
             """
             UPDATE payments
             SET
-                status = 'APROBADO',
+                status = 'REGISTRADO',
                 approved_by = $2,
                 approved_at = NOW(),
                 rejected_by = NULL,

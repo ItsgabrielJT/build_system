@@ -129,7 +129,7 @@ describe('OwnerPaymentsPage', () => {
         apartment_code: '101',
         paid_at: '2026-05-15',
         amount: 500,
-        status: 'APROBADO',
+        status: 'REGISTRADO',
         rejection_reason: null,
       },
     ];

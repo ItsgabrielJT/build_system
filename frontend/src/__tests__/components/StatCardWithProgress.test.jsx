@@ -15,7 +15,7 @@ describe('StatCardWithProgress', () => {
 
     expect(screen.getByText('Mantenimiento')).toBeInTheDocument();
     expect(screen.getByText('$1,250.00')).toBeInTheDocument();
-    expect(screen.getByText('/ $5,000 Budget')).toBeInTheDocument();
+    expect(screen.getByText('/ $5,000 presupuesto')).toBeInTheDocument();
   });
 
   it('muestra barra de progreso con porcentaje correcto', () => {
@@ -44,7 +44,7 @@ describe('StatCardWithProgress', () => {
       />
     );
 
-    expect(screen.getByText('Over Budget')).toBeInTheDocument();
+    expect(screen.getByText('Presupuesto Excedido')).toBeInTheDocument();
   });
 
   it('no muestra badge Over Budget cuando percentage <= 100', () => {
@@ -58,7 +58,7 @@ describe('StatCardWithProgress', () => {
       />
     );
 
-    expect(screen.queryByText('Over Budget')).not.toBeInTheDocument();
+    expect(screen.queryByText('Presupuesto Excedido')).not.toBeInTheDocument();
   });
 
   it('muestra texto de porcentaje utilizado cuando no excede budget', () => {
@@ -72,6 +72,6 @@ describe('StatCardWithProgress', () => {
       />
     );
 
-    expect(screen.getByText('90% utilized')).toBeInTheDocument();
+    expect(screen.getByText('90% utilizado')).toBeInTheDocument();
   });
 });

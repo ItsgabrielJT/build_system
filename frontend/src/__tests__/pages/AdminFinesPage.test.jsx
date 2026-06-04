@@ -15,6 +15,13 @@ vi.mock('../../hooks/useAuth', () => ({
     role: 'ADMIN',
   }),
 }));
+vi.mock('../../context/NotificationContext', () => ({
+  useNotification: () => ({
+    success: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
+
 
 describe('AdminFinesPage', () => {
   beforeEach(() => {

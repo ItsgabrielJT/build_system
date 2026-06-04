@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../context/NotificationContext';
 import StatCardWithProgress from '../../components/StatCardWithProgress/StatCardWithProgress';
 import RecentExpensesList from '../../components/RecentExpensesList/RecentExpensesList';
 import ExpenseCategoryChart from '../../components/ExpenseCategoryChart/ExpenseCategoryChart';
@@ -22,6 +23,7 @@ function getToken(auth) {
 
 export default function AdminExpensesPage() {
   const auth = useAuth();
+  const { success, error: toastError } = useNotification();
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const [monthlyStats, setMonthlyStats] = useState(null);
@@ -115,11 +117,14 @@ export default function AdminExpensesPage() {
         category: form.category || undefined,
       };
       await createExpense(payload, token);
+      success('Gasto registrado con éxito');
       setForm(EMPTY_FORM);
       setFormErrors({});
       await Promise.all([fetchStats(), fetchRecent()]);
-    } catch {
-      setSubmitError('Failed to save expense. Please try again.');
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to save expense. Please try again.';
+      setSubmitError(msg);
+      toastError(msg);
     } finally {
       setSubmitting(false);
     }

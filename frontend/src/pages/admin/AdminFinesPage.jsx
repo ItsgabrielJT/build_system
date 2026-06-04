@@ -88,6 +88,8 @@ const getStatsFallback = (fines) => {
   };
 };
 
+import { useNotification } from '../../context/NotificationContext';
+
 export default function AdminFinesPage() {
   const {
     fines,
@@ -100,6 +102,7 @@ export default function AdminFinesPage() {
     createFine,
     annulFine,
   } = useFines();
+  const { success, error: toastError } = useNotification();
   const { apartments, fetchApartments } = useApartments();
   const { owners, fetchOwners } = useOwners();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -194,11 +197,16 @@ export default function AdminFinesPage() {
   ];
 
   const handleCreate = async (data) => {
-    await createFine({ ...data, amount: parseFloat(data.amount) });
-    setIsFormOpen(false);
-    setFilteredApartments([]);
-    fetchFines({ ...filters, page, page_size: PAGE_SIZE });
-    if (typeof fetchFineStats === 'function') fetchFineStats(filters);
+    try {
+      await createFine({ ...data, amount: parseFloat(data.amount) });
+      success('Multa registrada con éxito');
+      setIsFormOpen(false);
+      setFilteredApartments([]);
+      fetchFines({ ...filters, page, page_size: PAGE_SIZE });
+      if (typeof fetchFineStats === 'function') fetchFineStats(filters);
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al registrar multa');
+    }
   };
 
   const handleFormClose = () => {
@@ -210,10 +218,13 @@ export default function AdminFinesPage() {
     setActionError(null);
     try {
       await annulFine(annulTarget.id);
+      success('Multa anulada con éxito');
       fetchFines({ ...filters, page, page_size: PAGE_SIZE });
       if (typeof fetchFineStats === 'function') fetchFineStats(filters);
     } catch (err) {
-      setActionError(err.response?.data?.detail || 'Error al anular multa');
+      const msg = err.response?.data?.detail || 'Error al anular multa';
+      setActionError(msg);
+      toastError(msg);
     } finally {
       setAnnulTarget(null);
     }

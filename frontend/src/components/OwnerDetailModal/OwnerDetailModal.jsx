@@ -12,8 +12,11 @@ const EDIT_FIELDS = [
   { name: 'phone', label: 'Teléfono', type: 'tel' },
 ];
 
+import { useNotification } from '../../context/NotificationContext';
+
 export default function OwnerDetailModal({ owner, onClose, onRefresh }) {
   const { token } = useAuth();
+  const { success, error: toastError } = useNotification();
   const [showEditModal, setShowEditModal] = useState(false);
   const [availableApartments, setAvailableApartments] = useState([]);
   const [selectedAptId, setSelectedAptId] = useState('');
@@ -46,16 +49,21 @@ export default function OwnerDetailModal({ owner, onClose, onRefresh }) {
   };
 
   const handleSaveEdit = async (formData) => {
-    const payload = {
-      full_name: formData.full_name,
-      document_id: formData.document_id,
-      phone: formData.phone || undefined,
-      email: formData.email || undefined,
-    };
-    await ownerService.updateOwner(owner.id, payload, token);
-    setShowEditModal(false);
-    onRefresh?.();
-    onClose();
+    try {
+      const payload = {
+        full_name: formData.full_name,
+        document_id: formData.document_id,
+        phone: formData.phone || undefined,
+        email: formData.email || undefined,
+      };
+      await ownerService.updateOwner(owner.id, payload, token);
+      success('Propietario actualizado con éxito');
+      setShowEditModal(false);
+      onRefresh?.();
+      onClose();
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al actualizar propietario');
+    }
   };
 
   const handleAssignApartment = async () => {
@@ -64,10 +72,13 @@ export default function OwnerDetailModal({ owner, onClose, onRefresh }) {
     setError(null);
     try {
       await apartmentService.assignOwner(selectedAptId, owner.id, {}, token);
+      success('Apartamento asignado con éxito');
       onRefresh?.();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al asignar apartamento');
+      const msg = err.response?.data?.detail || 'Error al asignar apartamento';
+      setError(msg);
+      toastError(msg);
     } finally {
       setAssigning(false);
     }
@@ -78,10 +89,13 @@ export default function OwnerDetailModal({ owner, onClose, onRefresh }) {
     setError(null);
     try {
       await apartmentService.removeOwner(unitId, owner.id, token);
+      success('Apartamento desvinculado con éxito');
       onRefresh?.();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al quitar apartamento');
+      const msg = err.response?.data?.detail || 'Error al quitar apartamento';
+      setError(msg);
+      toastError(msg);
     } finally {
       setRemoving(null);
     }

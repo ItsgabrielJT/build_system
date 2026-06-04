@@ -75,6 +75,8 @@ const getPeriodLabel = (period) => {
     .format(new Date(Number(year), Number(month) - 1, 1));
 };
 
+import { useNotification } from '../../context/NotificationContext';
+
 export default function AdminPaymentsPage() {
   const { payments, loading, error, fetchPayments, createPayment, annulPayment, downloadAdminReceipt } = usePayments();
   const {
@@ -86,6 +88,7 @@ export default function AdminPaymentsPage() {
     rejectPayment,
     downloadProof,
   } = useAdminPaymentReview();
+  const { success, error: toastError } = useNotification();
   const { apartments, fetchApartments } = useApartments();
   const { owners, fetchOwners } = useOwners();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -261,9 +264,14 @@ export default function AdminPaymentsPage() {
   ];
 
   const handleCreate = async (data) => {
-    await createPayment({ ...data, amount: parseFloat(data.amount) });
-    setIsFormOpen(false);
-    setFilteredApartments([]);
+    try {
+      await createPayment({ ...data, amount: parseFloat(data.amount) });
+      success('Pago registrado con éxito');
+      setIsFormOpen(false);
+      setFilteredApartments([]);
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al registrar pago');
+    }
   };
 
   const handleFormClose = () => {
@@ -275,8 +283,11 @@ export default function AdminPaymentsPage() {
     setActionError(null);
     try {
       await annulPayment(annulTarget.id);
+      success('Pago anulado con éxito');
     } catch (err) {
-      setActionError(err.response?.data?.detail || 'Error al anular pago');
+      const msg = err.response?.data?.detail || 'Error al anular pago';
+      setActionError(msg);
+      toastError(msg);
     } finally {
       setAnnulTarget(null);
     }
@@ -689,8 +700,24 @@ export default function AdminPaymentsPage() {
       <PaymentReviewModal
         payment={reviewTarget}
         onDownloadProof={handleDownloadProof}
-        onApprove={async (id) => { await approvePayment(id); setReviewTarget(null); }}
-        onReject={async (id, reason) => { await rejectPayment(id, reason); setReviewTarget(null); }}
+        onApprove={async (id) => {
+          try {
+            await approvePayment(id);
+            success('Pago aprobado con éxito');
+            setReviewTarget(null);
+          } catch (err) {
+            toastError(err.response?.data?.detail || 'Error al aprobar pago');
+          }
+        }}
+        onReject={async (id, reason) => {
+          try {
+            await rejectPayment(id, reason);
+            success('Pago rechazado con éxito');
+            setReviewTarget(null);
+          } catch (err) {
+            toastError(err.response?.data?.detail || 'Error al rechazar pago');
+          }
+        }}
         onClose={() => setReviewTarget(null)}
       />
     </div>

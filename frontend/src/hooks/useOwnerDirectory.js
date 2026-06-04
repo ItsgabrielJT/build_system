@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { useNotification } from '../context/NotificationContext';
 import * as ownerService from '../services/ownerService';
 
 export function useOwnerDirectory() {
   const { token } = useAuth();
+  const { success, error: toastError } = useNotification();
   const [owners, setOwners] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -83,17 +85,22 @@ export function useOwnerDirectory() {
 
   const handleCreateOwner = useCallback(
     async (formData) => {
-      const payload = {
-        full_name: formData.full_name,
-        document_id: formData.document_id,
-        phone: formData.phone || undefined,
-        email: formData.email || undefined,
-      };
-      await ownerService.createOwner(payload, token);
-      setShowCreateModal(false);
-      fetchOwners(1, searchTerm);
+      try {
+        const payload = {
+          full_name: formData.full_name,
+          document_id: formData.document_id,
+          phone: formData.phone || undefined,
+          email: formData.email || undefined,
+        };
+        await ownerService.createOwner(payload, token);
+        success('Propietario creado con éxito');
+        setShowCreateModal(false);
+        fetchOwners(1, searchTerm);
+      } catch (err) {
+        toastError(err.response?.data?.detail || 'Error al crear propietario');
+      }
     },
-    [token, fetchOwners, searchTerm]
+    [token, fetchOwners, searchTerm, success, toastError]
   );
 
   useEffect(() => {

@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { useNotification } from '../context/NotificationContext';
 import * as apartmentService from '../services/apartmentService';
 import { getBuildings } from '../services/buildingService';
 
 export function useApartmentDirectory() {
   const { token } = useAuth();
+  const { success, error: toastError } = useNotification();
   const [statistics, setStatistics] = useState(null);
   const [apartments, setApartments] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -97,18 +99,23 @@ export function useApartmentDirectory() {
 
   const handleCreateApartment = useCallback(
     async (formData) => {
-      const payload = {
-        code: formData.code,
-        floor: formData.floor ? parseInt(formData.floor, 10) : undefined,
-        tower: formData.tower || undefined,
-        building_id: formData.building_id || undefined,
-      };
-      await apartmentService.createApartment(payload, token);
-      setShowCreateModal(false);
-      fetchStatistics(buildingFilter);
-      fetchApartments(1, filter);
+      try {
+        const payload = {
+          code: formData.code,
+          floor: formData.floor ? parseInt(formData.floor, 10) : undefined,
+          tower: formData.tower || undefined,
+          building_id: formData.building_id || undefined,
+        };
+        await apartmentService.createApartment(payload, token);
+        success('Apartamento creado con éxito');
+        setShowCreateModal(false);
+        fetchStatistics(buildingFilter);
+        fetchApartments(1, filter);
+      } catch (err) {
+        toastError(err.response?.data?.detail || 'Error al crear apartamento');
+      }
     },
-    [token, fetchStatistics, fetchApartments, filter, buildingFilter]
+    [token, fetchStatistics, fetchApartments, filter, buildingFilter, success, toastError]
   );
 
   useEffect(() => {

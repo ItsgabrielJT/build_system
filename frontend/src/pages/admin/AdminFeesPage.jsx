@@ -7,6 +7,7 @@ import StatsCard from '../../components/StatsCard/StatsCard';
 import PeriodsHistoryTable from '../../components/PeriodsHistoryTable/PeriodsHistoryTable';
 import styles from './AdminFeesPage.module.css';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../context/NotificationContext';
 import { getFeesByPeriod, getApartmentFeeStats } from '../../services/apartmentFeeService';
 import {
   ResponsiveContainer,
@@ -49,6 +50,7 @@ export default function AdminFeesPage() {
   const [actionError, setActionError] = useState(null);
 
   const { token } = useAuth();
+  const { success, error: toastError } = useNotification();
 
   // Modal "Ver detalle"
   const [detailPeriod, setDetailPeriod] = useState(null);
@@ -100,12 +102,15 @@ export default function AdminFeesPage() {
         .map(([apartment_id, amount]) => ({ apartment_id, amount: parseFloat(amount) }));
       if (!feesList.length) return;
       const result = await bulkUpload({ period, fees: feesList });
+      success('Cuotas guardadas con éxito');
       setBulkResult(result);
       fetchFees(period);
       setIsBulkOpen(false);
       setBulkValues({});
     } catch (err) {
-      setActionError(err.response?.data?.detail || 'Error al guardar cuotas');
+      const msg = err.response?.data?.detail || 'Error al guardar cuotas';
+      setActionError(msg);
+      toastError(msg);
     }
   };
 

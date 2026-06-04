@@ -121,7 +121,7 @@ export default function EditExpenseModal({ isOpen, onClose, expense, onSubmit })
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onClick={onClose} data-testid="edit-modal">
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         {/* HEADER */}
         <div className={styles.header}>

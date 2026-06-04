@@ -5,11 +5,17 @@ import StatCardWithProgress from '../../components/StatCardWithProgress/StatCard
 import RecentExpensesList from '../../components/RecentExpensesList/RecentExpensesList';
 import ExpenseCategoryChart from '../../components/ExpenseCategoryChart/ExpenseCategoryChart';
 import ExpenseTrendChart from '../../components/ExpenseTrendChart/ExpenseTrendChart';
+import ViewAllExpensesModal from '../../components/ViewAllExpensesModal/ViewAllExpensesModal';
+import EditExpenseModal from '../../components/EditExpenseModal/EditExpenseModal';
 import {
   createExpense,
   getMonthlyStats,
   getChartData,
   getRecentExpenses,
+  getExpensesByMonth,
+  updateExpense,
+  deleteExpense,
+  downloadExpenseReceipt,
 } from '../../services/expenseService';
 import styles from './AdminExpensesPage.module.css';
 
@@ -42,6 +48,11 @@ export default function AdminExpensesPage() {
   const [dragOver, setDragOver] = useState(false);
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptError, setReceiptError] = useState(null);
+
+  const [isViewAllOpen, setIsViewAllOpen] = useState(false);
+  const [allExpenses, setAllExpenses] = useState([]);
+  const [allExpensesLoading, setAllExpensesLoading] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
   const fileInputRef = useRef(null);
 
   const token = getToken(auth);
@@ -83,12 +94,80 @@ export default function AdminExpensesPage() {
     }
   }, [token]);
 
+  const fetchAllExpenses = useCallback(async () => {
+    setAllExpensesLoading(true);
+    try {
+      const response = await getExpensesByMonth(token, null);
+      setAllExpenses(response.data || []);
+    } catch {
+      setAllExpenses([]);
+      toastError('No se pudieron cargar todos los gastos');
+    } finally {
+      setAllExpensesLoading(false);
+    }
+  }, [token, toastError]);
+
   useEffect(() => {
     if (!token) return;
     fetchStats();
     fetchChartData();
     fetchRecent();
   }, [fetchStats, fetchChartData, fetchRecent, token]);
+
+  useEffect(() => {
+    if (isViewAllOpen && token) {
+      fetchAllExpenses();
+    }
+  }, [isViewAllOpen, token, fetchAllExpenses]);
+
+  const handleDownloadReceipt = async (expense) => {
+    try {
+      const blob = await downloadExpenseReceipt(expense.id, token);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', expense.receipt_file_name || 'comprobante');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      success('Comprobante descargado con éxito');
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al descargar el comprobante');
+    }
+  };
+
+  const handleDeleteExpense = async (expense) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar este gasto?')) return;
+    try {
+      await deleteExpense(expense.id, token);
+      success('Gasto eliminado con éxito');
+      await Promise.all([
+        fetchStats(),
+        fetchChartData(),
+        fetchRecent(),
+        isViewAllOpen ? fetchAllExpenses() : Promise.resolve(),
+      ]);
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al eliminar el gasto');
+    }
+  };
+
+  const handleUpdateExpenseSubmit = async (expenseId, formData) => {
+    try {
+      await updateExpense(expenseId, formData, token);
+      success('Gasto actualizado con éxito');
+      await Promise.all([
+        fetchStats(),
+        fetchChartData(),
+        fetchRecent(),
+        fetchAllExpenses(),
+      ]);
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al actualizar el gasto');
+      throw err;
+    }
+  };
 
   function validateForm(f) {
     const errors = {};
@@ -339,7 +418,11 @@ export default function AdminExpensesPage() {
         </div>
 
         {/* RIGHT: RECENT */}
-        <RecentExpensesList expenses={recentExpenses} loading={recentLoading} />
+        <RecentExpensesList
+          expenses={recentExpenses}
+          loading={recentLoading}
+          onViewAll={() => setIsViewAllOpen(true)}
+        />
       </div>
 
       {/* CHARTS */}
@@ -347,6 +430,25 @@ export default function AdminExpensesPage() {
         <ExpenseCategoryChart data={chartData?.by_category} loading={chartLoading} />
         <ExpenseTrendChart data={chartData?.monthly_trend} loading={chartLoading} />
       </div>
+
+      {/* VIEW ALL EXPENSES MODAL */}
+      <ViewAllExpensesModal
+        isOpen={isViewAllOpen}
+        onClose={() => setIsViewAllOpen(false)}
+        expenses={allExpenses}
+        loading={allExpensesLoading}
+        onDownloadReceipt={handleDownloadReceipt}
+        onEdit={(exp) => setEditingExpense(exp)}
+        onDelete={handleDeleteExpense}
+      />
+
+      {/* EDIT EXPENSE MODAL */}
+      <EditExpenseModal
+        isOpen={!!editingExpense}
+        onClose={() => setEditingExpense(null)}
+        expense={editingExpense}
+        onSubmit={handleUpdateExpenseSubmit}
+      />
     </div>
   );
 }

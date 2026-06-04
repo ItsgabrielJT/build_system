@@ -235,7 +235,7 @@ export default function OwnerPaymentsPage() {
               <select
                 id="apartment_id"
                 name="apartment_id"
-                className={styles.input}
+                className={`${styles.input} ${styles.select}`}
                 value={form.apartment_id}
                 onChange={handleChange}
                 required
@@ -255,7 +255,7 @@ export default function OwnerPaymentsPage() {
               </label>
               <select
                 id="selected_debt"
-                className={styles.input}
+                className={`${styles.input} ${styles.select}`}
                 value={selectedDebt}
                 onChange={handleDebtChange}
                 disabled={!form.apartment_id}
@@ -342,7 +342,7 @@ export default function OwnerPaymentsPage() {
               <select
                 id="method"
                 name="method"
-                className={styles.input}
+                className={`${styles.input} ${styles.select}`}
                 value={form.method}
                 onChange={handleChange}
               >

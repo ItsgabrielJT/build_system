@@ -106,3 +106,23 @@ async def list_payment_notifications(
     """Lista notificaciones internas de pagos pendientes para el ADMIN."""
     service = _build_service(db)
     return await service.list_notifications(page=page, page_size=page_size)
+
+
+@router.put("/notifications/{notification_id}/read")
+async def mark_admin_notification_as_read(
+    notification_id: UUID,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    """Marca una notificación de admin como leída."""
+    repo = NotificationRepository(db)
+    notification = await repo.get_by_id(notification_id)
+    if not notification:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Notificación no encontrada")
+    if notification.get("target_role") != "ADMIN":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta notificación")
+
+    success = await repo.mark_as_read(notification_id)
+    return {"success": success}

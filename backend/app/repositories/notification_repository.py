@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Optional
+from uuid import UUID
 
 import asyncpg
 
@@ -67,6 +68,24 @@ class NotificationRepository:
         )
         return self._map_notification_row(row) or {}
 
+    async def get_by_id(self, notification_id: UUID) -> dict | None:
+        row = await self._conn.fetchrow(
+            "SELECT * FROM notifications WHERE id = $1",
+            notification_id,
+        )
+        return self._map_notification_row(row) if row else None
+
+    async def mark_as_read(self, notification_id: UUID) -> bool:
+        result = await self._conn.execute(
+            """
+            UPDATE notifications
+            SET read_at = NOW()
+            WHERE id = $1 AND read_at IS NULL
+            """,
+            notification_id,
+        )
+        return result == "UPDATE 1"
+
     async def list_for_admin(
         self, page: int = 1, page_size: int = 20
     ) -> tuple[list[dict], int]:
@@ -74,7 +93,7 @@ class NotificationRepository:
         rows = await self._conn.fetch(
             """
             SELECT * FROM notifications
-            WHERE target_role = 'ADMIN'
+            WHERE target_role = 'ADMIN' AND read_at IS NULL
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
             """,
@@ -82,7 +101,7 @@ class NotificationRepository:
             offset,
         )
         total = await self._conn.fetchval(
-            "SELECT COUNT(*) FROM notifications WHERE target_role = 'ADMIN'"
+            "SELECT COUNT(*) FROM notifications WHERE target_role = 'ADMIN' AND read_at IS NULL"
         )
         return [self._map_notification_row(r) or {} for r in rows], int(total or 0)
 
@@ -93,7 +112,7 @@ class NotificationRepository:
         rows = await self._conn.fetch(
             """
             SELECT * FROM notifications
-            WHERE target_user_id = $1 OR target_role = 'PROPIETARIO'
+            WHERE (target_user_id = $1 OR target_role = 'PROPIETARIO') AND read_at IS NULL
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
             """,
@@ -104,7 +123,7 @@ class NotificationRepository:
         total = await self._conn.fetchval(
             """
             SELECT COUNT(*) FROM notifications
-            WHERE target_user_id = $1 OR target_role = 'PROPIETARIO'
+            WHERE (target_user_id = $1 OR target_role = 'PROPIETARIO') AND read_at IS NULL
             """,
             user_id,
         )

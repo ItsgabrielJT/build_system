@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import require_owner
@@ -38,3 +39,27 @@ async def list_owner_payment_notifications(
         page=page,
         page_size=page_size,
     )
+
+
+@router.put("/{notification_id}/read")
+async def mark_owner_notification_as_read(
+    notification_id: UUID,
+    user: dict = Depends(require_owner),
+    db=Depends(get_db),
+):
+    """Marca una notificación de propietario como leída."""
+    repo = NotificationRepository(db)
+    notification = await repo.get_by_id(notification_id)
+    if not notification:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Notificación no encontrada")
+
+    if notification.get("target_role") != "PROPIETARIO":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver esta notificación")
+    if notification.get("target_user_id") and notification.get("target_user_id") != str(user["user_id"]):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver esta notificación")
+
+    success = await repo.mark_as_read(notification_id)
+    return {"success": success}

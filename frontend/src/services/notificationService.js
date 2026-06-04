@@ -17,3 +17,13 @@ export async function getOwnerPaymentNotifications(token, params = {}) {
   });
   return res.data;
 }
+
+export async function markNotificationAsRead(token, notificationId, isAdmin = false) {
+  const endpoint = isAdmin
+    ? `${API_BASE}/api/v1/admin/notifications/${notificationId}/read`
+    : `${API_BASE}/api/v1/owner/notifications/${notificationId}/read`;
+  const res = await axios.put(endpoint, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}

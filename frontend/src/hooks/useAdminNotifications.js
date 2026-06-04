@@ -3,6 +3,7 @@ import { useAuth } from './useAuth';
 import {
   getAdminPaymentNotifications,
   getOwnerPaymentNotifications,
+  markNotificationAsRead,
 } from '../services/notificationService';
 
 export function useAdminNotifications() {
@@ -37,6 +38,17 @@ export function useAdminNotifications() {
     }
   }, [role, token]);
 
+  const markAsRead = useCallback(async (notificationId) => {
+    if (!token) return;
+    try {
+      await markNotificationAsRead(token, notificationId, role === 'ADMIN');
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      setTotal((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Error al marcar notificación como leída:', err);
+    }
+  }, [token, role]);
+
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
@@ -47,6 +59,7 @@ export function useAdminNotifications() {
     loading,
     error,
     fetchNotifications,
+    markAsRead,
     enabled: ['ADMIN', 'PROPIETARIO'].includes(role),
   };
 }

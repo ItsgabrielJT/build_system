@@ -1165,3 +1165,53 @@ class TestNotificationRepositoryContracts:
             )
 
         assert exc_info.value.status_code == 422
+
+
+class TestMarkNotificationRead:
+    @pytest.mark.asyncio
+    async def test_mark_admin_notification_read_success(
+        self,
+        async_client: AsyncClient,
+        admin_headers: dict,
+    ):
+        notif_id = uuid4()
+        with (
+            patch(
+                "app.repositories.notification_repository.NotificationRepository.get_by_id",
+                new=AsyncMock(return_value={"id": notif_id, "target_role": "ADMIN", "target_user_id": None}),
+            ),
+            patch(
+                "app.repositories.notification_repository.NotificationRepository.mark_as_read",
+                new=AsyncMock(return_value=True),
+            ),
+        ):
+            response = await async_client.put(
+                f"/api/v1/admin/notifications/{notif_id}/read",
+                headers=admin_headers,
+            )
+        assert response.status_code == 200
+        assert response.json() == {"success": True}
+
+    @pytest.mark.asyncio
+    async def test_mark_owner_notification_read_success(
+        self,
+        async_client: AsyncClient,
+        propietario_headers: dict,
+    ):
+        notif_id = uuid4()
+        with (
+            patch(
+                "app.repositories.notification_repository.NotificationRepository.get_by_id",
+                new=AsyncMock(return_value={"id": notif_id, "target_role": "PROPIETARIO", "target_user_id": str(PROPIETARIO_USER_ID)}),
+            ),
+            patch(
+                "app.repositories.notification_repository.NotificationRepository.mark_as_read",
+                new=AsyncMock(return_value=True),
+            ),
+        ):
+            response = await async_client.put(
+                f"/api/v1/owner/notifications/{notif_id}/read",
+                headers=propietario_headers,
+            )
+        assert response.status_code == 200
+        assert response.json() == {"success": True}

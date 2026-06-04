@@ -79,6 +79,14 @@ class AdminPaymentReviewService:
                 detail=f"Transición inválida: el pago está en estado {payment['status']}",
             )
         updated = await self._payment_repo.approve(payment_id, admin_id)
+        
+        recipient = str(payment["created_by"])
+        owner = None
+        if self._owner_repo:
+            owner = await self._owner_repo.get_by_id(payment["owner_id"])
+            if owner and owner.get("firebase_uid"):
+                recipient = owner["firebase_uid"]
+
         await self._notification_repo.create(
             notification_type="PAGO_APROBADO",
             title=f"Pago aprobado — {payment['period']}",
@@ -86,20 +94,18 @@ class AdminPaymentReviewService:
                 f"Tu comprobante por ${payment['amount']} del período {payment['period']} "
                 "fue aprobado por administración."
             ),
-            recipient=str(payment["created_by"]),
+            recipient=recipient,
             metadata={"payment_id": str(payment_id)},
         )
 
-        if self._owner_repo:
-            owner = await self._owner_repo.get_by_id(payment["owner_id"])
-            if owner:
-                from app.services.email_service import EmailService
-                await EmailService.send_payment_approved_email(
-                    owner_email=owner.get("email"),
-                    owner_name=owner.get("full_name", "Propietario"),
-                    amount=float(payment["amount"]),
-                    period=payment["period"],
-                )
+        if owner:
+            from app.services.email_service import EmailService
+            await EmailService.send_payment_approved_email(
+                owner_email=owner.get("email"),
+                owner_name=owner.get("full_name", "Propietario"),
+                amount=float(payment["amount"]),
+                period=payment["period"],
+            )
 
         return updated
 
@@ -118,6 +124,13 @@ class AdminPaymentReviewService:
                 detail=f"Transición inválida: el pago está en estado {payment['status']}",
             )
         updated = await self._payment_repo.reject(payment_id, admin_id, reason)
+
+        recipient = str(payment["created_by"])
+        if self._owner_repo:
+            owner = await self._owner_repo.get_by_id(payment["owner_id"])
+            if owner and owner.get("firebase_uid"):
+                recipient = owner["firebase_uid"]
+
         await self._notification_repo.create(
             notification_type="PAGO_RECHAZADO",
             title=f"Pago rechazado — {payment['period']}",
@@ -125,7 +138,7 @@ class AdminPaymentReviewService:
                 f"Tu comprobante por ${payment['amount']} del período {payment['period']} "
                 f"fue rechazado. Motivo: {reason}"
             ),
-            recipient=str(payment["created_by"]),
+            recipient=recipient,
             metadata={"payment_id": str(payment_id)},
         )
         return updated

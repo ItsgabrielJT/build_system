@@ -50,6 +50,7 @@ export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSi
     loading,
     error,
     fetchNotifications,
+    markAsRead,
     enabled: notificationsEnabled,
   } = useAdminNotifications();
   const isReports = pathname === '/admin/reports';
@@ -80,8 +81,11 @@ export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSi
     setIsNotificationsOpen((current) => !current);
   };
 
-  const handleNotificationClick = () => {
+  const handleNotificationClick = async (notification) => {
     setIsNotificationsOpen(false);
+    if (notification && notification.id) {
+      await markAsRead(notification.id);
+    }
     navigate(role === 'ADMIN' ? '/admin/payments' : '/owner/payments');
   };
 
@@ -150,7 +154,7 @@ export default function Navbar({ buildingName = 'Edificio Horizonte', onToggleSi
                       key={notification.id}
                       type="button"
                       className={styles.notificationItem}
-                      onClick={handleNotificationClick}
+                      onClick={() => handleNotificationClick(notification)}
                     >
                       <strong>{notification.title || 'Notificación del sistema'}</strong>
                       <span>{notification.body || 'Sin detalle adicional.'}</span>

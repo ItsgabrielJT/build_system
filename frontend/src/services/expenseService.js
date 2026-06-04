@@ -39,3 +39,29 @@ export async function getRecentExpenses(token, limit = 10) {
   });
   return res.data;
 }
+
+export async function deleteExpense(expenseId, token) {
+  const res = await axios.delete(`${API_BASE}/api/v1/expenses/${expenseId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export async function updateExpense(expenseId, formData, token) {
+  const res = await axios.put(`${API_BASE}/api/v1/expenses/${expenseId}`, formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data;
+}
+
+export async function downloadExpenseReceipt(expenseId, token) {
+  const res = await axios.get(`${API_BASE}/api/v1/expenses/${expenseId}/receipt`, {
+    headers: { Authorization: `Bearer ${token}` },
+    responseType: 'blob',
+  });
+  return res.data;
+}
+

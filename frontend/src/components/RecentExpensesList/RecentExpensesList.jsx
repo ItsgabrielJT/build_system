@@ -15,12 +15,12 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('es', { day: '2-digit', month: 'short' }).toUpperCase();
 }
 
-export default function RecentExpensesList({ expenses, loading }) {
+export default function RecentExpensesList({ expenses, loading, onViewAll }) {
   return (
     <div className={styles.panel}>
       <div className={styles.panelHeader}>
         <span className={styles.panelTitle}>Gastos Recientes</span>
-        <span className={styles.viewAll}>Ver Todo</span>
+        <span className={styles.viewAll} onClick={onViewAll}>Ver Todo</span>
       </div>
       {loading ? (
         <p className={styles.empty}>Cargando...</p>

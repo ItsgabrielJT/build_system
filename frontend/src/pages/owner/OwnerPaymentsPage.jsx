@@ -67,6 +67,12 @@ export default function OwnerPaymentsPage() {
   const [pendingDebts, setPendingDebts] = useState({ cuotas: [], multas: [] });
   const [selectedDebt, setSelectedDebt] = useState('');
 
+  // Filters & Pagination
+  const [filterPeriod, setFilterPeriod] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   useEffect(() => {
     fetchApartments();
     reload();
@@ -192,6 +198,22 @@ export default function OwnerPaymentsPage() {
     }
   };
 
+  const filteredPayments = payments.filter((p) => {
+    if (filterPeriod && p.period !== filterPeriod) return false;
+    if (filterDate && p.paid_at !== filterDate) return false;
+    return true;
+  });
+
+  const totalPages = Math.ceil(filteredPayments.length / ITEMS_PER_PAGE);
+  const paginatedPayments = filteredPayments.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -205,7 +227,7 @@ export default function OwnerPaymentsPage() {
       <section className={styles.formSection}>
         <h2 className={styles.sectionTitle}>Nueva solicitud de pago</h2>
         <form className={styles.form} onSubmit={handleSubmit}>
-          <div className={styles.formGrid}>
+          <div className={styles.formRow}>
             <div className={styles.fieldGroup}>
               <label className={styles.label} htmlFor="apartment_id">
                 Departamento <span aria-hidden="true">*</span>
@@ -227,43 +249,43 @@ export default function OwnerPaymentsPage() {
               </select>
             </div>
 
-            {form.apartment_id && (
-              <div className={styles.fieldGroup}>
-                <label className={styles.label} htmlFor="selected_debt">
-                  Concepto / Deuda Pendiente
-                </label>
-                <select
-                  id="selected_debt"
-                  className={styles.input}
-                  value={selectedDebt}
-                  onChange={handleDebtChange}
-                >
-                  <option value="">Otro / Pago personalizado</option>
-                  
-                  {pendingDebts.cuotas.length > 0 && (
-                    <optgroup label="Cuotas pendientes">
-                      {pendingDebts.cuotas.map((c) => (
-                        <option key={`cuota:${c.id}`} value={`cuota:${c.id}`}>
-                          {c.description} ({formatCurrency(c.amount)})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  
-                  {pendingDebts.multas.length > 0 && (
-                    <optgroup label="Multas activas">
-                      {pendingDebts.multas.map((m) => (
-                        <option key={`multas:${m.id}`} value={`multas:${m.id}`}>
-                          {m.description} ({formatCurrency(m.amount)})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-            )}
+            <div className={styles.fieldGroup}>
+              <label className={styles.label} htmlFor="selected_debt">
+                Concepto / Deuda Pendiente
+              </label>
+              <select
+                id="selected_debt"
+                className={styles.input}
+                value={selectedDebt}
+                onChange={handleDebtChange}
+                disabled={!form.apartment_id}
+              >
+                <option value="">Otro / Pago personalizado</option>
+                
+                {pendingDebts.cuotas.length > 0 && (
+                  <optgroup label="Cuotas pendientes">
+                    {pendingDebts.cuotas.map((c) => (
+                      <option key={`cuota:${c.id}`} value={`cuota:${c.id}`}>
+                        {c.description} ({formatCurrency(c.amount)})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                
+                {pendingDebts.multas.length > 0 && (
+                  <optgroup label="Multas activas">
+                    {pendingDebts.multas.map((m) => (
+                      <option key={`multas:${m.id}`} value={`multas:${m.id}`}>
+                        {m.description} ({formatCurrency(m.amount)})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          </div>
 
-
+          <div className={styles.formRow3}>
             <div className={styles.fieldGroup}>
               <label className={styles.label} htmlFor="period">
                 Período <span aria-hidden="true">*</span>
@@ -310,7 +332,9 @@ export default function OwnerPaymentsPage() {
                 required
               />
             </div>
+          </div>
 
+          <div className={styles.formRow}>
             <div className={styles.fieldGroup}>
               <label className={styles.label} htmlFor="method">
                 Método de pago
@@ -370,7 +394,49 @@ export default function OwnerPaymentsPage() {
       </section>
 
       <section className={styles.historySection}>
-        <h2 className={styles.sectionTitle}>Historial de pagos</h2>
+        <div className={styles.historyHeader}>
+          <h2 className={styles.sectionTitle}>Historial de pagos</h2>
+          <div className={styles.filters}>
+            <div className={styles.filterGroup}>
+              <label className={styles.filterLabel} htmlFor="filterPeriod">Período</label>
+              <input
+                id="filterPeriod"
+                type="month"
+                className={styles.filterInput}
+                value={filterPeriod}
+                onChange={(e) => {
+                  setFilterPeriod(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+            <div className={styles.filterGroup}>
+              <label className={styles.filterLabel} htmlFor="filterDate">Fecha pago</label>
+              <input
+                id="filterDate"
+                type="date"
+                className={styles.filterInput}
+                value={filterDate}
+                onChange={(e) => {
+                  setFilterDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+            {(filterPeriod || filterDate) && (
+              <button
+                className={styles.clearFiltersBtn}
+                onClick={() => {
+                  setFilterPeriod('');
+                  setFilterDate('');
+                  setCurrentPage(1);
+                }}
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+        </div>
 
         {loading ? (
           <p className={styles.loading}>Cargando historial...</p>
@@ -378,66 +444,92 @@ export default function OwnerPaymentsPage() {
           <p className={styles.errorMsg}>{error}</p>
         ) : payments.length === 0 ? (
           <p className={styles.empty}>No tienes pagos registrados aún.</p>
+        ) : filteredPayments.length === 0 ? (
+          <p className={styles.empty}>No se encontraron pagos con los filtros aplicados.</p>
         ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Período</th>
-                  <th>Departamento</th>
-                  <th>Fecha de pago</th>
-                  <th>Monto</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td>{payment.period}</td>
-                    <td>{payment.apartment_code || 'N/D'}</td>
-                    <td>{formatDate(payment.paid_at)}</td>
-                    <td className={styles.amountCell}>{formatCurrency(payment.amount)}</td>
-                    <td>
-                      <PaymentStatusBadge status={payment.status} />
-                      {payment.status === 'RECHAZADO' && payment.rejection_reason && (
-                        <p className={styles.rejectionReason}>{payment.rejection_reason}</p>
-                      )}
-                    </td>
-                    <td className={styles.actionCell}>
-                      <button
-                        type="button"
-                        className={styles.btnAction}
-                        onClick={() => handleDownloadAcknowledgement(payment)}
-                        disabled={downloadingId === `ack-${payment.id}`}
-                        title="Descargar constancia de envío"
-                      >
-                        Constancia
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.btnAction} ${
-                          payment.status === 'REGISTRADO' ? styles.btnActionPrimary : ''
-                        }`}
-                        onClick={() => handleDownloadReceipt(payment)}
-                        disabled={
-                          payment.status !== 'REGISTRADO' ||
-                          downloadingId === `rec-${payment.id}`
-                        }
-                        title={
-                          payment.status !== 'REGISTRADO'
-                            ? 'El recibo oficial solo está disponible para pagos aprobados'
-                            : 'Descargar recibo oficial'
-                        }
-                      >
-                        Recibo oficial
-                      </button>
-                    </td>
+          <>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Período</th>
+                    <th>Departamento</th>
+                    <th>Fecha de pago</th>
+                    <th>Monto</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginatedPayments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td>{payment.period}</td>
+                      <td>{payment.apartment_code || 'N/D'}</td>
+                      <td>{formatDate(payment.paid_at)}</td>
+                      <td className={styles.amountCell}>{formatCurrency(payment.amount)}</td>
+                      <td>
+                        <PaymentStatusBadge status={payment.status} />
+                        {payment.status === 'RECHAZADO' && payment.rejection_reason && (
+                          <p className={styles.rejectionReason}>{payment.rejection_reason}</p>
+                        )}
+                      </td>
+                      <td className={styles.actionCell}>
+                        <button
+                          type="button"
+                          className={styles.btnAction}
+                          onClick={() => handleDownloadAcknowledgement(payment)}
+                          disabled={downloadingId === `ack-${payment.id}`}
+                          title="Descargar constancia de envío"
+                        >
+                          Constancia
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.btnAction} ${
+                            payment.status === 'REGISTRADO' ? styles.btnActionPrimary : ''
+                          }`}
+                          onClick={() => handleDownloadReceipt(payment)}
+                          disabled={
+                            payment.status !== 'REGISTRADO' ||
+                            downloadingId === `rec-${payment.id}`
+                          }
+                          title={
+                            payment.status !== 'REGISTRADO'
+                              ? 'El recibo oficial solo está disponible para pagos aprobados'
+                              : 'Descargar recibo oficial'
+                          }
+                        >
+                          Recibo oficial
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className={styles.pagination}>
+                <button
+                  className={styles.pageBtn}
+                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                >
+                  Anterior
+                </button>
+                <span className={styles.pageInfo}>
+                  Página {currentPage} de {totalPages}
+                </span>
+                <button
+                  className={styles.pageBtn}
+                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                >
+                  Siguiente
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

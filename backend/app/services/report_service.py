@@ -10,13 +10,14 @@ from typing import Optional
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
 
 from app.repositories.expense_repository import ExpenseRepository
 from app.repositories.payment_repository import PaymentRepository
+from app.services.pdf_branding import build_pdf_brand_header, get_default_building_config
 from app.services.delinquency_service import DelinquencyService
 
 _MONTH_PERIOD_RE = re.compile(r"^\d{4}-\d{2}$")
@@ -88,6 +89,16 @@ class ReportService:
         if previous <= 0:
             return None
         return round(float((current - previous) / previous * 100), 2)
+
+    async def _pdf_header(self, title: str, subtitle: str) -> list:
+        conn = getattr(self._payment_repo, "_conn", None)
+        building = await get_default_building_config(conn)
+        return build_pdf_brand_header(
+            title,
+            subtitle,
+            building,
+            width=7.5 * inch,
+        )
 
     async def _payments(
         self,
@@ -429,18 +440,13 @@ class ReportService:
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
         
-        # Title
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            textColor=colors.HexColor('#1f2937'),
-            spaceAfter=6,
+        story.extend(
+            await self._pdf_header(
+                "Reporte de Ingresos",
+                f"Periodo: {period or 'Todos'} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+            )
         )
-        story.append(Paragraph("Reporte de Ingresos", title_style))
-        story.append(Paragraph(f"Período: {period or 'Todos'} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-        story.append(Spacer(1, 0.2*inch))
         
         # Table
         data = [["Fecha", "Propietario", "Departamento", "Período", "Monto", "Método", "Estado"]]
@@ -492,16 +498,12 @@ class ReportService:
         story = []
         
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            textColor=colors.HexColor('#1f2937'),
-            spaceAfter=6,
+        story.extend(
+            await self._pdf_header(
+                "Reporte de Balance",
+                f"Periodo: {period or 'Todos'} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+            )
         )
-        story.append(Paragraph("Reporte de Balance", title_style))
-        story.append(Paragraph(f"Período: {period or 'Todos'} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-        story.append(Spacer(1, 0.2*inch))
         
         # Table
         data = [["Concepto", "Monto"]]
@@ -536,16 +538,12 @@ class ReportService:
         story = []
         
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            textColor=colors.HexColor('#1f2937'),
-            spaceAfter=6,
+        story.extend(
+            await self._pdf_header(
+                "Reporte de Morosidad",
+                f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+            )
         )
-        story.append(Paragraph("Reporte de Morosidad", title_style))
-        story.append(Paragraph(f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-        story.append(Spacer(1, 0.2*inch))
         
         # Table
         data = [["Propietario", "Email", "Documento", "Deuda Total", "Períodos Vencidos", "Estado"]]

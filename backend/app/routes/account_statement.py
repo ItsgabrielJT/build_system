@@ -11,6 +11,7 @@ from app.config.database import get_db
 from app.repositories.delinquency_repository import DelinquencyRepository
 from app.repositories.owner_repository import OwnerRepository
 from app.services.account_statement_service import AccountStatementService
+from app.services.pdf_branding import build_pdf_brand_header, get_default_building_config
 
 router = APIRouter(tags=["account-statement"])
 
@@ -97,18 +98,26 @@ async def export_account_statement(
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
         from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 
         output = io.BytesIO()
         doc = SimpleDocTemplate(output, pagesize=landscape(A4), leftMargin=1.5 * cm, rightMargin=1.5 * cm, topMargin=2 * cm, bottomMargin=2 * cm)
-        styles = getSampleStyleSheet()
         elements = []
+        building = await get_default_building_config(db)
 
-        elements.append(Paragraph("Estado de Cuenta", styles["Title"]))
-        if start_period and end_period:
-            elements.append(Paragraph(f"Período: {start_period} — {end_period}", styles["Normal"]))
-        elements.append(Spacer(1, 0.5 * cm))
+        period_label = (
+            f"Periodo: {start_period} - {end_period}"
+            if start_period and end_period
+            else "Periodo: Todos"
+        )
+        elements.extend(
+            build_pdf_brand_header(
+                "Estado de Cuenta",
+                period_label,
+                building,
+                width=26.7 * cm,
+            )
+        )
 
         table_data = [headers_row]
         for row in rows:

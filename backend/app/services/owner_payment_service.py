@@ -31,6 +31,7 @@ _SUCCESS_BG = colors.HexColor("#edf9f0")
 _DANGER_RED = colors.HexColor("#c74444")
 _SLATE = colors.HexColor("#243447")
 _SOFT_GRAY = colors.HexColor("#eef2f7")
+_PAYMENT_CONTENT_WIDTH = 6.55 * inch
 
 
 class OwnerPaymentService:
@@ -312,8 +313,11 @@ class OwnerPaymentService:
         logo_path = building.get("logo_storage_path")
         if logo_path and Path(logo_path).exists():
             image = Image(logo_path)
-            image.drawWidth = 1.45 * inch
-            image.drawHeight = 0.72 * inch
+            max_width = 1.45 * inch
+            max_height = 0.85 * inch
+            ratio = min(max_width / image.imageWidth, max_height / image.imageHeight)
+            image.drawWidth = image.imageWidth * ratio
+            image.drawHeight = image.imageHeight * ratio
             return image
         return self._build_logo_drawing()
 
@@ -339,7 +343,7 @@ class OwnerPaymentService:
                     ),
                 )
             ]],
-            colWidths=[2.7 * inch],
+            colWidths=[2.9 * inch],
         )
         title_block.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
 
@@ -348,7 +352,7 @@ class OwnerPaymentService:
                 [Paragraph('<font size="10">Documento No.:</font>', ParagraphStyle("DocLabel", fontName="Helvetica", alignment=1, textColor=_SLATE))],
                 [Paragraph(f'<font size="14"><b>{document_number}</b></font>', ParagraphStyle("DocNumber", fontName="Helvetica-Bold", alignment=1, textColor=_PRIMARY_BLUE))],
             ],
-            colWidths=[1.8 * inch],
+            colWidths=[1.65 * inch],
         )
         doc_box.setStyle(
             TableStyle(
@@ -365,7 +369,7 @@ class OwnerPaymentService:
 
         header = Table(
             [[self._build_logo_asset(building), title_block, doc_box]],
-            colWidths=[2.2 * inch, 2.9 * inch, 1.9 * inch],
+            colWidths=[1.75 * inch, 3.05 * inch, 1.75 * inch],
         )
         header.setStyle(
             TableStyle(
@@ -381,7 +385,7 @@ class OwnerPaymentService:
         return header
 
     def _build_section_title(self, title: str) -> Table:
-        table = Table([[Paragraph(title, self._base_pdf_styles()["section"])]], colWidths=[7.0 * inch])
+        table = Table([[Paragraph(title, self._base_pdf_styles()["section"])]], colWidths=[_PAYMENT_CONTENT_WIDTH])
         table.setStyle(
             TableStyle(
                 [
@@ -396,7 +400,6 @@ class OwnerPaymentService:
         return table
 
     def _build_owner_info_table(self, owner: dict, payment: dict, styles: dict) -> Table:
-        rows = []
         info_items = [
             ("Propietario", owner.get("full_name") or "--"),
             ("Departamento", payment.get("apartment_code") or "--"),
@@ -404,35 +407,51 @@ class OwnerPaymentService:
             ("Telefono", owner.get("phone") or "--"),
             ("Email", owner.get("email") or "--"),
         ]
-        for label, value in info_items:
-            rows.append(
-                [
-                    Paragraph(f'<font size="9" color="#5f6b7a">{label}</font>', styles["muted"]),
-                    Paragraph(f'<font size="12"><b>{value}</b></font>', styles["value"]),
-                ]
-            )
 
         content = [[self._build_section_title("DATOS DEL PROPIETARIO")]]
-        for row in rows:
-            content.append([Table([row], colWidths=[2.5 * inch, 4.0 * inch])])
+        paired_rows = [
+            [info_items[0], info_items[1]],
+            [info_items[2], info_items[3]],
+            [info_items[4], ("", "")],
+        ]
+        for row in paired_rows:
+            cells = []
+            for label, value in row:
+                if not label:
+                    cells.append("")
+                    continue
+                cells.append(
+                    Paragraph(
+                        (
+                            f'<font size="8.5" color="#5f6b7a">{label}</font><br/>'
+                            f'<font size="11"><b>{value}</b></font>'
+                        ),
+                        styles["body"],
+                    )
+                )
+            content.append([Table([cells], colWidths=[3.05 * inch, 3.1 * inch])])
 
-        owner_table = Table(content, colWidths=[7.0 * inch])
+        owner_table = Table(content, colWidths=[_PAYMENT_CONTENT_WIDTH])
         owner_table.setStyle(
             TableStyle(
                 [
                     ("BACKGROUND", (0, 1), (-1, -1), colors.white),
                     ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#d1dae8")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
                     ("LEFTPADDING", (0, 1), (-1, -1), 12),
                     ("RIGHTPADDING", (0, 1), (-1, -1), 12),
-                    ("TOPPADDING", (0, 1), (-1, -1), 10),
-                    ("BOTTOMPADDING", (0, 1), (-1, -1), 10),
+                    ("TOPPADDING", (0, 1), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
                 ]
             )
         )
         return owner_table
 
     def _build_detail_table(self, detail_rows: list[list[Paragraph | str]]) -> Table:
-        table = Table(detail_rows, colWidths=[4.8 * inch, 2.2 * inch])
+        table = Table(detail_rows, colWidths=[4.35 * inch, 2.2 * inch])
         table.setStyle(
             TableStyle(
                 [
@@ -465,7 +484,7 @@ class OwnerPaymentService:
         drawing.add(String(9, 5, "OK" if ok else "!", fontName="Helvetica-Bold", fontSize=8, fillColor=colors.white, textAnchor="middle"))
         banner = Table(
             [[drawing, Paragraph(f'<font size="16"><b>Estado: {status_text}</b></font>', ParagraphStyle("StatusText", fontName="Helvetica-Bold", textColor=icon_color, leading=16))]],
-            colWidths=[0.35 * inch, 6.65 * inch],
+            colWidths=[0.35 * inch, 6.2 * inch],
         )
         banner.setStyle(
             TableStyle(
@@ -505,7 +524,7 @@ class OwnerPaymentService:
         return [
             Table(
                 [[Paragraph("Documento emitido electronicamente con fines de control administrativo.", styles["muted"]) ]],
-                colWidths=[7.0 * inch],
+                colWidths=[_PAYMENT_CONTENT_WIDTH],
             ),
             Spacer(1, 0.18 * inch),
             signature,
@@ -529,7 +548,7 @@ class OwnerPaymentService:
         story = [
             self._build_header_table(title, subtitle, document_number, building),
             Spacer(1, 0.14 * inch),
-            Table([["" ]], colWidths=[7.0 * inch], rowHeights=[0.03 * inch], style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PRIMARY_BLUE)])),
+            Table([["" ]], colWidths=[_PAYMENT_CONTENT_WIDTH], rowHeights=[0.03 * inch], style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PRIMARY_BLUE)])),
             Spacer(1, 0.14 * inch),
             self._build_owner_info_table(owner, payment, styles),
             Spacer(1, 0.16 * inch),

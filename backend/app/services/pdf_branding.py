@@ -9,6 +9,9 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Image, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import ParagraphStyle
 
+_PRIMARY_BLUE = colors.HexColor("#123c7a")
+_ACCENT_BLUE = colors.HexColor("#dbe7f7")
+
 
 async def get_default_building_config(conn: Any) -> dict:
     if conn is None or "unittest.mock" in type(conn).__module__:
@@ -32,8 +35,11 @@ def build_pdf_brand_header(
     logo_cell = ""
     if logo_path and Path(logo_path).exists():
         logo = Image(logo_path)
-        logo.drawWidth = 1.2 * inch
-        logo.drawHeight = 0.75 * inch
+        max_width = 1.2 * inch
+        max_height = 0.75 * inch
+        ratio = min(max_width / logo.imageWidth, max_height / logo.imageHeight)
+        logo.drawWidth = logo.imageWidth * ratio
+        logo.drawHeight = logo.imageHeight * ratio
         logo_cell = logo
 
     text = Paragraph(
@@ -46,7 +52,7 @@ def build_pdf_brand_header(
             "PdfBrandHeaderText",
             fontName="Helvetica",
             leading=14,
-            textColor=colors.HexColor("#111827"),
+            textColor=_PRIMARY_BLUE,
         ),
     )
     logo_width = 1.45 * inch
@@ -62,7 +68,7 @@ def build_pdf_brand_header(
                 ("RIGHTPADDING", (0, 0), (-1, -1), 8),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-                ("LINEBELOW", (0, 0), (-1, -1), 0.75, colors.HexColor("#e5e7eb")),
+                ("LINEBELOW", (0, 0), (-1, -1), 1.4, _PRIMARY_BLUE),
             ]
         )
     )

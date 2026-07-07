@@ -52,3 +52,12 @@ export async function getOwnerMonthlyBalance(period, token) {
   });
   return res.data;
 }
+
+export async function downloadOwnerMonthlyBalancePdf(period, token) {
+  const res = await axios.get(`${API_BASE}/api/v1/owner/monthly-balance`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { ...(period ? { period } : {}), format: 'pdf' },
+    responseType: 'blob',
+  });
+  return res.data;
+}

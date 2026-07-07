@@ -65,7 +65,7 @@ async def export_account_statement(
         ws.title = "Estado de Cuenta"
 
         header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+        header_fill = PatternFill(start_color="123C7A", end_color="123C7A", fill_type="solid")
         for col_idx, header in enumerate(headers_row, 1):
             cell = ws.cell(row=1, column=col_idx, value=header)
             cell.font = header_font
@@ -134,13 +134,13 @@ async def export_account_statement(
         col_widths = [3 * cm, 4 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm]
         t = Table(table_data, colWidths=col_widths, repeatRows=1)
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2C3E50")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123c7a")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), 10),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F3F4")]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
             ("FONTSIZE", (0, 1), (-1, -1), 9),
         ]))
         elements.append(t)

@@ -463,13 +463,13 @@ class ReportService:
         
         table = Table(data, colWidths=[0.9*inch, 1.1*inch, 0.8*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.8*inch])
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#123c7a')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 8),
         ]))
@@ -513,13 +513,13 @@ class ReportService:
         
         table = Table(data, colWidths=[3*inch, 2*inch])
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#123c7a')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
         ]))
@@ -559,13 +559,13 @@ class ReportService:
         
         table = Table(data, colWidths=[1.2*inch, 1.3*inch, 1*inch, 1*inch, 1*inch, 0.8*inch])
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#123c7a')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('FONTSIZE', (0, 1), (-1, -1), 8),
         ]))
@@ -592,7 +592,7 @@ class ReportService:
         
         # Headers
         headers = ["Fecha", "Propietario", "Departamento", "Período", "Monto", "Método", "Estado"]
-        header_fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
+        header_fill = PatternFill(start_color="123C7A", end_color="123C7A", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF")
         
         for col, header in enumerate(headers, 1):
@@ -644,7 +644,7 @@ class ReportService:
         
         # Headers
         headers = ["Concepto", "Monto"]
-        header_fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
+        header_fill = PatternFill(start_color="123C7A", end_color="123C7A", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF")
         
         for col, header in enumerate(headers, 1):
@@ -679,7 +679,7 @@ class ReportService:
         
         # Headers
         headers = ["Propietario", "Email", "Documento", "Deuda Total", "Períodos Vencidos", "Estado"]
-        header_fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
+        header_fill = PatternFill(start_color="123C7A", end_color="123C7A", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF")
         
         for col, header in enumerate(headers, 1):

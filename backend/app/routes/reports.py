@@ -179,9 +179,21 @@ async def report_monthly_balance(
 @router.get("/owner/monthly-balance", response_model=MonthlyBalanceResponse)
 async def owner_monthly_balance(
     period: Optional[str] = None,
+    format: str = "json",
     _user: dict = Depends(require_owner),
     db=Depends(get_db),
 ):
+    if format not in ("json", "pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Format debe ser: json o pdf'
+        )
+
     validated_period = _validate_month_period_or_400(period)
     service = _get_report_service(db)
+    if format == "pdf":
+        content = await service.balance_pdf(validated_period)
+        filename_base = f"balance-mensual{'-' + validated_period if validated_period else ''}"
+        return _pdf_response(content, f"{filename_base}.pdf")
+
     return await service.monthly_balance_summary(validated_period)

@@ -7,6 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
+from xml.sax.saxutils import escape
 
 from fastapi import HTTPException, UploadFile, status
 from reportlab.lib import colors
@@ -384,8 +385,8 @@ class OwnerPaymentService:
         )
         return header
 
-    def _build_section_title(self, title: str) -> Table:
-        table = Table([[Paragraph(title, self._base_pdf_styles()["section"])]], colWidths=[_PAYMENT_CONTENT_WIDTH])
+    def _build_section_title(self, title: str, width: float = _PAYMENT_CONTENT_WIDTH) -> Table:
+        table = Table([[Paragraph(title, self._base_pdf_styles()["section"])]], colWidths=[width])
         table.setStyle(
             TableStyle(
                 [
@@ -405,33 +406,22 @@ class OwnerPaymentService:
             ("Departamento", payment.get("apartment_code") or "--"),
             ("Periodo", payment.get("period") or "--"),
             ("Telefono", owner.get("phone") or "--"),
-            ("Email", owner.get("email") or "--"),
         ]
 
-        content = [[self._build_section_title("DATOS DEL PROPIETARIO")]]
-        paired_rows = [
-            [info_items[0], info_items[1]],
-            [info_items[2], info_items[3]],
-            [info_items[4], ("", "")],
-        ]
-        for row in paired_rows:
-            cells = []
-            for label, value in row:
-                if not label:
-                    cells.append("")
-                    continue
-                cells.append(
-                    Paragraph(
-                        (
-                            f'<font size="8.5" color="#5f6b7a">{label}</font><br/>'
-                            f'<font size="11"><b>{value}</b></font>'
-                        ),
-                        styles["body"],
-                    )
+        card_width = 2.78 * inch
+        rows = [[self._build_section_title("DATOS DEL PROPIETARIO", width=card_width)]]
+        for label, value in info_items:
+            rows.append([
+                Paragraph(
+                    (
+                        f'<font size="8.2" color="#5f6b7a">{escape(label)}:</font><br/>'
+                        f'<font size="11"><b>{escape(str(value))}</b></font>'
+                    ),
+                    styles["body"],
                 )
-            content.append([Table([cells], colWidths=[3.05 * inch, 3.1 * inch])])
+            ])
 
-        owner_table = Table(content, colWidths=[_PAYMENT_CONTENT_WIDTH])
+        owner_table = Table(rows, colWidths=[card_width])
         owner_table.setStyle(
             TableStyle(
                 [
@@ -441,14 +431,68 @@ class OwnerPaymentService:
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                    ("LEFTPADDING", (0, 1), (-1, -1), 12),
-                    ("RIGHTPADDING", (0, 1), (-1, -1), 12),
-                    ("TOPPADDING", (0, 1), (-1, -1), 6),
-                    ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
+                    ("LEFTPADDING", (0, 1), (-1, -1), 14),
+                    ("RIGHTPADDING", (0, 1), (-1, -1), 10),
+                    ("TOPPADDING", (0, 1), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 1), (-1, -1), 7),
+                    ("LINEBELOW", (0, 1), (-1, -2), 0.5, colors.HexColor("#d9e2ef")),
                 ]
             )
         )
         return owner_table
+
+    def _build_building_photo_asset(self, building: dict) -> Image | Drawing:
+        photo_path = building.get("photo_storage_path")
+        if photo_path and Path(photo_path).exists():
+            image = Image(photo_path)
+            max_width = 3.55 * inch
+            max_height = 2.2 * inch
+            ratio = min(max_width / image.imageWidth, max_height / image.imageHeight)
+            image.drawWidth = image.imageWidth * ratio
+            image.drawHeight = image.imageHeight * ratio
+            return image
+
+        drawing = Drawing(255, 158)
+        drawing.add(Rect(0, 0, 255, 158, strokeColor=colors.HexColor("#d1dae8"), fillColor=colors.HexColor("#f8fafc"), rx=8, ry=8))
+        drawing.add(String(127, 82, "Foto del edificio", fontName="Helvetica-Bold", fontSize=12, fillColor=colors.HexColor("#64748b"), textAnchor="middle"))
+        return drawing
+
+    def _build_owner_photo_section(self, owner: dict, payment: dict, building: dict, styles: dict) -> Table:
+        photo_box = Table(
+            [[self._build_building_photo_asset(building)]],
+            colWidths=[3.55 * inch],
+            rowHeights=[2.25 * inch],
+        )
+        photo_box.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#d1dae8")),
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
+        section = Table(
+            [[self._build_owner_info_table(owner, payment, styles), photo_box]],
+            colWidths=[2.85 * inch, 3.7 * inch],
+        )
+        section.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        return section
 
     def _build_detail_table(self, detail_rows: list[list[Paragraph | str]]) -> Table:
         table = Table(detail_rows, colWidths=[4.35 * inch, 2.2 * inch])
@@ -503,11 +547,25 @@ class OwnerPaymentService:
 
     def _build_footer(self, styles: dict, signer_label: str, building: dict) -> list:
         building_name = building.get("name") or "edificio"
+        contact_parts = [
+            building.get("address"),
+            building.get("email"),
+            building.get("phone"),
+        ]
+        contact_line = " | ".join(str(part) for part in contact_parts if part)
         signature = Table(
             [
-                [Paragraph(f"<b>Administracion de {building_name}</b>", styles["footer"])],
+                [
+                    Paragraph(
+                        (
+                            f"<b>Administracion de {escape(building_name)}</b>"
+                            + (f"<br/><font size=\"7.5\">{escape(contact_line)}</font>" if contact_line else "")
+                        ),
+                        styles["footer"],
+                    )
+                ],
             ],
-            colWidths=[2.6 * inch],
+            colWidths=[3.7 * inch],
         )
         signature.setStyle(
             TableStyle(
@@ -548,7 +606,7 @@ class OwnerPaymentService:
             Spacer(1, 0.14 * inch),
             Table([["" ]], colWidths=[_PAYMENT_CONTENT_WIDTH], rowHeights=[0.03 * inch], style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PRIMARY_BLUE)])),
             Spacer(1, 0.14 * inch),
-            self._build_owner_info_table(owner, payment, styles),
+            self._build_owner_photo_section(owner, payment, building, styles),
             Spacer(1, 0.16 * inch),
             self._build_section_title("DETALLE DEL PAGO"),
             self._build_detail_table(detail_rows),

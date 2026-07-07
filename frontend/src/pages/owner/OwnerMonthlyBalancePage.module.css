@@ -43,6 +43,12 @@
   max-width: 600px;
 }
 
+.headerActions {
+  align-items: flex-end;
+  display: flex;
+  gap: 12px;
+}
+
 .monthField {
   display: flex;
   flex-direction: column;
@@ -66,6 +72,24 @@
   padding: 12px 14px;
 }
 
+.pdfButton {
+  background: #2563eb;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  min-height: 45px;
+  padding: 0 18px;
+  white-space: nowrap;
+}
+
+.pdfButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .errorBanner {
   background: #fef3f2;
   border: 1px solid #fecdca;
@@ -84,6 +108,16 @@
   }
 
   .monthField input {
+    width: 100%;
+  }
+
+  .headerActions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .pdfButton {
     width: 100%;
   }
 }

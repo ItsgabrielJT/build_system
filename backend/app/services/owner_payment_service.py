@@ -505,8 +505,7 @@ class OwnerPaymentService:
         building_name = building.get("name") or "edificio"
         signature = Table(
             [
-                [""],
-                [Paragraph(f"<b>{signer_label}</b><br/>Administracion de {building_name}", styles["footer"])],
+                [Paragraph(f"<b>Administracion de {building_name}</b>", styles["footer"])],
             ],
             colWidths=[2.6 * inch],
         )
@@ -514,9 +513,8 @@ class OwnerPaymentService:
             TableStyle(
                 [
                     ("LINEABOVE", (0, 0), (-1, 0), 1, _PRIMARY_BLUE),
-                    ("TOPPADDING", (0, 0), (-1, 0), 12),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
-                    ("TOPPADDING", (0, 1), (-1, 1), 4),
+                    ("TOPPADDING", (0, 0), (-1, 0), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 0),
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ]
             )
@@ -526,7 +524,7 @@ class OwnerPaymentService:
                 [[Paragraph("Documento emitido electronicamente con fines de control administrativo.", styles["muted"]) ]],
                 colWidths=[_PAYMENT_CONTENT_WIDTH],
             ),
-            Spacer(1, 0.18 * inch),
+            Spacer(1, 0.48 * inch),
             signature,
         ]
 

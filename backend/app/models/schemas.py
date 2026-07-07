@@ -52,6 +52,12 @@ class BuildingCreate(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    photo_file_name: Optional[str] = None
+    photo_content_type: Optional[str] = None
+    photo_storage_path: Optional[str] = None
+    logo_file_name: Optional[str] = None
+    logo_content_type: Optional[str] = None
+    logo_storage_path: Optional[str] = None
 
 
 class BuildingUpdate(BaseModel):
@@ -59,6 +65,12 @@ class BuildingUpdate(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    photo_file_name: Optional[str] = None
+    photo_content_type: Optional[str] = None
+    photo_storage_path: Optional[str] = None
+    logo_file_name: Optional[str] = None
+    logo_content_type: Optional[str] = None
+    logo_storage_path: Optional[str] = None
 
 
 class BuildingResponse(BaseModel):
@@ -67,6 +79,12 @@ class BuildingResponse(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    photo_file_name: Optional[str] = None
+    photo_content_type: Optional[str] = None
+    photo_storage_path: Optional[str] = None
+    logo_file_name: Optional[str] = None
+    logo_content_type: Optional[str] = None
+    logo_storage_path: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

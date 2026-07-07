@@ -13,6 +13,26 @@ logger = logging.getLogger(__name__)
 
 class EmailService:
     @staticmethod
+    def _system_link_text() -> str:
+        return settings.app_url.rstrip("/")
+
+    @staticmethod
+    def _append_system_link(text_content: str, html_content: str) -> tuple[str, str]:
+        system_link = EmailService._system_link_text()
+        if system_link in text_content and system_link in html_content:
+            return text_content, html_content
+        text = (
+            f"{text_content.rstrip()}\n\n"
+            f"Enlace del sistema: {system_link}\n"
+        )
+        html = (
+            f"{html_content}"
+            f"<p><strong>Enlace del sistema:</strong> "
+            f'<a href="{system_link}">{system_link}</a></p>'
+        )
+        return text, html
+
+    @staticmethod
     async def send_email(
         to_email: str,
         subject: str,
@@ -24,6 +44,11 @@ class EmailService:
         Envía un correo electrónico usando la API v3.1 de Mailjet.
         Si no se configuran las claves, realiza fallback a logger (para desarrollo).
         """
+        text_content, html_content = EmailService._append_system_link(
+            text_content,
+            html_content,
+        )
+
         api_key = settings.mailjet_api_key
         api_secret = settings.mailjet_api_secret
         from_email = settings.mailjet_from_email
@@ -100,6 +125,10 @@ class EmailService:
             f"<p>Por seguridad, deberás cambiar tu contraseña al ingresar por primera vez.</p>"
             f"<br/><p>Saludos,<br/>El equipo de HabitaUIO</p>"
         )
+        text_content, html_content = EmailService._append_system_link(
+            text_content,
+            html_content,
+        )
         return await EmailService.send_email(user_email, subject, text_content, html_content)
 
     @staticmethod
@@ -126,6 +155,10 @@ class EmailService:
             f"<p>Al iniciar sesión con esta contraseña, se te pedirá que crees una nueva contraseña definitiva.</p>"
             f"<p>Si no solicitaste este cambio, por favor contacta a la administración de inmediato.</p>"
             f"<br/><p>Saludos,<br/>El equipo de HabitaUIO</p>"
+        )
+        text_content, html_content = EmailService._append_system_link(
+            text_content,
+            html_content,
         )
         return await EmailService.send_email(user_email, subject, text_content, html_content)
 
@@ -161,6 +194,10 @@ class EmailService:
                 f"</ul>"
                 f"<p>Por favor, ingresa al módulo de revisión de pagos en el portal de administración para gestionarlo.</p>"
             )
+            admin_text, admin_html = EmailService._append_system_link(
+                admin_text,
+                admin_html,
+            )
             await EmailService.send_email(admin_email, admin_subject, admin_text, admin_html, "Administrador")
 
         # 2. Confirmación al Propietario
@@ -178,6 +215,10 @@ class EmailService:
                 f"<p>Hemos recibido el comprobante de pago cargado para el período <strong>{period}</strong> por un monto de <strong>USD {amount}</strong>.</p>"
                 f"<p>Tu pago está pendiente de revisión por parte de la administración. Te enviaremos un correo tan pronto sea aprobado.</p>"
                 f"<br/><p>Saludos,<br/>Administración de HabitaUIO</p>"
+            )
+            owner_text, owner_html = EmailService._append_system_link(
+                owner_text,
+                owner_html,
             )
             await EmailService.send_email(owner_email, owner_subject, owner_text, owner_html, owner_name)
 
@@ -204,5 +245,9 @@ class EmailService:
             f"<p>Te notificamos que tu pago por un monto de <strong>USD {amount}</strong> para el período <strong>{period}</strong> fue aprobado con éxito.</p>"
             f"<p>Tu recibo oficial ya se encuentra disponible para su descarga en el portal dentro del módulo 'Mis Pagos'.</p>"
             f"<br/><p>Saludos,<br/>Administración de HabitaUIO</p>"
+        )
+        text_content, html_content = EmailService._append_system_link(
+            text_content,
+            html_content,
         )
         return await EmailService.send_email(owner_email, subject, text_content, html_content, owner_name)

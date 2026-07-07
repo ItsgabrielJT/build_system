@@ -49,7 +49,7 @@ class PaymentRepository:
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         query = f"""
-            SELECT p.*, a.code AS apartment_code, o.full_name AS owner_name
+            SELECT p.*, a.code AS apartment_code, a.building_id, o.full_name AS owner_name
             FROM payments p
             JOIN apartments a ON p.apartment_id = a.id
             JOIN owners o ON p.owner_id = o.id
@@ -62,7 +62,7 @@ class PaymentRepository:
     async def get_by_id(self, payment_id: UUID) -> dict | None:
         row = await self._conn.fetchrow(
             """
-            SELECT p.*, a.code AS apartment_code, o.full_name AS owner_name
+            SELECT p.*, a.code AS apartment_code, a.building_id, o.full_name AS owner_name
             FROM payments p
             JOIN apartments a ON p.apartment_id = a.id
             JOIN owners o ON p.owner_id = o.id
@@ -160,7 +160,7 @@ class PaymentRepository:
 
         rows = await self._conn.fetch(
             f"""
-            SELECT p.*, a.code AS apartment_code, o.full_name AS owner_name
+            SELECT p.*, a.code AS apartment_code, a.building_id, o.full_name AS owner_name
             FROM payments p
             JOIN apartments a ON p.apartment_id = a.id
             JOIN owners o ON p.owner_id = o.id
@@ -178,7 +178,7 @@ class PaymentRepository:
     ) -> dict | None:
         row = await self._conn.fetchrow(
             """
-            SELECT p.*, a.code AS apartment_code, o.full_name AS owner_name
+            SELECT p.*, a.code AS apartment_code, a.building_id, o.full_name AS owner_name
             FROM payments p
             JOIN apartments a ON p.apartment_id = a.id
             JOIN owners o ON p.owner_id = o.id
@@ -197,7 +197,7 @@ class PaymentRepository:
         offset = (page - 1) * page_size
         rows = await self._conn.fetch(
             """
-            SELECT p.*, a.code AS apartment_code, o.full_name AS owner_name
+            SELECT p.*, a.code AS apartment_code, a.building_id, o.full_name AS owner_name
             FROM payments p
             JOIN apartments a ON p.apartment_id = a.id
             JOIN owners o ON p.owner_id = o.id
@@ -287,4 +287,3 @@ class PaymentRepository:
                     row["fine_id"],
                 )
             return dict(row) if row else None
-

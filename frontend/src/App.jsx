@@ -9,6 +9,7 @@ import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
 import AdminFinesPage from './pages/admin/AdminFinesPage';
 import AdminExpensesPage from './pages/admin/AdminExpensesPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
+import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import OwnersDirectoryPage from './pages/admin/OwnersDirectoryPage';
 import OwnerApartmentsPage from './pages/owner/OwnerApartmentsPage';
@@ -39,6 +40,7 @@ export default function App() {
         }
       >
         <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="users" element={<AdminUsersPage />} />
         <Route path="owners" element={<OwnersDirectoryPage />} />
         <Route path="apartments" element={<DepartmentsPage />} />

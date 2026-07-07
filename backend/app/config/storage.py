@@ -12,6 +12,7 @@ from app.config.settings import settings
 _ALLOWED_CONTENT_TYPES: frozenset[str] = frozenset(
     t.strip() for t in settings.allowed_proof_types.split(",")
 )
+_ALLOWED_IMAGE_TYPES: frozenset[str] = frozenset({"image/jpeg", "image/png"})
 _MAX_BYTES: int = settings.max_proof_size_mb * 1024 * 1024
 
 
@@ -79,6 +80,52 @@ def _receipt_upload_dir() -> Path:
     return path
 
 
+def _building_asset_upload_dir() -> Path:
+    path = Path(settings.upload_dir) / "building_assets"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+async def validate_and_store_building_asset(file: UploadFile, label: str) -> dict:
+    """Valida y persiste una imagen del edificio."""
+    if file.content_type not in _ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Tipo de archivo no soportado para {label}: {file.content_type}. "
+                f"Tipos permitidos: {', '.join(sorted(_ALLOWED_IMAGE_TYPES))}"
+            ),
+        )
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"El archivo de {label} está vacío",
+        )
+
+    if len(contents) > _MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"El archivo de {label} excede el tamaño máximo permitido "
+                f"de {settings.max_proof_size_mb} MB"
+            ),
+        )
+
+    original_name = file.filename or label
+    ext = Path(original_name).suffix.lower()
+    stored_name = f"{label}-{uuid.uuid4().hex}{ext}"
+    storage_path = _building_asset_upload_dir() / stored_name
+    storage_path.write_bytes(contents)
+
+    return {
+        "file_name": original_name,
+        "content_type": file.content_type,
+        "storage_path": str(storage_path),
+    }
+
+
 async def validate_and_store_expense_receipt(file: UploadFile) -> dict:
     """Valida y persiste un comprobante de gasto. Retorna dict con metadata del archivo."""
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
@@ -118,4 +165,3 @@ async def validate_and_store_expense_receipt(file: UploadFile) -> dict:
         "content_type": file.content_type,
         "storage_path": str(storage_path),
     }
-

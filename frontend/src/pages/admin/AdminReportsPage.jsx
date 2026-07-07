@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -105,6 +106,8 @@ function IconMail() {
 
 export default function AdminReportsPage() {
   const { token } = useAuth();
+  const { building } = useOutletContext() || {};
+  const buildingName = building?.name || 'Edificio Principal';
   const initialRange = useMemo(() => getQuarterRange(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
   const [endDate, setEndDate] = useState(initialRange.endDate);
@@ -172,7 +175,7 @@ export default function AdminReportsPage() {
       <section className={styles.header}>
         <div>
           <h1>Reportes financieros</h1>
-          <p>{getRangeLabel(startDate)} de Edificio Horizonte</p>
+          <p>{getRangeLabel(startDate)} de {buildingName}</p>
         </div>
         <div className={styles.actions}>
           <label className={styles.dateField}>

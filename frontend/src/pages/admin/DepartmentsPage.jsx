@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -25,6 +26,7 @@ const STATUS_COLORS = {
 };
 
 export default function DepartmentsPage() {
+  const navigate = useNavigate();
   const {
     statistics,
     apartments,
@@ -112,6 +114,12 @@ export default function DepartmentsPage() {
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
+          <button
+            className={styles.btnSecondary}
+            onClick={() => navigate('/admin/settings')}
+          >
+            Configurar edificio
+          </button>
           <button className={styles.btnPrimary} onClick={onOpenCreateModal}>
           + Agregar Apartamento
           </button>

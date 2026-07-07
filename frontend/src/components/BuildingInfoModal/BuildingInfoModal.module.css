@@ -16,7 +16,7 @@
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   width: 90%;
-  max-width: 500px;
+  max-width: 620px;
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -81,6 +81,12 @@
   margin-bottom: 20px;
 }
 
+.assetsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
 .label {
   display: block;
   margin-bottom: 8px;
@@ -110,6 +116,30 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
+.fileInput {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px dashed var(--color-border, #d1d5db);
+  border-radius: 6px;
+  background: var(--color-bg-muted, #f9fafb);
+  color: var(--color-text, #1f2937);
+  font-size: 13px;
+}
+
+.fileInput:focus {
+  outline: none;
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.fileHint {
+  margin-top: 6px;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 12px;
+  word-break: break-word;
+}
+
 .actions {
   display: flex;
   gap: 12px;
@@ -117,6 +147,13 @@
   margin-top: 28px;
   padding-top: 20px;
   border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+@media (max-width: 640px) {
+  .formRow,
+  .assetsGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .btnCancel {

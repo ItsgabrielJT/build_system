@@ -10,6 +10,10 @@ export default function BuildingInfoModal({ isOpen, onClose, onSave, building })
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [assetFiles, setAssetFiles] = useState({
+    photo_file: null,
+    logo_file: null,
+  });
 
   useEffect(() => {
     if (building) {
@@ -18,6 +22,10 @@ export default function BuildingInfoModal({ isOpen, onClose, onSave, building })
         address: building.address || '',
         phone: building.phone || '',
         email: building.email || '',
+      });
+      setAssetFiles({
+        photo_file: null,
+        logo_file: null,
       });
     }
   }, [building, isOpen]);
@@ -31,13 +39,25 @@ export default function BuildingInfoModal({ isOpen, onClose, onSave, building })
     setError(null);
   };
 
+  const handleFileChange = (e) => {
+    const { name, files } = e.target;
+    setAssetFiles((prev) => ({
+      ...prev,
+      [name]: files?.[0] || null,
+    }));
+    setError(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      await onSave(formData);
+      await onSave({
+        ...formData,
+        ...assetFiles,
+      });
       onClose();
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al guardar información del edificio');
@@ -121,6 +141,46 @@ export default function BuildingInfoModal({ isOpen, onClose, onSave, building })
                 className={styles.input}
                 placeholder="ej. contacto@edificio.com"
               />
+            </div>
+          </div>
+
+          <div className={styles.assetsGrid}>
+            <div className={styles.formGroup}>
+              <label htmlFor="photo_file" className={styles.label}>
+                Foto del edificio
+              </label>
+              <input
+                id="photo_file"
+                type="file"
+                name="photo_file"
+                accept="image/png,image/jpeg"
+                onChange={handleFileChange}
+                className={styles.fileInput}
+              />
+              <div className={styles.fileHint}>
+                {assetFiles.photo_file
+                  ? assetFiles.photo_file.name
+                  : building?.photo_file_name || 'Sin foto configurada'}
+              </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="logo_file" className={styles.label}>
+                Logo para comprobantes y PDFs
+              </label>
+              <input
+                id="logo_file"
+                type="file"
+                name="logo_file"
+                accept="image/png,image/jpeg"
+                onChange={handleFileChange}
+                className={styles.fileInput}
+              />
+              <div className={styles.fileHint}>
+                {assetFiles.logo_file
+                  ? assetFiles.logo_file.name
+                  : building?.logo_file_name || 'Sin logo configurado'}
+              </div>
             </div>
           </div>
 

@@ -11,9 +11,23 @@ CREATE TABLE IF NOT EXISTS buildings (
     address      VARCHAR(255),
     phone        VARCHAR(20),
     email        VARCHAR(255),
+    photo_file_name VARCHAR(255),
+    photo_content_type VARCHAR(100),
+    photo_storage_path VARCHAR(500),
+    logo_file_name VARCHAR(255),
+    logo_content_type VARCHAR(100),
+    logo_storage_path VARCHAR(500),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE buildings
+ADD COLUMN IF NOT EXISTS photo_file_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS photo_content_type VARCHAR(100),
+ADD COLUMN IF NOT EXISTS photo_storage_path VARCHAR(500),
+ADD COLUMN IF NOT EXISTS logo_file_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS logo_content_type VARCHAR(100),
+ADD COLUMN IF NOT EXISTS logo_storage_path VARCHAR(500);
 
 -- ─── 2. AGREGAR COLUMNAS A APARTMENTS ──────────────────────────────
 

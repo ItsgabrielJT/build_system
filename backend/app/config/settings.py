@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     mailjet_from_email: str = "no-reply@edificios.com"
     mailjet_from_name: str = "Build System"
     admin_notification_email: str = "admin@edificios.com"
+    app_url: str = "http://localhost:5173"
 
     # JWT Configuration
     jwt_secret: str = "your-secret-key-change-in-production"

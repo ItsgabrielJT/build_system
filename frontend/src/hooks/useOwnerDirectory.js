@@ -101,7 +101,7 @@ export function useOwnerDirectory(filters = {}) {
         await ownerService.createOwner(payload, token);
         success('Propietario creado con éxito');
         setShowCreateModal(false);
-        fetchOwners(1, searchTerm);
+        await fetchOwners(1, searchTerm);
       } catch (err) {
         toastError(err.response?.data?.detail || 'Error al crear propietario');
       }

@@ -227,8 +227,11 @@ export default function AdminFinesPage() {
       success('Multa registrada con éxito');
       setIsFormOpen(false);
       setFilteredApartments([]);
-      fetchFines({ ...filters, page, page_size: PAGE_SIZE });
-      if (typeof fetchFineStats === 'function') fetchFineStats(filters);
+      setPage(1);
+      await Promise.all([
+        fetchFines({ ...filters, page: 1, page_size: PAGE_SIZE }),
+        typeof fetchFineStats === 'function' ? fetchFineStats(filters) : Promise.resolve(),
+      ]);
     } catch (err) {
       toastError(err.response?.data?.detail || 'Error al registrar multa');
     }
@@ -244,8 +247,10 @@ export default function AdminFinesPage() {
     try {
       await annulFine(annulTarget.id);
       success('Multa anulada con éxito');
-      fetchFines({ ...filters, page, page_size: PAGE_SIZE });
-      if (typeof fetchFineStats === 'function') fetchFineStats(filters);
+      await Promise.all([
+        fetchFines({ ...filters, page, page_size: PAGE_SIZE }),
+        typeof fetchFineStats === 'function' ? fetchFineStats(filters) : Promise.resolve(),
+      ]);
     } catch (err) {
       const msg = err.response?.data?.detail || 'Error al anular multa';
       setActionError(msg);

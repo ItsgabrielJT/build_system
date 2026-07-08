@@ -139,7 +139,11 @@ export default function AdminFeesPage() {
       const result = await bulkUpload({ period, fees: feesList });
       success('Cuotas guardadas con éxito');
       setBulkResult(result);
-      fetchFees(period);
+      await Promise.all([
+        fetchFees(period),
+        fetchStats(period),
+        fetchPeriods(1, 100),
+      ]);
       setIsBulkOpen(false);
       setBulkValues({});
     } catch (err) {
@@ -282,6 +286,14 @@ export default function AdminFeesPage() {
         <div className={styles.overlay} onClick={() => setIsBulkOpen(false)}>
           <div className={styles.bulkModal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Carga masiva — {period}</h2>
+            <label className={styles.periodField}>
+              <span>Mes de emisión</span>
+              <input
+                type="month"
+                value={period}
+                onChange={(event) => setPeriod(event.target.value)}
+              />
+            </label>
             <div className={styles.bulkGrid}>
               {apartments.map((apt) => (
                 <div key={apt.id} className={styles.bulkRow}>

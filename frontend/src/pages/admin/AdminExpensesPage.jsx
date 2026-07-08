@@ -278,7 +278,12 @@ export default function AdminExpensesPage() {
       setReceiptFile(null);
       setReceiptError(null);
       setFormErrors({});
-      await Promise.all([fetchStats(), fetchRecent()]);
+      await Promise.all([
+        fetchStats(),
+        fetchChartData(),
+        fetchRecent(),
+        isViewAllOpen ? fetchAllExpenses() : Promise.resolve(),
+      ]);
     } catch (err) {
       const msg = err.response?.data?.detail || 'No se pudo guardar el gasto. Inténtelo de nuevo.';
       setSubmitError(msg);

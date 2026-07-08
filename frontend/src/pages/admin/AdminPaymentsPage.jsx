@@ -130,6 +130,12 @@ export default function AdminPaymentsPage() {
   const [paymentsPage, setPaymentsPage] = useState(1);
   const [pendingPage, setPendingPage] = useState(1);
 
+  const getPaymentFetchParams = () => {
+    const params = {};
+    if (filterStatus) params.status = filterStatus;
+    return params;
+  };
+
   useEffect(() => {
     fetchApartments();
     fetchOwners();
@@ -137,9 +143,7 @@ export default function AdminPaymentsPage() {
   }, [fetchApartments, fetchOwners, fetchPending]);
 
   useEffect(() => {
-    const params = {};
-    if (filterStatus) params.status = filterStatus;
-    fetchPayments(params);
+    fetchPayments(getPaymentFetchParams());
   }, [filterStatus, fetchPayments]);
 
   const visiblePayments = useMemo(() => {
@@ -390,6 +394,8 @@ export default function AdminPaymentsPage() {
       setFilteredApartments([]);
       setSelectedApartmentId('');
       setFormPendingDebts({ cuotas: [], multas: [] });
+      setPaymentsPage(1);
+      await fetchPayments(getPaymentFetchParams());
     } catch (err) {
       toastError(err.response?.data?.detail || 'Error al registrar pago');
     }
@@ -407,6 +413,7 @@ export default function AdminPaymentsPage() {
     try {
       await annulPayment(annulTarget.id);
       success('Pago anulado con éxito');
+      await fetchPayments(getPaymentFetchParams());
     } catch (err) {
       const msg = err.response?.data?.detail || 'Error al anular pago';
       setActionError(msg);
@@ -839,6 +846,10 @@ export default function AdminPaymentsPage() {
             await approvePayment(id);
             success('Pago aprobado con éxito');
             setReviewTarget(null);
+            await Promise.all([
+              fetchPending(),
+              fetchPayments(getPaymentFetchParams()),
+            ]);
           } catch (err) {
             toastError(err.response?.data?.detail || 'Error al aprobar pago');
           }
@@ -848,6 +859,10 @@ export default function AdminPaymentsPage() {
             await rejectPayment(id, reason);
             success('Pago rechazado con éxito');
             setReviewTarget(null);
+            await Promise.all([
+              fetchPending(),
+              fetchPayments(getPaymentFetchParams()),
+            ]);
           } catch (err) {
             toastError(err.response?.data?.detail || 'Error al rechazar pago');
           }

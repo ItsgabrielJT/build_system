@@ -109,13 +109,16 @@ export function useApartmentDirectory() {
         await apartmentService.createApartment(payload, token);
         success('Apartamento creado con éxito');
         setShowCreateModal(false);
-        fetchStatistics(buildingFilter);
-        fetchApartments(1, filter);
+        await Promise.all([
+          fetchStatistics(buildingFilter),
+          fetchApartments(1, filter),
+          fetchBuildings(),
+        ]);
       } catch (err) {
         toastError(err.response?.data?.detail || 'Error al crear apartamento');
       }
     },
-    [token, fetchStatistics, fetchApartments, filter, buildingFilter, success, toastError]
+    [token, fetchStatistics, fetchApartments, fetchBuildings, filter, buildingFilter, success, toastError]
   );
 
   useEffect(() => {

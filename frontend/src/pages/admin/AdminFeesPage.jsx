@@ -10,6 +10,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../context/NotificationContext';
 import { getFeesByPeriod, getApartmentFeeStats } from '../../services/apartmentFeeService';
 import { downloadFeesReport } from '../../services/reportService';
+import DownloadIcon from '../../components/icons/DownloadIcon';
 import {
   ResponsiveContainer,
   PieChart,
@@ -227,9 +228,11 @@ export default function AdminFeesPage() {
             <input type="date" value={reportEndDate} onChange={(event) => setReportEndDate(event.target.value)} />
           </label>
           <button className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            <DownloadIcon />
             {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
           </button>
           <button className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            <DownloadIcon />
             {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
           </button>
           <button className={styles.btnPrimary} onClick={handleEmitirProximoMes}>

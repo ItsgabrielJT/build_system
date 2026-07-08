@@ -17,6 +17,7 @@ import {
   downloadExpenseReceipt,
 } from '../../services/expenseService';
 import { downloadExpensesReport } from '../../services/reportService';
+import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './AdminExpensesPage.module.css';
 
 const CATEGORIES = ['Servicios', 'Mantenimiento', 'Seguridad', 'Limpieza', 'Administración', 'Otros'];
@@ -329,9 +330,11 @@ export default function AdminExpensesPage() {
             <input type="date" value={reportEndDate} onChange={(event) => setReportEndDate(event.target.value)} />
           </label>
           <button className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            <DownloadIcon />
             {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
           </button>
           <button className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            <DownloadIcon />
             {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
           </button>
         </div>

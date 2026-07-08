@@ -18,6 +18,7 @@ import { downloadPaymentsReport } from '../../services/reportService';
 import FormModal from '../../components/FormModal/FormModal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
 import PaymentReviewModal from '../../components/PaymentReviewModal/PaymentReviewModal';
+import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './AdminPaymentsPage.module.css';
 
 const STATUS_FILTERS = [
@@ -513,9 +514,11 @@ export default function AdminPaymentsPage() {
           </label>
           <div className={styles.reportActions}>
             <button type="button" className={styles.btnReport} onClick={() => handleExport('pdf')} disabled={exportingReport === 'pdf'}>
+              <DownloadIcon />
               {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
             </button>
             <button type="button" className={styles.btnReportSecondary} onClick={() => handleExport('excel')} disabled={exportingReport === 'excel'}>
+              <DownloadIcon />
               {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
             </button>
           </div>

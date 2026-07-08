@@ -8,6 +8,7 @@ import {
   updateBuildingConfig,
 } from '../../services/buildingService';
 import { downloadBuildingsReport } from '../../services/reportService';
+import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './AdminSettingsPage.module.css';
 
 const initialForm = {
@@ -237,9 +238,11 @@ export default function AdminSettingsPage() {
             <input type="date" value={reportEndDate} onChange={(event) => setReportEndDate(event.target.value)} />
           </label>
           <button type="button" className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            <DownloadIcon />
             {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
           </button>
           <button type="button" className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            <DownloadIcon />
             {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
           </button>
         </div>

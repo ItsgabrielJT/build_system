@@ -18,6 +18,7 @@ import FormModal from '../../components/FormModal/FormModal';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../context/NotificationContext';
 import { downloadOwnersReport } from '../../services/reportService';
+import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './OwnersDirectoryPage.module.css';
 
 const CREATE_OWNER_FIELDS = [
@@ -146,9 +147,11 @@ export default function OwnersDirectoryPage() {
         </div>
         <div className={styles.reportActions}>
           <button className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            <DownloadIcon />
             {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
           </button>
           <button className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            <DownloadIcon />
             {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
           </button>
           <button className={styles.btnPrimary} onClick={onOpenCreateModal}>

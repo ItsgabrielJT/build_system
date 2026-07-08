@@ -15,6 +15,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { downloadFinesReport } from '../../services/reportService';
 import FormModal from '../../components/FormModal/FormModal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
+import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './AdminFinesPage.module.css';
 
 const PAGE_SIZE = 8;
@@ -308,9 +309,11 @@ export default function AdminFinesPage() {
             <input type="date" value={reportEndDate} onChange={(event) => setReportEndDate(event.target.value)} />
           </label>
           <button type="button" className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            <DownloadIcon />
             {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
           </button>
           <button type="button" className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            <DownloadIcon />
             {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
           </button>
           <button type="button" className={styles.btnPrimary} onClick={() => setIsFormOpen(true)}>

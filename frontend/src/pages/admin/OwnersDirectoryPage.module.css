@@ -79,6 +79,10 @@
 }
 
 .btnReport {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 10px 20px;
   background: var(--color-primary);
   color: #fff;
@@ -92,6 +96,10 @@
 }
 
 .btnReportSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 10px 20px;
   background: #eef4ff;
   color: var(--color-primary);

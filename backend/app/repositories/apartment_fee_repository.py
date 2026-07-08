@@ -23,20 +23,35 @@ class ApartmentFeeRepository:
     async def get_by_period(self, period: str) -> list[dict]:
         rows = await self._conn.fetch(
             """
-            SELECT f.*, 
-                   EXISTS (
-                       SELECT 1 FROM payments p 
-                       WHERE p.apartment_id = f.apartment_id 
-                         AND p.period = f.period 
-                         AND p.status = 'REGISTRADO'
-                   ) AS is_paid
+            SELECT
+                f.*,
+                COALESCE(p.paid_amount, 0) AS paid_amount,
+                f.amount - COALESCE(p.paid_amount, 0) AS pending_amount,
+                CASE
+                    WHEN COALESCE(p.paid_amount, 0) > f.amount THEN COALESCE(p.paid_amount, 0) - f.amount
+                    ELSE 0
+                END AS credit_amount,
+                COALESCE(p.paid_amount, 0) >= f.amount AS is_paid
             FROM apartment_fees f
+            LEFT JOIN (
+                SELECT apartment_id, period, SUM(amount) AS paid_amount
+                FROM payments
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL
+                GROUP BY apartment_id, period
+            ) p ON p.apartment_id = f.apartment_id AND p.period = f.period
             WHERE f.period = $1
             ORDER BY f.apartment_id
             """,
             period,
         )
         return [dict(r) for r in rows]
+
+    async def get_by_id(self, fee_id: UUID) -> Optional[dict]:
+        row = await self._conn.fetchrow(
+            "SELECT * FROM apartment_fees WHERE id = $1",
+            fee_id,
+        )
+        return dict(row) if row else None
 
     async def fee_exists(self, apartment_id: UUID, period: str) -> bool:
         row = await self._conn.fetchrow(
@@ -91,6 +106,19 @@ class ApartmentFeeRepository:
                 amount,
             )
             return dict(row), True
+
+    async def update_amount(self, fee_id: UUID, amount: Decimal) -> Optional[dict]:
+        row = await self._conn.fetchrow(
+            """
+            UPDATE apartment_fees
+            SET amount = $2
+            WHERE id = $1
+            RETURNING *
+            """,
+            fee_id,
+            amount,
+        )
+        return dict(row) if row else None
 
     async def get_stats(self, period: str) -> dict:
         row = await self._conn.fetchrow(

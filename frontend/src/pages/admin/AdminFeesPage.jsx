@@ -8,7 +8,7 @@ import PeriodsHistoryTable from '../../components/PeriodsHistoryTable/PeriodsHis
 import styles from './AdminFeesPage.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../context/NotificationContext';
-import { getFeesByPeriod, getApartmentFeeStats } from '../../services/apartmentFeeService';
+import { getFeesByPeriod, getApartmentFeeStats, updateFee } from '../../services/apartmentFeeService';
 import { downloadFeesReport } from '../../services/reportService';
 import DownloadIcon from '../../components/icons/DownloadIcon';
 import {
@@ -90,6 +90,9 @@ export default function AdminFeesPage() {
   const [detailPeriod, setDetailPeriod] = useState(null);
   const [detailFees, setDetailFees] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [editingFeeId, setEditingFeeId] = useState(null);
+  const [editingFeeAmount, setEditingFeeAmount] = useState('');
+  const [savingFeeId, setSavingFeeId] = useState(null);
 
   // Modal "Ver estadísticas"
   const [chartPeriod, setChartPeriod] = useState(null);
@@ -158,6 +161,8 @@ export default function AdminFeesPage() {
     setDetailPeriod(row);
     setDetailFees([]);
     setDetailLoading(true);
+    setEditingFeeId(null);
+    setEditingFeeAmount('');
     try {
       const data = await getFeesByPeriod(token, row.period);
       setDetailFees(Array.isArray(data) ? data : []);
@@ -165,6 +170,51 @@ export default function AdminFeesPage() {
       setDetailFees([]);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleStartEditFee = (fee) => {
+    setEditingFeeId(fee.id);
+    setEditingFeeAmount(String(fee.amount ?? ''));
+  };
+
+  const handleCancelEditFee = () => {
+    setEditingFeeId(null);
+    setEditingFeeAmount('');
+  };
+
+  const getFeeStatus = (fee) => {
+    const paid = Number(fee.paid_amount || 0);
+    const pending = Number(fee.pending_amount || 0);
+    const credit = Number(fee.credit_amount || 0);
+    if (credit > 0) return { label: `Saldo a favor ${formatMoney(credit)}`, className: styles.inlineBadge_CREDIT };
+    if (pending > 0 && paid > 0) return { label: `Debe ${formatMoney(pending)}`, className: styles.inlineBadge_PENDIENTE };
+    if (pending > 0) return { label: 'Pendiente', className: styles.inlineBadge_PENDIENTE };
+    return { label: 'Pagado', className: styles.inlineBadge_PAGADO };
+  };
+
+  const handleSaveFee = async (fee) => {
+    const nextAmount = Number(editingFeeAmount);
+    if (!Number.isFinite(nextAmount) || nextAmount < 0) {
+      toastError('Ingrese un valor válido para la cuota');
+      return;
+    }
+    setSavingFeeId(fee.id);
+    try {
+      await updateFee(fee.id, { amount: nextAmount }, token);
+      const data = await getFeesByPeriod(token, fee.period);
+      setDetailFees(Array.isArray(data) ? data : []);
+      await Promise.all([
+        fetchFees(fee.period),
+        fetchStats(fee.period),
+        fetchPeriods(1, 100),
+      ]);
+      success('Cuota actualizada con éxito');
+      handleCancelEditFee();
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al actualizar la cuota');
+    } finally {
+      setSavingFeeId(null);
     }
   };
 
@@ -341,29 +391,68 @@ export default function AdminFeesPage() {
                       <th className={styles.th}>Piso</th>
                       <th className={styles.th}>Torre</th>
                       <th className={styles.th}>Cuota</th>
+                      <th className={styles.th}>Pagado</th>
                       <th className={styles.th}>Estado</th>
+                      <th className={styles.th}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detailFees.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
+                        <td colSpan={7} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
                           Sin cuotas registradas en este período
                         </td>
                       </tr>
                     ) : (
                       detailFees.map((fee) => {
                         const apt = aptMap[fee.apartment_id] || {};
+                        const status = getFeeStatus(fee);
+                        const isEditing = editingFeeId === fee.id;
                         return (
                           <tr key={fee.id} className={styles.tr}>
                             <td className={styles.td}>{apt.code || '—'}</td>
                             <td className={styles.td}>{apt.floor ?? '—'}</td>
                             <td className={styles.td}>{apt.tower ?? '—'}</td>
-                            <td className={styles.td}>{formatMoney(fee.amount)}</td>
                             <td className={styles.td}>
-                              <span className={`${styles.inlineBadge} ${fee.is_paid ? styles.inlineBadge_PAGADO : styles.inlineBadge_PENDIENTE}`}>
-                                {fee.is_paid ? 'Pagado' : 'Pendiente'}
+                              {isEditing ? (
+                                <input
+                                  className={styles.inlineInput}
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={editingFeeAmount}
+                                  onChange={(event) => setEditingFeeAmount(event.target.value)}
+                                />
+                              ) : (
+                                formatMoney(fee.amount)
+                              )}
+                            </td>
+                            <td className={styles.td}>{formatMoney(fee.paid_amount || 0)}</td>
+                            <td className={styles.td}>
+                              <span className={`${styles.inlineBadge} ${status.className}`}>
+                                {status.label}
                               </span>
+                            </td>
+                            <td className={styles.td}>
+                              {isEditing ? (
+                                <div className={styles.inlineActions}>
+                                  <button
+                                    type="button"
+                                    className={styles.btnInlinePrimary}
+                                    onClick={() => handleSaveFee(fee)}
+                                    disabled={savingFeeId === fee.id}
+                                  >
+                                    {savingFeeId === fee.id ? 'Guardando...' : 'Guardar'}
+                                  </button>
+                                  <button type="button" className={styles.btnInline} onClick={handleCancelEditFee}>
+                                    Cancelar
+                                  </button>
+                                </div>
+                              ) : (
+                                <button type="button" className={styles.btnInline} onClick={() => handleStartEditFee(fee)}>
+                                  Editar
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from app.models.schemas import ApartmentFeeCreate, BulkFeeCreate
+from app.models.schemas import ApartmentFeeCreate, ApartmentFeeUpdate, BulkFeeCreate
 from app.repositories.apartment_fee_repository import ApartmentFeeRepository
 
 
@@ -22,6 +23,16 @@ class ApartmentFeeService:
                 detail="Cuota ya existe para este período",
             )
         return await self._repo.create(data)
+
+    async def update(self, fee_id: UUID, data: ApartmentFeeUpdate) -> dict:
+        existing = await self._repo.get_by_id(fee_id)
+        if not existing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cuota no encontrada",
+            )
+        updated = await self._repo.update_amount(fee_id, data.amount)
+        return updated
 
     async def bulk_upsert(self, data: BulkFeeCreate) -> dict:
         created = 0

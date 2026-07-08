@@ -9,6 +9,13 @@ export async function createFee(data, token) {
   return res.data;
 }
 
+export async function updateFee(feeId, data, token) {
+  const res = await axios.put(`${API_BASE}/api/v1/apartment-fees/${feeId}`, data, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
 export async function bulkUploadFees(data, token) {
   const res = await axios.post(`${API_BASE}/api/v1/apartment-fees/bulk`, data, {
     headers: { Authorization: `Bearer ${token}` },

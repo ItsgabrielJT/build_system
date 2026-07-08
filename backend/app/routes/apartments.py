@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
@@ -194,21 +195,42 @@ async def get_apartment_pending_debts(
     db=Depends(get_db),
 ):
     """Retrieve unpaid fees and active fines for a specific apartment."""
-    fees = await db.fetch(
+    fee_rows = await db.fetch(
         """
-        SELECT af.id, af.period, af.amount
+        SELECT
+            af.id,
+            af.period,
+            af.amount,
+            COALESCE(p.paid_amount, 0) AS paid_amount
         FROM apartment_fees af
+        LEFT JOIN (
+            SELECT apartment_id, period, SUM(amount) AS paid_amount
+            FROM payments
+            WHERE status IN ('REGISTRADO', 'PENDIENTE_APROBACION') AND fine_id IS NULL
+            GROUP BY apartment_id, period
+        ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
         WHERE af.apartment_id = $1
-          AND NOT EXISTS (
-              SELECT 1 FROM payments p
-              WHERE p.apartment_id = af.apartment_id
-                AND p.period = af.period
-                AND p.status IN ('REGISTRADO', 'PENDIENTE_APROBACION')
-          )
         ORDER BY af.period ASC
         """,
         apartment_id,
     )
+
+    pending_fees = []
+    credit = Decimal("0")
+    for row in fee_rows:
+        amount = Decimal(str(row["amount"] or 0))
+        paid_amount = Decimal(str(row["paid_amount"] or 0))
+        net = amount - paid_amount - credit
+        if net <= 0:
+            credit = abs(net)
+            continue
+        credit = Decimal("0")
+        pending_fees.append({
+            "id": str(row["id"]),
+            "period": row["period"],
+            "amount": float(net),
+            "description": f"Cuota - Período {row['period']}",
+        })
     
     fines = await db.fetch(
         """
@@ -222,15 +244,7 @@ async def get_apartment_pending_debts(
     )
     
     return {
-        "cuotas": [
-            {
-                "id": str(r["id"]),
-                "period": r["period"],
-                "amount": float(r["amount"]),
-                "description": f"Cuota - Período {r['period']}",
-            }
-            for r in fees
-        ],
+        "cuotas": pending_fees,
         "multas": [
             {
                 "id": str(r["id"]),
@@ -241,4 +255,3 @@ async def get_apartment_pending_debts(
             for r in fines
         ],
     }
-

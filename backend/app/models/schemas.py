@@ -135,10 +135,35 @@ class ApartmentFeeCreate(BaseModel):
     def validate_period(cls, v: str) -> str:
         return _validate_period(v)
 
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
+
+
+class ApartmentFeeUpdate(BaseModel):
+    amount: Decimal
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
+
 
 class BulkFeeItem(BaseModel):
     apartment_id: UUID
     amount: Decimal
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
 
 
 class BulkFeeCreate(BaseModel):

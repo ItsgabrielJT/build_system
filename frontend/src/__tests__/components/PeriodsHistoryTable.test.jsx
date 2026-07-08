@@ -93,24 +93,6 @@ describe('PeriodsHistoryTable', () => {
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
-  it('calls onFilterYear when year filter selected', async () => {
-    const user = userEvent.setup();
-    const onFilterYear = vi.fn();
-
-    render(
-      <PeriodsHistoryTable
-        loading={false}
-        data={[]}
-        total={0}
-        onFilterYear={onFilterYear}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /Filtrar Año/i }));
-
-    expect(onFilterYear).toHaveBeenCalledWith(new Date().getFullYear());
-  });
-
   it('calls onExport when export button clicked', async () => {
     const user = userEvent.setup();
     const onExport = vi.fn();

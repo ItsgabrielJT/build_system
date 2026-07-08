@@ -24,19 +24,51 @@ vi.mock('../../hooks/useAuth', () => ({
   }),
 }));
 
+function currentPeriod() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function currentMonthDate(day) {
+  return `${currentPeriod()}-${String(day).padStart(2, '0')}`;
+}
+
 describe('AdminPaymentsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('filtra pagos por periodo', async () => {
+  it('filtra pagos por rango de fechas', async () => {
     const fetchPayments = vi.fn();
     const fetchPending = vi.fn();
     const fetchApartments = vi.fn();
     const fetchOwners = vi.fn();
 
     usePayments.mockReturnValue({
-      payments: [],
+      payments: [
+        {
+          id: 'pay-1',
+          period: currentPeriod(),
+          apartment_code: '101',
+          owner_name: 'Ana Ruiz',
+          amount: 120,
+          method: 'transferencia',
+          paid_at: currentMonthDate(10),
+          status: 'REGISTRADO',
+          reference: 'TRX-1',
+        },
+        {
+          id: 'pay-2',
+          period: currentPeriod(),
+          apartment_code: '202',
+          owner_name: 'Luis Mora',
+          amount: 95,
+          method: 'efectivo',
+          paid_at: currentMonthDate(20),
+          status: 'REGISTRADO',
+          reference: 'REC-2',
+        },
+      ],
       loading: false,
       error: null,
       fetchPayments,
@@ -77,13 +109,17 @@ describe('AdminPaymentsPage', () => {
       expect(fetchPayments).toHaveBeenCalledWith({});
     });
 
-    const periodInput = container.querySelector('input[type="month"]');
-    expect(periodInput).not.toBeNull();
-    fireEvent.change(periodInput, { target: { value: '2026-05' } });
+    expect(screen.getByText('Ana Ruiz')).toBeInTheDocument();
+    expect(screen.getByText('Luis Mora')).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(fetchPayments).toHaveBeenCalledWith({ period: '2026-05' });
-    });
+    const [startDateInput, endDateInput] = container.querySelectorAll('input[type="date"]');
+    expect(startDateInput).not.toBeNull();
+    expect(endDateInput).not.toBeNull();
+    fireEvent.change(startDateInput, { target: { value: currentMonthDate(15) } });
+    fireEvent.change(endDateInput, { target: { value: currentMonthDate(28) } });
+
+    expect(screen.queryByText('Ana Ruiz')).not.toBeInTheDocument();
+    expect(screen.getByText('Luis Mora')).toBeInTheDocument();
   });
 
   it('pre-carga el período con el mes actual al abrir formulario', async () => {
@@ -268,7 +304,7 @@ describe('AdminPaymentsPage', () => {
       id: `pending-${index + 1}`,
       apartment_code: `A-10${index + 1}`,
       owner_name: `Owner ${index + 1}`,
-      period: '2026-05',
+      period: currentPeriod(),
       amount: 100 + index,
       proof_file_name: `proof-${index + 1}.pdf`,
     }));
@@ -276,10 +312,10 @@ describe('AdminPaymentsPage', () => {
       id: `payment-${index + 1}`,
       apartment_code: `B-20${index + 1}`,
       owner_name: `Resident ${index + 1}`,
-      period: '2026-05',
+      period: currentPeriod(),
       amount: 300 + index,
       method: 'transferencia',
-      paid_at: '2026-05-20',
+      paid_at: currentMonthDate(20),
       reference: `REF-${index + 1}`,
       status: 'REGISTRADO',
     }));

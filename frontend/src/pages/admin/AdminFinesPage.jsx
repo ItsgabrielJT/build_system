@@ -11,9 +11,10 @@ import {
 import { useFines } from '../../hooks/useFines';
 import { useApartments } from '../../hooks/useApartments';
 import { useOwners } from '../../hooks/useOwners';
+import { useAuth } from '../../hooks/useAuth';
+import { downloadFinesReport } from '../../services/reportService';
 import FormModal from '../../components/FormModal/FormModal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
-import PeriodSelector from '../../components/PeriodSelector/PeriodSelector';
 import styles from './AdminFinesPage.module.css';
 
 const PAGE_SIZE = 8;
@@ -32,6 +33,25 @@ const STATUS_CONFIG = {
 const getCurrentMonth = () => {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const getCurrentMonthRange = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+};
+
+const triggerDownload = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 };
 
 const formatCurrency = (value) => `$${Number(value || 0).toLocaleString(undefined, {
@@ -102,18 +122,22 @@ export default function AdminFinesPage() {
     createFine,
     annulFine,
   } = useFines();
+  const { token } = useAuth();
   const { success, error: toastError } = useNotification();
   const { apartments, fetchApartments } = useApartments();
   const { owners, fetchOwners } = useOwners();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [annulTarget, setAnnulTarget] = useState(null);
-  const [filterPeriod, setFilterPeriod] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterReason, setFilterReason] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [actionError, setActionError] = useState(null);
   const [filteredApartments, setFilteredApartments] = useState([]);
+  const initialRange = useMemo(() => getCurrentMonthRange(), []);
+  const [reportStartDate, setReportStartDate] = useState(initialRange.startDate);
+  const [reportEndDate, setReportEndDate] = useState(initialRange.endDate);
+  const [exportingReport, setExportingReport] = useState(null);
 
   useEffect(() => {
     fetchApartments();
@@ -122,16 +146,17 @@ export default function AdminFinesPage() {
 
   const filters = useMemo(() => {
     const params = {};
-    if (filterPeriod) params.period = filterPeriod;
     if (filterStatus) params.status = filterStatus;
     if (filterReason) params.reason = filterReason;
     if (query.trim()) params.search = query.trim();
+    if (reportStartDate) params.start_date = reportStartDate;
+    if (reportEndDate) params.end_date = reportEndDate;
     return params;
-  }, [filterPeriod, filterStatus, filterReason, query]);
+  }, [filterStatus, filterReason, query, reportStartDate, reportEndDate]);
 
   useEffect(() => {
     setPage(1);
-  }, [filterPeriod, filterStatus, filterReason, query]);
+  }, [filterStatus, filterReason, query, reportStartDate, reportEndDate]);
 
   useEffect(() => {
     fetchFines({ ...filters, page, page_size: PAGE_SIZE });
@@ -231,33 +256,33 @@ export default function AdminFinesPage() {
   };
 
   const clearFilters = () => {
-    setFilterPeriod('');
     setFilterStatus('');
     setFilterReason('');
     setQuery('');
   };
 
-  const handleExport = () => {
-    const headers = ['periodo', 'departamento', 'propietario', 'motivo', 'monto', 'fecha_emision', 'estado'];
-    const rows = fines.map((fine) => [
-      fine.period,
-      fine.apartment_code,
-      fine.owner_name,
-      fine.reason,
-      fine.amount,
-      fine.issued_at,
-      fine.status,
-    ]);
-    const csv = [headers, ...rows]
-      .map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `multas-${filterPeriod || 'reporte'}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const handleDownloadReport = async (format) => {
+    setExportingReport(format);
+    setActionError(null);
+    try {
+      const blob = await downloadFinesReport(token, {
+        format,
+        ...(filterStatus ? { status_filter: filterStatus } : {}),
+        ...(filterReason ? { reason: filterReason } : {}),
+        ...(query.trim() ? { search: query.trim() } : {}),
+        start_date: reportStartDate,
+        end_date: reportEndDate,
+      });
+      const ext = format === 'excel' ? 'xlsx' : 'pdf';
+      triggerDownload(blob, `reporte-multas-${reportStartDate}-${reportEndDate}.${ext}`);
+      success(`Reporte de multas descargado en ${format === 'excel' ? 'Excel' : 'PDF'}`);
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Error al descargar el reporte de multas';
+      setActionError(msg);
+      toastError(msg);
+    } finally {
+      setExportingReport(null);
+    }
   };
 
   return (
@@ -268,9 +293,25 @@ export default function AdminFinesPage() {
           <h1 className={styles.title}>Gestión de Multas</h1>
           <p className={styles.subtitle}>Supervisión y control de infracciones registradas en el sistema.</p>
         </div>
-        <button type="button" className={styles.btnPrimary} onClick={() => setIsFormOpen(true)}>
-          + Registrar multa
-        </button>
+        <div className={styles.reportActions}>
+          <label className={styles.dateField}>
+            <span>Inicio</span>
+            <input type="date" value={reportStartDate} onChange={(event) => setReportStartDate(event.target.value)} />
+          </label>
+          <label className={styles.dateField}>
+            <span>Fin</span>
+            <input type="date" value={reportEndDate} onChange={(event) => setReportEndDate(event.target.value)} />
+          </label>
+          <button type="button" className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
+          </button>
+          <button type="button" className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
+          </button>
+          <button type="button" className={styles.btnPrimary} onClick={() => setIsFormOpen(true)}>
+            + Registrar multa
+          </button>
+        </div>
       </section>
 
       {(error || actionError) && <div className={styles.errorBanner}>{error || actionError}</div>}
@@ -302,7 +343,6 @@ export default function AdminFinesPage() {
         <div className={styles.mainColumn}>
           <article className={styles.filtersPanel}>
             <strong>Filtros</strong>
-            <PeriodSelector period={filterPeriod} onChange={setFilterPeriod} label="Período" />
             <select className={styles.select} value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
               {STATUS_FILTERS.map((option) => (
                 <option key={option.value || 'all'} value={option.value}>{option.label}</option>
@@ -329,9 +369,6 @@ export default function AdminFinesPage() {
                 <h2>Registro de multas</h2>
                 <p>Mostrando {fines.length} de {pagination?.total || fines.length} registros.</p>
               </div>
-              <button type="button" className={styles.btnSecondary} onClick={handleExport} disabled={!fines.length}>
-                Exportar CSV
-              </button>
             </div>
 
             {loading ? (

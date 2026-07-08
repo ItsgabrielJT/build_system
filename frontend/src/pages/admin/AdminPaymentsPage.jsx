@@ -14,10 +14,10 @@ import { useApartments } from '../../hooks/useApartments';
 import { useOwners } from '../../hooks/useOwners';
 import { useAuth } from '../../hooks/useAuth';
 import { getApartmentPendingDebts } from '../../services/apartmentService';
+import { downloadPaymentsReport } from '../../services/reportService';
 import FormModal from '../../components/FormModal/FormModal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
 import PaymentReviewModal from '../../components/PaymentReviewModal/PaymentReviewModal';
-import PeriodSelector from '../../components/PeriodSelector/PeriodSelector';
 import styles from './AdminPaymentsPage.module.css';
 
 const STATUS_FILTERS = [
@@ -51,6 +51,25 @@ const getCurrentMonth = () => {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 };
 
+const getCurrentMonthRange = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+};
+
+const triggerDownload = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
 const formatCurrency = (value) => `$${Number(value || 0).toLocaleString(undefined, {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -80,6 +99,7 @@ const getPeriodLabel = (period) => {
 import { useNotification } from '../../context/NotificationContext';
 
 export default function AdminPaymentsPage() {
+  const initialRange = useMemo(() => getCurrentMonthRange(), []);
   const { payments, loading, error, fetchPayments, createPayment, annulPayment, downloadAdminReceipt } = usePayments();
   const {
     pendingPayments,
@@ -99,11 +119,13 @@ export default function AdminPaymentsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [annulTarget, setAnnulTarget] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
-  const [filterPeriod, setFilterPeriod] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState(initialRange.startDate);
+  const [filterEndDate, setFilterEndDate] = useState(initialRange.endDate);
   const [query, setQuery] = useState('');
   const [activeView, setActiveView] = useState('overview');
   const [actionError, setActionError] = useState(null);
+  const [exportingReport, setExportingReport] = useState(null);
   const [filteredApartments, setFilteredApartments] = useState([]);
   const [paymentsPage, setPaymentsPage] = useState(1);
   const [pendingPage, setPendingPage] = useState(1);
@@ -116,23 +138,26 @@ export default function AdminPaymentsPage() {
 
   useEffect(() => {
     const params = {};
-    if (filterPeriod) params.period = filterPeriod;
     if (filterStatus) params.status = filterStatus;
     fetchPayments(params);
-  }, [filterPeriod, filterStatus, fetchPayments]);
+  }, [filterStatus, fetchPayments]);
 
   const visiblePayments = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return payments;
-    return payments.filter((payment) => [
-      payment.period,
-      payment.apartment_code,
-      payment.owner_name,
-      payment.method,
-      payment.reference,
-      payment.status,
-    ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery)));
-  }, [payments, query]);
+    return payments.filter((payment) => {
+      if (filterStartDate && (!payment.paid_at || payment.paid_at < filterStartDate)) return false;
+      if (filterEndDate && (!payment.paid_at || payment.paid_at > filterEndDate)) return false;
+      if (!normalizedQuery) return true;
+      return [
+        payment.period,
+        payment.apartment_code,
+        payment.owner_name,
+        payment.method,
+        payment.reference,
+        payment.status,
+      ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery));
+    });
+  }, [payments, query, filterStartDate, filterEndDate]);
 
   const registeredPayments = useMemo(
     () => visiblePayments.filter((payment) => payment.status === 'REGISTRADO'),
@@ -205,7 +230,7 @@ export default function AdminPaymentsPage() {
 
   useEffect(() => {
     setPaymentsPage(1);
-  }, [filterPeriod, filterStatus, query]);
+  }, [filterStatus, filterStartDate, filterEndDate, query]);
 
   useEffect(() => {
     if (paymentsPage > paymentsTotalPages) {
@@ -391,28 +416,27 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const handleExport = () => {
-    const headers = ['periodo', 'departamento', 'propietario', 'monto', 'metodo', 'fecha_pago', 'estado', 'referencia'];
-    const rows = visiblePayments.map((payment) => [
-      payment.period,
-      payment.apartment_code,
-      payment.owner_name,
-      payment.amount,
-      formatMethod(payment.method),
-      payment.paid_at,
-      payment.status,
-      payment.reference,
-    ]);
-    const csv = [headers, ...rows]
-      .map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `pagos-${filterPeriod || 'todos'}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const handleExport = async (format) => {
+    setExportingReport(format);
+    setActionError(null);
+    try {
+      const params = {
+        format,
+        ...(filterStatus ? { status_filter: filterStatus } : {}),
+        ...(filterStartDate ? { start_date: filterStartDate } : {}),
+        ...(filterEndDate ? { end_date: filterEndDate } : {}),
+      };
+      const blob = await downloadPaymentsReport(token, params);
+      const ext = format === 'excel' ? 'xlsx' : 'pdf';
+      triggerDownload(blob, `reporte-pagos-${filterStartDate || 'todos'}-${filterEndDate || 'actual'}.${ext}`);
+      success(`Reporte de pagos descargado en ${format === 'excel' ? 'Excel' : 'PDF'}`);
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Error al descargar el reporte de pagos';
+      setActionError(msg);
+      toastError(msg);
+    } finally {
+      setExportingReport(null);
+    }
   };
 
   const handleDownloadProof = async (payment) => {
@@ -462,7 +486,6 @@ export default function AdminPaymentsPage() {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <PeriodSelector period={filterPeriod} onChange={setFilterPeriod} label="Período" />
           <select
             className={styles.select}
             value={filterStatus}
@@ -473,6 +496,22 @@ export default function AdminPaymentsPage() {
               <option key={option.value || 'all'} value={option.value}>{option.label}</option>
             ))}
           </select>
+          <label className={styles.dateField}>
+            <span>Inicio</span>
+            <input type="date" value={filterStartDate} onChange={(event) => setFilterStartDate(event.target.value)} />
+          </label>
+          <label className={styles.dateField}>
+            <span>Fin</span>
+            <input type="date" value={filterEndDate} onChange={(event) => setFilterEndDate(event.target.value)} />
+          </label>
+          <div className={styles.reportActions}>
+            <button type="button" className={styles.btnReport} onClick={() => handleExport('pdf')} disabled={exportingReport === 'pdf'}>
+              {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
+            </button>
+            <button type="button" className={styles.btnReportSecondary} onClick={() => handleExport('excel')} disabled={exportingReport === 'excel'}>
+              {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
+            </button>
+          </div>
           <button type="button" className={styles.btnPrimary} onClick={() => setIsFormOpen(true)}>
             + Registrar pago
           </button>
@@ -577,7 +616,7 @@ export default function AdminPaymentsPage() {
         <article className={styles.metricCard}>
           <div className={styles.metricTopline}>
             <span className={styles.iconCircle}>$</span>
-            <span className={styles.metricTag}>{filterPeriod || 'Todos'}</span>
+            <span className={styles.metricTag}>{filterStartDate || filterEndDate ? 'Rango' : 'Todos'}</span>
           </div>
           <span className={styles.metricLabel}>Total recaudado</span>
           <strong className={styles.metricValue}>{formatCurrency(totalCollected)}</strong>
@@ -615,9 +654,6 @@ export default function AdminPaymentsPage() {
                 <h2>Tendencia mensual</h2>
                 <p>Recaudado y anulado según los pagos cargados.</p>
               </div>
-              <button className={styles.btnSecondary} onClick={handleExport} disabled={!visiblePayments.length}>
-                Exportar
-              </button>
             </div>
             {monthlyData.length ? (
               <div className={styles.chartBox}>

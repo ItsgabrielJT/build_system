@@ -9,6 +9,7 @@ import styles from './AdminFeesPage.module.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../context/NotificationContext';
 import { getFeesByPeriod, getApartmentFeeStats } from '../../services/apartmentFeeService';
+import { downloadFeesReport } from '../../services/reportService';
 import {
   ResponsiveContainer,
   PieChart,
@@ -41,13 +42,45 @@ function formatMoney(value) {
   return `$${Number(value).toLocaleString('es-CL')}`;
 }
 
+function getCurrentMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function periodInDateRange(period, startDate, endDate) {
+  if (!period) return false;
+  const startPeriod = startDate ? startDate.slice(0, 7) : null;
+  const endPeriod = endDate ? endDate.slice(0, 7) : null;
+  if (startPeriod && period < startPeriod) return false;
+  if (endPeriod && period > endPeriod) return false;
+  return true;
+}
+
 export default function AdminFeesPage() {
   const currentPeriod = new Date().toISOString().slice(0, 7);
+  const initialRange = getCurrentMonthRange();
   const [period, setPeriod] = useState(currentPeriod);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [bulkValues, setBulkValues] = useState({});
   const [bulkResult, setBulkResult] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [reportStartDate, setReportStartDate] = useState(initialRange.startDate);
+  const [reportEndDate, setReportEndDate] = useState(initialRange.endDate);
+  const [exportingReport, setExportingReport] = useState(null);
 
   const { token } = useAuth();
   const { success, error: toastError } = useNotification();
@@ -63,13 +96,13 @@ export default function AdminFeesPage() {
   const [chartLoading, setChartLoading] = useState(false);
 
   const { stats, fetchStats } = useApartmentFeeStats();
-  const { periods, total, page, loading: periodsLoading, fetchPeriods } = usePeriodsSummary();
+  const { periods, loading: periodsLoading, fetchPeriods } = usePeriodsSummary();
   const { fees, fetchFees, bulkUpload } = useApartmentFees();
   const { apartments, fetchApartments } = useApartments();
 
   useEffect(() => {
     fetchStats(currentPeriod);
-    fetchPeriods(1, 10);
+    fetchPeriods(1, 100);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -81,6 +114,8 @@ export default function AdminFeesPage() {
 
   const aptMap = {};
   apartments.forEach((a) => { aptMap[a.id] = a; });
+
+  const filteredPeriods = periods.filter((row) => periodInDateRange(row.period, reportStartDate, reportEndDate));
 
   const handleEmitirProximoMes = () => {
     const nextMonth = getNextMonth(currentPeriod);
@@ -142,31 +177,25 @@ export default function AdminFeesPage() {
     }
   };
 
-  const handleExport = () => {
-    if (!periods || periods.length === 0) return;
-
-    const headers = ['Período', 'Estado', 'Total Emitido', 'Total Recaudado', 'Morosidad (%)'];
-    const rows = periods.map((p) => [
-      p.label || p.period,
-      p.estado || '',
-      p.total_emitido != null ? Number(p.total_emitido).toFixed(2) : '0',
-      p.total_recaudado != null ? Number(p.total_recaudado).toFixed(2) : '0',
-      p.morosidad_pct != null ? Number(p.morosidad_pct).toFixed(1) : '0',
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `historial-cuotas-${new Date().toISOString().slice(0, 7)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const handleDownloadReport = async (format) => {
+    setExportingReport(format);
+    setActionError(null);
+    try {
+      const blob = await downloadFeesReport(token, {
+        format,
+        start_date: reportStartDate,
+        end_date: reportEndDate,
+      });
+      const ext = format === 'excel' ? 'xlsx' : 'pdf';
+      triggerDownload(blob, `reporte-cuotas-${reportStartDate}-${reportEndDate}.${ext}`);
+      success(`Reporte de cuotas descargado en ${format === 'excel' ? 'Excel' : 'PDF'}`);
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Error al descargar el reporte de cuotas';
+      setActionError(msg);
+      toastError(msg);
+    } finally {
+      setExportingReport(null);
+    }
   };
 
   const variacion = stats?.tendencia_emitido;
@@ -184,9 +213,25 @@ export default function AdminFeesPage() {
           <h1 className={styles.title}>Gestión de Cuotas</h1>
           <p className={styles.subtitle}>Control centralizado de emisión y recaudación por períodos.</p>
         </div>
-        <button className={styles.btnPrimary} onClick={handleEmitirProximoMes}>
-          + Emitir Cuota Próximo Mes
-        </button>
+        <div className={styles.reportActions}>
+          <label className={styles.dateField}>
+            <span>Inicio</span>
+            <input type="date" value={reportStartDate} onChange={(event) => setReportStartDate(event.target.value)} />
+          </label>
+          <label className={styles.dateField}>
+            <span>Fin</span>
+            <input type="date" value={reportEndDate} onChange={(event) => setReportEndDate(event.target.value)} />
+          </label>
+          <button className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
+          </button>
+          <button className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
+          </button>
+          <button className={styles.btnPrimary} onClick={handleEmitirProximoMes}>
+            + Emitir Cuota Próximo Mes
+          </button>
+        </div>
       </div>
 
       {actionError && (
@@ -223,14 +268,12 @@ export default function AdminFeesPage() {
       </div>
 
       <PeriodsHistoryTable
-        data={periods}
+        data={filteredPeriods}
         loading={periodsLoading}
-        total={total}
-        page={page}
-        pageSize={10}
-        onPageChange={(p) => fetchPeriods(p, 10)}
-        onFilterYear={(y) => fetchPeriods(1, 10, y)}
-        onExport={handleExport}
+        total={filteredPeriods.length}
+        page={1}
+        pageSize={Math.max(filteredPeriods.length, 1)}
+        onExport={() => handleDownloadReport('excel')}
         onViewDetail={handleViewDetail}
         onViewChart={handleViewChart}
       />

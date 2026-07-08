@@ -29,7 +29,6 @@ export default function ViewAllExpensesModal({
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('');
 
   // Client-side filtering
   const filteredExpenses = useMemo(() => {
@@ -41,11 +40,9 @@ export default function ViewAllExpensesModal({
 
       const matchCategory = !selectedCategory || exp.category === selectedCategory;
 
-      const matchMonth = !selectedMonth || (exp.date && exp.date.startsWith(selectedMonth));
-
-      return matchSearch && matchCategory && matchMonth;
+      return matchSearch && matchCategory;
     });
-  }, [expenses, searchTerm, selectedCategory, selectedMonth]);
+  }, [expenses, searchTerm, selectedCategory]);
 
   const totalAmount = useMemo(() => {
     return filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0);
@@ -96,22 +93,11 @@ export default function ViewAllExpensesModal({
             </select>
           </div>
 
-          <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>Mes</label>
-            <input
-              type="month"
-              className={styles.filterInput}
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            />
-          </div>
-
           <button
             className={styles.btnClearFilters}
             onClick={() => {
               setSearchTerm('');
               setSelectedCategory('');
-              setSelectedMonth('');
             }}
           >
             Limpiar Filtros

@@ -11,26 +11,54 @@ import {
   createExpense,
   getMonthlyStats,
   getChartData,
-  getRecentExpenses,
   getExpensesByMonth,
   updateExpense,
   deleteExpense,
   downloadExpenseReceipt,
 } from '../../services/expenseService';
+import { downloadExpensesReport } from '../../services/reportService';
 import styles from './AdminExpensesPage.module.css';
 
 const CATEGORIES = ['Servicios', 'Mantenimiento', 'Seguridad', 'Limpieza', 'Administración', 'Otros'];
 
 const EMPTY_FORM = { provider: '', category: '', date: '', amount: '', concept: '', description: '' };
 
+function getCurrentMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
 function getToken(auth) {
   return auth?.token || auth?.idToken || '';
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function filterByDateRange(rows, startDate, endDate) {
+  return (rows || []).filter((row) => {
+    if (startDate && (!row.date || row.date < startDate)) return false;
+    if (endDate && (!row.date || row.date > endDate)) return false;
+    return true;
+  });
 }
 
 export default function AdminExpensesPage() {
   const auth = useAuth();
   const { success, error: toastError } = useNotification();
   const currentMonth = new Date().toISOString().slice(0, 7);
+  const initialRange = getCurrentMonthRange();
 
   const [monthlyStats, setMonthlyStats] = useState(null);
   const [chartData, setChartData] = useState(null);
@@ -39,6 +67,9 @@ export default function AdminExpensesPage() {
   const [chartLoading, setChartLoading] = useState(true);
   const [recentLoading, setRecentLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
+  const [reportStartDate, setReportStartDate] = useState(initialRange.startDate);
+  const [reportEndDate, setReportEndDate] = useState(initialRange.endDate);
+  const [exportingReport, setExportingReport] = useState(null);
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState({});
@@ -85,27 +116,28 @@ export default function AdminExpensesPage() {
   const fetchRecent = useCallback(async () => {
     setRecentLoading(true);
     try {
-      const data = await getRecentExpenses(token, 10);
-      setRecentExpenses(Array.isArray(data) ? data : []);
+      const response = await getExpensesByMonth(token, null);
+      const data = Array.isArray(response?.data) ? response.data : [];
+      setRecentExpenses(filterByDateRange(data, reportStartDate, reportEndDate).slice(0, 10));
     } catch {
       setRecentExpenses([]);
     } finally {
       setRecentLoading(false);
     }
-  }, [token]);
+  }, [token, reportStartDate, reportEndDate]);
 
   const fetchAllExpenses = useCallback(async () => {
     setAllExpensesLoading(true);
     try {
       const response = await getExpensesByMonth(token, null);
-      setAllExpenses(response.data || []);
+      setAllExpenses(filterByDateRange(response.data || [], reportStartDate, reportEndDate));
     } catch {
       setAllExpenses([]);
       toastError('No se pudieron cargar todos los gastos');
     } finally {
       setAllExpensesLoading(false);
     }
-  }, [token, toastError]);
+  }, [token, reportStartDate, reportEndDate, toastError]);
 
   useEffect(() => {
     if (!token) return;
@@ -134,6 +166,24 @@ export default function AdminExpensesPage() {
       success('Comprobante descargado con éxito');
     } catch (err) {
       toastError(err.response?.data?.detail || 'Error al descargar el comprobante');
+    }
+  };
+
+  const handleDownloadReport = async (format) => {
+    setExportingReport(format);
+    try {
+      const blob = await downloadExpensesReport(token, {
+        format,
+        start_date: reportStartDate,
+        end_date: reportEndDate,
+      });
+      const ext = format === 'excel' ? 'xlsx' : 'pdf';
+      triggerDownload(blob, `reporte-gastos-${reportStartDate}-${reportEndDate}.${ext}`);
+      success(`Reporte de gastos descargado en ${format === 'excel' ? 'Excel' : 'PDF'}`);
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al descargar el reporte de gastos');
+    } finally {
+      setExportingReport(null);
     }
   };
 
@@ -264,9 +314,22 @@ export default function AdminExpensesPage() {
           <h1 className={styles.title}>Registro de Gastos</h1>
           <p className={styles.subtitle}>Registre, realice el seguimiento y administre todos los gastos del edificio.</p>
         </div>
-        <button className={styles.btnReport} onClick={() => alert('Próximamente')}>
-          Generar Reporte
-        </button>
+        <div className={styles.reportActions}>
+          <label className={styles.dateField}>
+            <span>Inicio</span>
+            <input type="date" value={reportStartDate} onChange={(event) => setReportStartDate(event.target.value)} />
+          </label>
+          <label className={styles.dateField}>
+            <span>Fin</span>
+            <input type="date" value={reportEndDate} onChange={(event) => setReportEndDate(event.target.value)} />
+          </label>
+          <button className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
+          </button>
+          <button className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
+          </button>
+        </div>
       </div>
 
       {statsError && <div className={styles.errorBanner}>{statsError}</div>}

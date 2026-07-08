@@ -15,6 +15,9 @@ import { useOwnerDirectory } from '../../hooks/useOwnerDirectory';
 import OwnerDirectoryTable from '../../components/OwnerDirectoryTable/OwnerDirectoryTable';
 import OwnerDetailModal from '../../components/OwnerDetailModal/OwnerDetailModal';
 import FormModal from '../../components/FormModal/FormModal';
+import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../context/NotificationContext';
+import { downloadOwnersReport } from '../../services/reportService';
 import styles from './OwnersDirectoryPage.module.css';
 
 const CREATE_OWNER_FIELDS = [
@@ -39,7 +42,18 @@ const formatCurrency = (value) => `$${Number(value || 0).toLocaleString('es-ES',
   maximumFractionDigits: 2,
 })}`;
 
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function OwnersDirectoryPage() {
+  const { token } = useAuth();
+  const { success, error: toastError } = useNotification();
   const {
     owners,
     currentPage,
@@ -61,6 +75,7 @@ export default function OwnersDirectoryPage() {
   } = useOwnerDirectory();
 
   const [ownerFilter, setOwnerFilter] = useState('TODOS');
+  const [exportingReport, setExportingReport] = useState(null);
 
   const visibleOwners = useMemo(() => {
     switch (ownerFilter) {
@@ -103,6 +118,22 @@ export default function OwnersDirectoryPage() {
     { label: 'Al día / crédito', propietarios: Math.max(ownerStats.visible - ownerStats.withBalance, 0) },
   ]), [ownerStats]);
 
+  const handleDownloadReport = async (format) => {
+    setExportingReport(format);
+    try {
+      const blob = await downloadOwnersReport(token, {
+        format,
+      });
+      const ext = format === 'excel' ? 'xlsx' : 'pdf';
+      triggerDownload(blob, `reporte-propietarios.${ext}`);
+      success(`Reporte de propietarios descargado en ${format === 'excel' ? 'Excel' : 'PDF'}`);
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al descargar el reporte de propietarios');
+    } finally {
+      setExportingReport(null);
+    }
+  };
+
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
@@ -113,9 +144,17 @@ export default function OwnersDirectoryPage() {
             Contactos, unidades asignadas y saldos consolidados calculados desde los registros reales.
           </p>
         </div>
-        <button className={styles.btnPrimary} onClick={onOpenCreateModal}>
-          + Agregar Propietario
-        </button>
+        <div className={styles.reportActions}>
+          <button className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
+            {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
+          </button>
+          <button className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
+            {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
+          </button>
+          <button className={styles.btnPrimary} onClick={onOpenCreateModal}>
+            + Agregar Propietario
+          </button>
+        </div>
       </section>
 
       {error && <div className={styles.errorBanner}>{error}</div>}

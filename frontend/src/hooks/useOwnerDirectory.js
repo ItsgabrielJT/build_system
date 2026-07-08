@@ -3,7 +3,7 @@ import { useAuth } from './useAuth';
 import { useNotification } from '../context/NotificationContext';
 import * as ownerService from '../services/ownerService';
 
-export function useOwnerDirectory() {
+export function useOwnerDirectory(filters = {}) {
   const { token } = useAuth();
   const { success, error: toastError } = useNotification();
   const [owners, setOwners] = useState([]);
@@ -33,6 +33,12 @@ export function useOwnerDirectory() {
         if (search.trim()) {
           params.search = search.trim();
         }
+        if (filters.startDate) {
+          params.start_date = filters.startDate;
+        }
+        if (filters.endDate) {
+          params.end_date = filters.endDate;
+        }
 
         const data = await ownerService.getOwnerDirectory(token, params);
         setOwners(data.items || data);
@@ -46,7 +52,7 @@ export function useOwnerDirectory() {
         setLoading(false);
       }
     },
-    [token]
+    [token, filters.startDate, filters.endDate]
   );
 
   const handleSearchChange = useCallback(

@@ -37,6 +37,60 @@ export async function downloadBalanceReport(token, params = {}) {
   return res.data;
 }
 
+export async function downloadPaymentsReport(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/reports/payments`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
+export async function downloadExpensesReport(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/reports/expenses`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
+export async function downloadFeesReport(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/reports/fees`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
+export async function downloadFinesReport(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/reports/fines`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
+export async function downloadOwnersReport(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/reports/owners`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
+export async function downloadBuildingsReport(token, params = {}) {
+  const res = await axios.get(`${API_BASE}/api/v1/reports/buildings`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params,
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
 export async function getAdminMonthlyBalance(period, token) {
   const res = await axios.get(`${API_BASE}/api/v1/reports/monthly-balance`, {
     headers: { Authorization: `Bearer ${token}` },

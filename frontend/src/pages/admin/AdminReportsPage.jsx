@@ -19,12 +19,14 @@ import { useMonthlyBalance } from '../../hooks/useMonthlyBalance';
 import * as reportService from '../../services/reportService';
 import styles from './AdminReportsPage.module.css';
 
-const REPORTS = ['delinquency', 'income', 'balance'];
+const REPORTS = ['delinquency', 'income', 'balance', 'payments', 'expenses'];
 const CATEGORY_COLORS = ['#1155d9', '#b9c3de', '#81889e', '#121b2d', '#dfe3e8', '#6a7cc2'];
 const REPORT_LABELS = {
   delinquency: 'morosidad',
   income: 'ingresos',
   balance: 'balance',
+  payments: 'pagos',
+  expenses: 'gastos',
 };
 
 function triggerDownload(blob, filename) {
@@ -36,11 +38,10 @@ function triggerDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-function getQuarterRange() {
+function getCurrentMonthRange() {
   const now = new Date();
-  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
-  const start = new Date(now.getFullYear(), quarterStartMonth, 1);
-  const end = now;
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
@@ -66,8 +67,7 @@ function formatChange(value) {
 function getRangeLabel(startDate) {
   if (!startDate) return 'Resumen';
   const date = new Date(`${startDate}T00:00:00`);
-  const quarter = Math.floor(date.getMonth() / 3) + 1;
-  return `Resumen T${quarter} ${date.getFullYear()}`;
+  return new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(date);
 }
 
 function getRiskLabel(riskLevel) {
@@ -108,10 +108,10 @@ export default function AdminReportsPage() {
   const { token } = useAuth();
   const { building } = useOutletContext() || {};
   const buildingName = building?.name || 'Edificio Principal';
-  const initialRange = useMemo(() => getQuarterRange(), []);
+  const initialRange = useMemo(() => getCurrentMonthRange(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
   const [endDate, setEndDate] = useState(initialRange.endDate);
-  const [monthlyPeriod, setMonthlyPeriod] = useState(getCurrentMonthPeriod());
+  const monthlyPeriod = startDate ? startDate.slice(0, 7) : getCurrentMonthPeriod();
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingExport, setLoadingExport] = useState({});
@@ -151,6 +151,8 @@ export default function AdminReportsPage() {
         delinquency: () => reportService.downloadDelinquencyReport(token, { format }),
         income: () => reportService.downloadIncomeReport(token, params),
         balance: () => reportService.downloadBalanceReport(token, params),
+        payments: () => reportService.downloadPaymentsReport(token, params),
+        expenses: () => reportService.downloadExpensesReport(token, params),
       };
       for (const report of REPORTS) {
         const blob = await downloads[report]();
@@ -228,15 +230,6 @@ export default function AdminReportsPage() {
             <h2>Balance mensual del edificio</h2>
             <p>Vista contable consolidada para contrastar el mes actual contra el anterior.</p>
           </div>
-          <label className={styles.monthField}>
-            <span>Mes</span>
-            <input
-              type="month"
-              value={monthlyPeriod}
-              onChange={(event) => setMonthlyPeriod(event.target.value)}
-              aria-label="Mes"
-            />
-          </label>
         </div>
 
         {monthlyBalanceError ? <div className={styles.errorBanner}>{monthlyBalanceError}</div> : null}

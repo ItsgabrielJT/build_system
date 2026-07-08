@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import styles from './PeriodsHistoryTable.module.css';
 
 const MONTH_NAMES = [
@@ -71,7 +70,6 @@ export default function PeriodsHistoryTable({
   page = 1,
   pageSize = 10,
   onPageChange,
-  onFilterYear,
   onExport,
   onViewDetail,
   onViewChart,
@@ -81,44 +79,11 @@ export default function PeriodsHistoryTable({
   const endItem = Math.min(page * pageSize, total);
   const pageNumbers = getPageNumbers(page, totalPages);
 
-  const [filterYear, setFilterYear] = useState(null);
-  const [showYearMenu, setShowYearMenu] = useState(false);
-
-  const currentYear = new Date().getFullYear();
-  const yearOptions = [null, currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
-
-  const handleYearSelect = (y) => {
-    setFilterYear(y);
-    setShowYearMenu(false);
-    onFilterYear && onFilterYear(y);
-  };
-
   return (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Historial de Períodos</h2>
         <div className={styles.sectionActions}>
-          <div className={styles.yearFilterWrapper}>
-            <button
-              className={styles.btnOutline}
-              onClick={() => setShowYearMenu((v) => !v)}
-            >
-              ≡ {filterYear ? `Año ${filterYear}` : 'Filtrar Año'}
-            </button>
-            {showYearMenu && (
-              <div className={styles.yearMenu}>
-                {yearOptions.map((y) => (
-                  <button
-                    key={y ?? 'all'}
-                    className={`${styles.yearMenuItem} ${filterYear === y ? styles.yearMenuItemActive : ''}`}
-                    onClick={() => handleYearSelect(y)}
-                  >
-                    {y ? String(y) : 'Todos los años'}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
           <button className={styles.btnOutline} onClick={onExport}>
             ↓ Exportar Todo
           </button>
@@ -149,8 +114,8 @@ export default function PeriodsHistoryTable({
                 </tr>
               ) : (
                 data.map((row) => {
-                  const status = (row.estado || 'CERRADO').toUpperCase();
-                  const delinquencyPct = row.morosidad_pct ?? 0;
+                  const status = (row.estado || row.status || 'CERRADO').toUpperCase();
+                  const delinquencyPct = row.morosidad_pct ?? row.delinquency_rate ?? 0;
                   return (
                     <tr key={row.period} className={styles.tr}>
                       <td className={styles.td}>

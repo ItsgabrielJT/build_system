@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
@@ -21,6 +22,8 @@ async def list_fines(
     owner_id: Optional[UUID] = None,
     reason: Optional[str] = None,
     search: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     page: Optional[int] = None,
     page_size: Optional[int] = None,
     _user: dict = Depends(require_admin),
@@ -33,6 +36,8 @@ async def list_fines(
         owner_id=owner_id,
         reason=reason,
         search=search,
+        start_date=start_date,
+        end_date=end_date,
         page=page,
         page_size=page_size,
     )
@@ -45,6 +50,8 @@ async def fine_stats(
     owner_id: Optional[UUID] = None,
     reason: Optional[str] = None,
     search: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     _user: dict = Depends(require_admin),
     db=Depends(get_db),
 ):
@@ -55,6 +62,8 @@ async def fine_stats(
         owner_id=owner_id,
         reason=reason,
         search=search,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 

@@ -63,6 +63,14 @@ def _validate_month_period_or_400(period: Optional[str]) -> Optional[str]:
     return period
 
 
+def _validate_date_range_or_422(start_date: Optional[date], end_date: Optional[date]) -> None:
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="start_date no puede ser mayor que end_date",
+        )
+
+
 @router.get("/reports/delinquency")
 async def report_delinquency(
     format: str = "csv",
@@ -95,11 +103,7 @@ async def report_dashboard_stats(
     _user: dict = Depends(require_admin),
     db=Depends(get_db),
 ):
-    if start_date and end_date and start_date > end_date:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="start_date no puede ser mayor que end_date",
-        )
+    _validate_date_range_or_422(start_date, end_date)
 
     service = _get_report_service(db)
     return await service.dashboard_stats(start_date=start_date, end_date=end_date)
@@ -114,6 +118,7 @@ async def report_income(
     _user: dict = Depends(require_admin),
     db=Depends(get_db),
 ):
+    _validate_date_range_or_422(start_date, end_date)
     if format not in ("csv", "pdf", "excel"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -144,6 +149,7 @@ async def report_balance(
     _user: dict = Depends(require_admin),
     db=Depends(get_db),
 ):
+    _validate_date_range_or_422(start_date, end_date)
     if format not in ("csv", "pdf", "excel"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -163,6 +169,148 @@ async def report_balance(
     else:  # excel
         content = await service.balance_excel(period, start_date, end_date)
         return _excel_response(content, f"{filename_base}.xlsx")
+
+
+@router.get("/reports/payments")
+async def report_payments(
+    period: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    status_filter: Optional[str] = None,
+    format: str = "pdf",
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    _validate_date_range_or_422(start_date, end_date)
+    if format not in ("pdf", "excel"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Format debe ser: pdf o excel'
+        )
+
+    service = _get_report_service(db)
+    filename_base = f"reporte-pagos{'-' + period if period else ''}"
+    if format == "pdf":
+        content = await service.payments_pdf(period, start_date, end_date, status_filter)
+        return _pdf_response(content, f"{filename_base}.pdf")
+
+    content = await service.payments_excel(period, start_date, end_date, status_filter)
+    return _excel_response(content, f"{filename_base}.xlsx")
+
+
+@router.get("/reports/expenses")
+async def report_expenses(
+    period: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    format: str = "pdf",
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    _validate_date_range_or_422(start_date, end_date)
+    if format not in ("pdf", "excel"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Format debe ser: pdf o excel'
+        )
+
+    service = _get_report_service(db)
+    filename_base = f"reporte-gastos{'-' + period if period else ''}"
+    if format == "pdf":
+        content = await service.expenses_pdf(period, start_date, end_date)
+        return _pdf_response(content, f"{filename_base}.pdf")
+
+    content = await service.expenses_excel(period, start_date, end_date)
+    return _excel_response(content, f"{filename_base}.xlsx")
+
+
+@router.get("/reports/fees")
+async def report_fees(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    format: str = "pdf",
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    _validate_date_range_or_422(start_date, end_date)
+    if format not in ("pdf", "excel"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Format debe ser: pdf o excel')
+
+    service = _get_report_service(db)
+    if format == "pdf":
+        content = await service.fees_pdf(start_date, end_date)
+        return _pdf_response(content, "reporte-cuotas.pdf")
+
+    content = await service.fees_excel(start_date, end_date)
+    return _excel_response(content, "reporte-cuotas.xlsx")
+
+
+@router.get("/reports/fines")
+async def report_fines(
+    period: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    status_filter: Optional[str] = None,
+    reason: Optional[str] = None,
+    search: Optional[str] = None,
+    format: str = "pdf",
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    _validate_date_range_or_422(start_date, end_date)
+    if format not in ("pdf", "excel"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Format debe ser: pdf o excel')
+
+    service = _get_report_service(db)
+    if format == "pdf":
+        content = await service.fines_pdf(period, start_date, end_date, status_filter, reason, search)
+        return _pdf_response(content, "reporte-multas.pdf")
+
+    content = await service.fines_excel(period, start_date, end_date, status_filter, reason, search)
+    return _excel_response(content, "reporte-multas.xlsx")
+
+
+@router.get("/reports/owners")
+async def report_owners(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    status_filter: Optional[str] = None,
+    format: str = "pdf",
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    _validate_date_range_or_422(start_date, end_date)
+    if format not in ("pdf", "excel"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Format debe ser: pdf o excel')
+
+    service = _get_report_service(db)
+    if format == "pdf":
+        content = await service.owners_pdf(start_date, end_date, status_filter)
+        return _pdf_response(content, "reporte-propietarios.pdf")
+
+    content = await service.owners_excel(start_date, end_date, status_filter)
+    return _excel_response(content, "reporte-propietarios.xlsx")
+
+
+@router.get("/reports/buildings")
+async def report_buildings(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    format: str = "pdf",
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    _validate_date_range_or_422(start_date, end_date)
+    if format not in ("pdf", "excel"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Format debe ser: pdf o excel')
+
+    service = _get_report_service(db)
+    if format == "pdf":
+        content = await service.buildings_pdf(start_date, end_date)
+        return _pdf_response(content, "reporte-edificios.pdf")
+
+    content = await service.buildings_excel(start_date, end_date)
+    return _excel_response(content, "reporte-edificios.xlsx")
 
 
 @router.get("/reports/monthly-balance", response_model=MonthlyBalanceResponse)

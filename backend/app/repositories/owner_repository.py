@@ -124,6 +124,8 @@ class OwnerRepository:
         page: int = 1,
         per_page: int = 10,
         search: Optional[str] = None,
+        start_date=None,
+        end_date=None,
     ) -> tuple[list[dict], int]:
         """
         Get paginated owners directory with consolidated balance.
@@ -138,6 +140,14 @@ class OwnerRepository:
             conditions.append(f"(o.full_name ILIKE ${idx} OR o.email ILIKE ${idx + 1} OR o.phone ILIKE ${idx + 2})")
             params.extend([search_pattern, search_pattern, search_pattern])
             idx += 3
+        if start_date:
+            conditions.append(f"o.created_at::date >= ${idx}")
+            params.append(start_date)
+            idx += 1
+        if end_date:
+            conditions.append(f"o.created_at::date <= ${idx}")
+            params.append(end_date)
+            idx += 1
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -288,4 +298,3 @@ class OwnerRepository:
         query = "UPDATE owners SET firebase_uid = $1, updated_at = NOW() WHERE id = $2"
         await self._conn.execute(query, str(user_id), owner_id)
         return True
-

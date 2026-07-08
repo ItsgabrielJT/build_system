@@ -44,6 +44,8 @@ class OwnerService:
         page: int = 1,
         per_page: int = 10,
         search: Optional[str] = None,
+        start_date=None,
+        end_date=None,
     ) -> tuple[list[dict], int]:
         """Get paginated owners directory with balance."""
         if page < 1:
@@ -55,6 +57,8 @@ class OwnerService:
             page=page,
             per_page=per_page,
             search=search,
+            start_date=start_date,
+            end_date=end_date,
         )
 
     async def get_owner_detail(self, owner_id: UUID) -> dict | None:

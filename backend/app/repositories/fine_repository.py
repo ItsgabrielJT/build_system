@@ -19,6 +19,8 @@ class FineRepository:
         owner_id: Optional[UUID] = None,
         reason: Optional[str] = None,
         search: Optional[str] = None,
+        start_date=None,
+        end_date=None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> list[dict]:
@@ -49,6 +51,14 @@ class FineRepository:
                 f"OR LOWER(o.full_name) LIKE ${idx})"
             )
             params.append(f"%{search.lower()}%")
+            idx += 1
+        if start_date:
+            conditions.append(f"f.issued_at >= ${idx}")
+            params.append(start_date)
+            idx += 1
+        if end_date:
+            conditions.append(f"f.issued_at <= ${idx}")
+            params.append(end_date)
             idx += 1
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
@@ -81,6 +91,8 @@ class FineRepository:
         owner_id: Optional[UUID] = None,
         reason: Optional[str] = None,
         search: Optional[str] = None,
+        start_date=None,
+        end_date=None,
     ) -> int:
         conditions: list[str] = []
         params: list = []
@@ -109,6 +121,14 @@ class FineRepository:
                 f"OR LOWER(o.full_name) LIKE ${idx})"
             )
             params.append(f"%{search.lower()}%")
+            idx += 1
+        if start_date:
+            conditions.append(f"f.issued_at >= ${idx}")
+            params.append(start_date)
+            idx += 1
+        if end_date:
+            conditions.append(f"f.issued_at <= ${idx}")
+            params.append(end_date)
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         query = f"""
@@ -127,6 +147,8 @@ class FineRepository:
         owner_id: Optional[UUID] = None,
         reason: Optional[str] = None,
         search: Optional[str] = None,
+        start_date=None,
+        end_date=None,
     ) -> dict:
         conditions: list[str] = []
         params: list = []
@@ -155,6 +177,14 @@ class FineRepository:
                 f"OR LOWER(o.full_name) LIKE ${idx})"
             )
             params.append(f"%{search.lower()}%")
+            idx += 1
+        if start_date:
+            conditions.append(f"f.issued_at >= ${idx}")
+            params.append(start_date)
+            idx += 1
+        if end_date:
+            conditions.append(f"f.issued_at <= ${idx}")
+            params.append(end_date)
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         totals = await self._conn.fetchrow(

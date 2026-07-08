@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 from uuid import UUID
 
@@ -29,6 +30,8 @@ async def get_owners_directory(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
     search: Optional[str] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
     _user: dict = Depends(require_admin),
     db=Depends(get_db),
 ):
@@ -38,6 +41,8 @@ async def get_owners_directory(
         page=page,
         per_page=per_page,
         search=search,
+        start_date=start_date,
+        end_date=end_date,
     )
 
     total_pages = (total + per_page - 1) // per_page

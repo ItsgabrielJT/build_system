@@ -21,6 +21,8 @@ class FineService:
         owner_id=None,
         reason=None,
         search=None,
+        start_date=None,
+        end_date=None,
         page: int | None = None,
         page_size: int | None = None,
     ):
@@ -31,6 +33,8 @@ class FineService:
                 owner_id=owner_id,
                 reason=reason,
                 search=search,
+                start_date=start_date,
+                end_date=end_date,
             )
 
         safe_page = max(page, 1)
@@ -42,6 +46,8 @@ class FineService:
             owner_id=owner_id,
             reason=reason,
             search=search,
+            start_date=start_date,
+            end_date=end_date,
             limit=safe_page_size,
             offset=offset,
         )
@@ -51,6 +57,8 @@ class FineService:
             owner_id=owner_id,
             reason=reason,
             search=search,
+            start_date=start_date,
+            end_date=end_date,
         )
         return {
             "items": items,
@@ -67,6 +75,8 @@ class FineService:
         owner_id=None,
         reason=None,
         search=None,
+        start_date=None,
+        end_date=None,
     ) -> dict:
         return await self._repo.get_stats(
             period=period,
@@ -74,6 +84,8 @@ class FineService:
             owner_id=owner_id,
             reason=reason,
             search=search,
+            start_date=start_date,
+            end_date=end_date,
         )
 
     async def create(self, data: FineCreate, created_by: str) -> dict:

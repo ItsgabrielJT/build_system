@@ -18,6 +18,7 @@ import FormModal from '../../components/FormModal/FormModal';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../context/NotificationContext';
 import { downloadOwnersReport } from '../../services/reportService';
+import { exportAccountStatement, exportExpenseCertificate } from '../../services/accountStatementService';
 import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './OwnersDirectoryPage.module.css';
 
@@ -77,6 +78,8 @@ export default function OwnersDirectoryPage() {
 
   const [ownerFilter, setOwnerFilter] = useState('TODOS');
   const [exportingReport, setExportingReport] = useState(null);
+  const [exportingCertificateId, setExportingCertificateId] = useState(null);
+  const [exportingStatementId, setExportingStatementId] = useState(null);
 
   const visibleOwners = useMemo(() => {
     switch (ownerFilter) {
@@ -132,6 +135,32 @@ export default function OwnersDirectoryPage() {
       toastError(err.response?.data?.detail || 'Error al descargar el reporte de propietarios');
     } finally {
       setExportingReport(null);
+    }
+  };
+
+  const handleDownloadCertificate = async (owner) => {
+    setExportingCertificateId(owner.id);
+    try {
+      const blob = await exportExpenseCertificate(token, { owner_id: owner.id });
+      triggerDownload(blob, `certificado-expensas-${owner.document_id || owner.id}.pdf`);
+      success('Certificado de expensas descargado');
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al descargar el certificado de expensas');
+    } finally {
+      setExportingCertificateId(null);
+    }
+  };
+
+  const handleDownloadStatement = async (owner) => {
+    setExportingStatementId(owner.id);
+    try {
+      const blob = await exportAccountStatement(token, 'pdf', { owner_id: owner.id });
+      triggerDownload(blob, `estado-cuenta-${owner.document_id || owner.id}.pdf`);
+      success('Estado de cuenta descargado');
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al descargar el estado de cuenta');
+    } finally {
+      setExportingStatementId(null);
     }
   };
 
@@ -259,6 +288,10 @@ export default function OwnersDirectoryPage() {
         onSearchChange={onSearchChange}
         onPageChange={onPageChange}
         onSelectOwner={onSelectOwner}
+        onDownloadCertificate={handleDownloadCertificate}
+        onDownloadStatement={handleDownloadStatement}
+        exportingCertificateId={exportingCertificateId}
+        exportingStatementId={exportingStatementId}
       />
       </section>
 

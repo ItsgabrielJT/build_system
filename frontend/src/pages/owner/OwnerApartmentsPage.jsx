@@ -1,14 +1,57 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useApartments } from '../../hooks/useApartments';
+import { useAuth } from '../../hooks/useAuth';
+import { useNotification } from '../../context/NotificationContext';
 import DelinquencyBadge from '../../components/DelinquencyBadge/DelinquencyBadge';
+import DownloadIcon from '../../components/icons/DownloadIcon';
+import { exportAccountStatement, exportExpenseCertificate } from '../../services/accountStatementService';
 import styles from './OwnerApartmentsPage.module.css';
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function OwnerApartmentsPage() {
   const { apartments, loading, error, fetchApartments } = useApartments();
+  const { token } = useAuth();
+  const { success, error: toastError } = useNotification();
+  const [downloadingCertificate, setDownloadingCertificate] = useState(false);
+  const [downloadingStatement, setDownloadingStatement] = useState(false);
 
   useEffect(() => {
     fetchApartments();
   }, [fetchApartments]);
+
+  const handleDownloadCertificate = async () => {
+    setDownloadingCertificate(true);
+    try {
+      const blob = await exportExpenseCertificate(token);
+      triggerDownload(blob, 'certificado-expensas.pdf');
+      success('Certificado de expensas descargado');
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'No se pudo descargar el certificado.');
+    } finally {
+      setDownloadingCertificate(false);
+    }
+  };
+
+  const handleDownloadStatement = async () => {
+    setDownloadingStatement(true);
+    try {
+      const blob = await exportAccountStatement(token, 'pdf');
+      triggerDownload(blob, 'estado-cuenta.pdf');
+      success('Estado de cuenta descargado');
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'No se pudo descargar el estado de cuenta.');
+    } finally {
+      setDownloadingStatement(false);
+    }
+  };
 
   if (loading) return <p className={styles.loading}>Cargando departamentos...</p>;
 
@@ -16,6 +59,26 @@ export default function OwnerApartmentsPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Mis Departamentos</h1>
+        <div className={styles.actions}>
+          <button
+            className={styles.pdfButton}
+            type="button"
+            onClick={handleDownloadStatement}
+            disabled={downloadingStatement || !apartments.length}
+          >
+            <DownloadIcon />
+            {downloadingStatement ? 'Generando...' : 'Estado de cuenta'}
+          </button>
+          <button
+            className={styles.pdfButton}
+            type="button"
+            onClick={handleDownloadCertificate}
+            disabled={downloadingCertificate || !apartments.length}
+          >
+            <DownloadIcon />
+            {downloadingCertificate ? 'Generando...' : 'Certificado de expensas'}
+          </button>
+        </div>
       </div>
 
       {error && <div className={styles.errorBanner}>{error}</div>}

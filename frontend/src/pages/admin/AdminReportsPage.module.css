@@ -34,7 +34,8 @@
   justify-content: flex-end;
 }
 
-.dateField {
+.dateField,
+.selectField {
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -44,7 +45,8 @@
   text-transform: uppercase;
 }
 
-.dateField input {
+.dateField input,
+.selectField select {
   height: 40px;
   min-width: 136px;
   border: 1px solid #dfe2e8;
@@ -52,6 +54,10 @@
   padding: 0 12px;
   color: #1f2430;
   background: #fff;
+}
+
+.selectField select {
+  min-width: 190px;
 }
 
 .btnPdf,
@@ -432,8 +438,10 @@
 
   .actions,
   .dateField,
+  .selectField,
   .monthField,
   .dateField input,
+  .selectField select,
   .monthField input,
   .btnPdf,
   .btnExcel {

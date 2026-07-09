@@ -11,6 +11,7 @@
  */
 
 import ContactCopy from '../ContactCopy/ContactCopy';
+import DownloadIcon from '../icons/DownloadIcon';
 import styles from './OwnerDirectoryTable.module.css';
 
 export default function OwnerDirectoryTable({
@@ -23,6 +24,10 @@ export default function OwnerDirectoryTable({
   onSearchChange,
   onPageChange,
   onSelectOwner,
+  onDownloadCertificate,
+  onDownloadStatement,
+  exportingCertificateId,
+  exportingStatementId,
 }) {
   const formatDate = (dateString) => {
     if (!dateString) return '—';
@@ -171,6 +176,28 @@ export default function OwnerDirectoryTable({
                         >
                           Ver
                         </button>
+                        {onDownloadCertificate && (
+                          <button
+                            className={styles.actionButton}
+                            onClick={() => onDownloadCertificate(owner)}
+                            disabled={exportingCertificateId === owner.id}
+                            title="Descargar certificado de expensas"
+                          >
+                            <DownloadIcon />
+                            {exportingCertificateId === owner.id ? 'Generando' : 'Certificado'}
+                          </button>
+                        )}
+                        {onDownloadStatement && (
+                          <button
+                            className={styles.actionButton}
+                            onClick={() => onDownloadStatement(owner)}
+                            disabled={exportingStatementId === owner.id}
+                            title="Descargar estado de cuenta"
+                          >
+                            <DownloadIcon />
+                            {exportingStatementId === owner.id ? 'Generando' : 'Estado cuenta'}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

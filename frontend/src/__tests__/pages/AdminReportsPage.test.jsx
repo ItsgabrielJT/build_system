@@ -73,6 +73,8 @@ describe('AdminReportsPage', () => {
     reportService.downloadDelinquencyReport.mockResolvedValue(new Blob(['delinquency']));
     reportService.downloadIncomeReport.mockResolvedValue(new Blob(['income']));
     reportService.downloadBalanceReport.mockResolvedValue(new Blob(['balance']));
+    reportService.downloadPaymentsReport.mockResolvedValue(new Blob(['payments']));
+    reportService.downloadExpensesReport.mockResolvedValue(new Blob(['expenses']));
     global.URL.createObjectURL = vi.fn(() => 'blob:test');
     global.URL.revokeObjectURL = vi.fn();
   });
@@ -81,8 +83,9 @@ describe('AdminReportsPage', () => {
     render(<AdminReportsPage />);
 
     expect(screen.getByRole('heading', { name: /Reportes financieros/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Exportar PDF/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Exportar Excel/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Descargar PDF/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Descargar Excel/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Reporte')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('$124.500')).toBeInTheDocument();
@@ -113,47 +116,20 @@ describe('AdminReportsPage', () => {
     });
   });
 
-  it('exporta todos los reportes en PDF', async () => {
+  it('exporta solo el reporte seleccionado en PDF', async () => {
     const user = userEvent.setup();
     render(<AdminReportsPage />);
 
-    await user.click(screen.getByRole('button', { name: /Exportar PDF/i }));
+    await user.selectOptions(screen.getByLabelText('Reporte'), 'balance');
+    await user.click(screen.getByRole('button', { name: /Descargar PDF/i }));
 
     await waitFor(() => {
-      expect(reportService.downloadDelinquencyReport).toHaveBeenCalledWith(
-        'test-token',
-        { format: 'pdf' }
-      );
-      expect(reportService.downloadIncomeReport).toHaveBeenCalledWith(
-        'test-token',
-        expect.objectContaining({ format: 'pdf' })
-      );
       expect(reportService.downloadBalanceReport).toHaveBeenCalledWith(
         'test-token',
         expect.objectContaining({ format: 'pdf' })
       );
-    });
-  });
-
-  it('exporta todos los reportes en Excel', async () => {
-    const user = userEvent.setup();
-    render(<AdminReportsPage />);
-
-    await user.click(screen.getByRole('button', { name: /Exportar Excel/i }));
-
-    await waitFor(() => {
-      expect(reportService.downloadDelinquencyReport).toHaveBeenCalledWith(
-        'test-token',
-        { format: 'excel' }
-      );
-      expect(reportService.downloadIncomeReport).toHaveBeenCalledWith(
-        'test-token',
-        expect.objectContaining({ format: 'excel' })
-      );
-      expect(reportService.downloadBalanceReport).toHaveBeenCalledWith(
-        'test-token',
-        expect.objectContaining({ format: 'excel' })
-      );
+      expect(reportService.downloadIncomeReport).not.toHaveBeenCalled();
+      expect(reportService.downloadDelinquencyReport).not.toHaveBeenCalled();
     });
   });
 
@@ -178,10 +154,11 @@ describe('AdminReportsPage', () => {
 
     render(<AdminReportsPage />);
 
-    await user.click(screen.getByRole('button', { name: /Exportar PDF/i }));
+    await user.selectOptions(screen.getByLabelText('Reporte'), 'delinquency');
+    await user.click(screen.getByRole('button', { name: /Descargar PDF/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Error al generar la descarga/i)).toBeInTheDocument();
+      expect(screen.getByText(/Network error/i)).toBeInTheDocument();
     });
   });
 });

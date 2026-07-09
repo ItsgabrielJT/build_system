@@ -21,6 +21,41 @@ async def get_default_building_config(conn: Any) -> dict:
     return dict(row) if row else {}
 
 
+def get_building_name(building: dict | None) -> str:
+    building = building or {}
+    return building.get("name") or "Edificio Torres Netanya"
+
+
+def get_building_logo(building: dict | None, *, max_width: float, max_height: float):
+    building = building or {}
+    logo_path = building.get("logo_storage_path")
+    if not logo_path:
+        return ""
+
+    path = Path(logo_path)
+    if not path.exists():
+        return ""
+
+    logo = Image(str(path))
+    ratio = min(max_width / logo.imageWidth, max_height / logo.imageHeight)
+    logo.drawWidth = logo.imageWidth * ratio
+    logo.drawHeight = logo.imageHeight * ratio
+    return logo
+
+
+def get_building_contact_lines(building: dict | None) -> list[str]:
+    building = building or {}
+    return [
+        value
+        for value in [
+            building.get("address"),
+            building.get("phone"),
+            building.get("email"),
+        ]
+        if value
+    ]
+
+
 def build_pdf_brand_header(
     title: str,
     subtitle: str,
@@ -29,18 +64,8 @@ def build_pdf_brand_header(
     width: float,
 ) -> list:
     building = building or {}
-    building_name = building.get("name") or "Administracion del edificio"
-    logo_path = building.get("logo_storage_path")
-
-    logo_cell = ""
-    if logo_path and Path(logo_path).exists():
-        logo = Image(logo_path)
-        max_width = 1.2 * inch
-        max_height = 0.75 * inch
-        ratio = min(max_width / logo.imageWidth, max_height / logo.imageHeight)
-        logo.drawWidth = logo.imageWidth * ratio
-        logo.drawHeight = logo.imageHeight * ratio
-        logo_cell = logo
+    building_name = get_building_name(building)
+    logo_cell = get_building_logo(building, max_width=1.2 * inch, max_height=0.75 * inch)
 
     text = Paragraph(
         (

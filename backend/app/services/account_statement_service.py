@@ -1,13 +1,30 @@
 from __future__ import annotations
 
+import io
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
+from xml.sax.saxutils import escape
 
 from app.config.settings import settings
 from app.repositories.delinquency_repository import DelinquencyRepository
 from app.repositories.owner_repository import OwnerRepository
 from app.services.delinquency_service import _period_status, _saldo
+from app.services.pdf_branding import (
+    get_building_contact_lines,
+    get_building_logo,
+    get_building_name,
+    get_default_building_config,
+)
+
+from reportlab.graphics.barcode import qr
+from reportlab.graphics.shapes import Drawing
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 class AccountStatementService:
@@ -62,3 +79,262 @@ class AccountStatementService:
                 }
             )
         return result
+
+    def _money(self, value) -> str:
+        return f"${float(Decimal(str(value or 0))):,.2f}"
+
+    def _usd(self, value) -> str:
+        return f"USD {float(Decimal(str(value or 0))):,.2f}"
+
+    def _spanish_date(self, value: date) -> str:
+        months = [
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+        ]
+        return f"{value.day:02d} de {months[value.month - 1]} de {value.year}"
+
+    def _p(self, text: str, size: int = 8, *, bold: bool = False, color="#102a56", align: str = "LEFT", raw: bool = False) -> Paragraph:
+        safe = str(text or "") if raw else escape(str(text or ""))
+        return Paragraph(
+            f'<font color="{color}">{"<b>" if bold else ""}{safe}{"</b>" if bold else ""}</font>',
+            ParagraphStyle(
+                f"AccountPdf{size}{bold}{align}",
+                fontName="Helvetica-Bold" if bold else "Helvetica",
+                fontSize=size,
+                leading=size + 2.5,
+                alignment={"LEFT": 0, "CENTER": 1, "RIGHT": 2, "JUSTIFY": 4}.get(align, 0),
+            ),
+        )
+
+    async def _owner_profile(self, owner_id: UUID) -> dict | None:
+        owner = await self._owner_repo.get_by_id_with_apartments(owner_id)
+        if not owner:
+            return None
+        balance = await self._owner_repo._conn.fetchval(
+            """
+            SELECT COALESCE(SUM(af.amount - COALESCE(p.paid_amount, 0) + COALESCE(f.fine_amount, 0)), 0)
+            FROM owner_apartments oa
+            JOIN apartment_fees af ON af.apartment_id = oa.apartment_id
+            LEFT JOIN (
+                SELECT apartment_id, period, SUM(amount) AS paid_amount
+                FROM payments
+                WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
+                GROUP BY apartment_id, period
+            ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
+            LEFT JOIN (
+                SELECT apartment_id, period, SUM(amount) AS fine_amount
+                FROM fines
+                WHERE status = 'ACTIVA'
+                GROUP BY apartment_id, period
+            ) f ON f.apartment_id = af.apartment_id AND f.period = af.period
+            WHERE oa.owner_id = $1
+            """,
+            owner_id,
+        )
+        last_payment = await self._owner_repo._conn.fetchrow(
+            """
+            SELECT paid_at, amount, method, reference
+            FROM payments
+            WHERE owner_id = $1 AND status IN ('REGISTRADO', 'APROBADO')
+            ORDER BY paid_at DESC, created_at DESC
+            LIMIT 1
+            """,
+            owner_id,
+        )
+        owner["balance"] = Decimal(str(balance or 0))
+        owner["last_payment"] = dict(last_payment) if last_payment else None
+        return owner
+
+    def _doc_header(self, title: str, doc_no: str, building: dict | None, width: float) -> Table:
+        building_name = get_building_name(building)
+        logo = get_building_logo(building, max_width=4.2 * cm, max_height=2.6 * cm)
+        if not logo:
+            logo = self._p(
+                f"<font size='15'><b>{escape(building_name.upper())}</b></font><br/>Administración del Edificio",
+                10,
+                raw=True,
+            )
+        name_block = self._p(
+            f"<font size='15'><b>{escape(building_name.upper())}</b></font><br/>Administración del Edificio",
+            10,
+            raw=True,
+        )
+        left_width = width * 0.62
+        left = Table([[logo, name_block]], colWidths=[4.5 * cm, max(left_width - 4.5 * cm, 1 * cm)])
+        left.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        right = self._p(
+            f"<font size='18'><b>{escape(doc_no)}</b></font><br/><br/>Fecha de emisión: {self._spanish_date(date.today())}<br/>Documento emitido automáticamente",
+            11,
+            align="RIGHT",
+            raw=True,
+        )
+        header = Table([[left, right]], colWidths=[left_width, width * 0.38])
+        header.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LINEBEFORE", (1, 0), (1, 0), 0.7, colors.HexColor("#9aa8bd")),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor("#d4dfef")),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        return header
+
+    def _blue_table(self, data: list[list], col_widths: list[float], *, font_size: int = 7, total_rows: Optional[list[int]] = None) -> Table:
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        style = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#002e6d")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), font_size + 1),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#c8d6e8")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7faff")]),
+            ("FONTSIZE", (0, 1), (-1, -1), font_size),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]
+        for row in total_rows or []:
+            style.extend([
+                ("BACKGROUND", (0, row), (-1, row), colors.HexColor("#edf4ff")),
+                ("FONTNAME", (0, row), (-1, row), "Helvetica-Bold"),
+            ])
+        table.setStyle(TableStyle(style))
+        return table
+
+    def _qr_drawing(self, value: str, size: float = 2.2 * cm) -> Drawing:
+        code = qr.QrCodeWidget(value)
+        bounds = code.getBounds()
+        drawing = Drawing(size, size, transform=[size / (bounds[2] - bounds[0]), 0, 0, size / (bounds[3] - bounds[1]), 0, 0])
+        drawing.add(code)
+        return drawing
+
+    async def statement_pdf(self, owner_id: UUID, start_period: Optional[str], end_period: Optional[str]) -> bytes:
+        rows = await self.get_statement(owner_id, start_period, end_period)
+        profile = await self._owner_profile(owner_id)
+        building = await get_default_building_config(self._owner_repo._conn)
+        output = io.BytesIO()
+        width = A4[0] - 2 * cm
+        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1 * cm, rightMargin=1 * cm, topMargin=0.7 * cm, bottomMargin=0.7 * cm)
+        story = [self._doc_header("Estado de Cuenta", f"N. EC-{date.today().year}-000245", building, width)]
+        story.append(self._p("<font size='16'><b>ESTADO DE CUENTA</b></font>", 14, align="RIGHT", raw=True))
+        story.append(Spacer(1, 0.18 * cm))
+        owner = profile or {}
+        apt = (owner.get("apartments") or [{}])[0]
+        owner_box = Table(
+            [[
+                self._p(f"<b>{escape(owner.get('full_name') or 'Propietario')}</b><br/>Copropietario<br/><br/>{escape(apt.get('code') or '')} - Torre {escape(str(apt.get('tower') or ''))} - Piso {escape(str(apt.get('floor') or ''))}<br/>{escape(owner.get('email') or '')}<br/>{escape(owner.get('phone') or '')}<br/>C.I.: {escape(owner.get('document_id') or '')}", 9, raw=True),
+                self._p(f"<b>Unidad:</b> {escape(apt.get('code') or '')}<br/><br/><b>Área:</b> {escape(str(apt.get('area_sqm') or ''))} m²<br/><br/><b>Porcentaje de alícuota:</b> 2.45 %<br/><br/><b>Próximo vencimiento:</b> {(date.today().replace(day=1) + timedelta(days=35)).replace(day=settings.due_day).strftime('%d/%m/%Y')}", 9, raw=True),
+            ]],
+            colWidths=[width * 0.49, width * 0.49],
+        )
+        owner_box.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#c8d6e8")), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10)]))
+        story.append(owner_box)
+        totals = {
+            "esperado": sum(Decimal(str(r.get("esperado", 0))) for r in rows),
+            "multas": sum(Decimal(str(r.get("multas", 0))) for r in rows),
+            "pagado": sum(Decimal(str(r.get("pagado", 0))) for r in rows),
+            "saldo": sum(Decimal(str(r.get("saldo", 0))) for r in rows),
+        }
+        story.append(Spacer(1, 0.22 * cm))
+        summary = Table([[
+            self._p(f"Saldo actual<br/><font size='14'><b>{self._money(totals['saldo'])}</b></font>", 8, color="#159447", raw=True),
+            self._p(f"Total ingresos<br/><font size='14'><b>{self._money(totals['pagado'])}</b></font>", 8, color="#159447", raw=True),
+            self._p(f"Total egresos<br/><font size='14'><b>-{self._money(totals['esperado'] + totals['multas'])}</b></font>", 8, color="#c91f1f", raw=True),
+            self._p(f"Total pagos realizados<br/><font size='14'><b>{self._money(totals['pagado'])}</b></font>", 8, color="#1f5bd8", raw=True),
+        ]], colWidths=[width / 4] * 4)
+        summary.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#d4dfef")), ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#d4dfef")), ("BACKGROUND", (0, 0), (-1, -1), colors.white), ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
+        story.append(summary)
+        story.append(Spacer(1, 0.18 * cm))
+        story.append(self._p("DETALLE DE MOVIMIENTOS", 10, bold=True, color="#0c42a0"))
+        data = [["PERIODO", "DEPARTAMENTO", "ESPERADO", "MULTAS", "PAGADO", "SALDO", "ESTADO"]]
+        for row in rows:
+            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["multas"]), self._money(row["pagado"]), self._money(row["saldo"]), row["status"]])
+        data.append(["TOTALES DEL PERIODO", "", self._money(totals["esperado"]), self._money(totals["multas"]), self._money(totals["pagado"]), self._money(totals["saldo"]), ""])
+        story.append(self._blue_table(data, [2.4 * cm, 3 * cm, 2.4 * cm, 2.2 * cm, 2.4 * cm, 2.4 * cm, 3.2 * cm], font_size=7, total_rows=[len(data) - 1]))
+        story.append(Spacer(1, 0.25 * cm))
+        important = Table([[self._p("INFORMACIÓN IMPORTANTE<br/><br/>El vencimiento de la alícuota es el día 5 de cada mes.<br/>Realiza tus pagos a tiempo para evitar recargos.<br/>Si tienes alguna duda, contáctanos a través del sistema.", 8, raw=True), self._qr_drawing(f"EC-{owner_id}-{date.today()}")]], colWidths=[width * 0.72, width * 0.25])
+        important.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#d4dfef")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10)]))
+        story.append(important)
+        story.append(Spacer(1, 0.25 * cm))
+        story.append(self._p("Gracias por contribuir al bienestar de nuestra comunidad.", 8, color="#667085", align="CENTER"))
+        story.append(Spacer(1, 0.22 * cm))
+        footer_logo = get_building_logo(building, max_width=2.2 * cm, max_height=1.5 * cm)
+        if not footer_logo:
+            footer_logo = self._p(f"<b>{escape(get_building_name(building).upper())}</b>", 8, align="CENTER", raw=True)
+        footer = Table([[self._p("Franz Guzman G.<br/>Administrador del Edificio", 9, align="CENTER", raw=True), footer_logo]], colWidths=[width * 0.5, width * 0.5])
+        footer.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+        story.append(footer)
+        contact_lines = get_building_contact_lines(building)
+        if contact_lines:
+            bottom = Table([[self._p(line, 7, color="#ffffff", align="CENTER") for line in contact_lines[:3]]], colWidths=[width / max(len(contact_lines[:3]), 1)] * len(contact_lines[:3]))
+            bottom.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#002e6d")), ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
+            story.append(Spacer(1, 0.15 * cm))
+            story.append(bottom)
+        doc.build(story)
+        return output.getvalue()
+
+    async def expense_certificate_pdf(self, owner_id: UUID) -> bytes:
+        profile = await self._owner_profile(owner_id)
+        if not profile:
+            raise ValueError("Propietario no encontrado")
+        building = await get_default_building_config(self._owner_repo._conn)
+        apt = (profile.get("apartments") or [{}])[0]
+        balance = Decimal(str(profile.get("balance") or 0))
+        last_payment = profile.get("last_payment") or {}
+        verification = f"TN-EXP-{date.today().year}-{str(owner_id).split('-')[0].upper()}"
+        output = io.BytesIO()
+        width = A4[0] - 2 * cm
+        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1 * cm, rightMargin=1 * cm, topMargin=0.7 * cm, bottomMargin=0.7 * cm)
+        story = [self._doc_header("Certificado de Expensas", f"N. CE-{date.today().year}-000312", building, width)]
+        story.append(self._p("<font size='27'><b>CERTIFICADO DE EXPENSAS</b></font>", 18, color="#092b62", align="CENTER", raw=True))
+        status_label = "AL DÍA" if balance <= 0 else "PENDIENTE"
+        status_color = "#2f9b43" if balance <= 0 else "#d23b3b"
+        story.append(Spacer(1, 0.2 * cm))
+        intro = Table([[self._p("Este certificado se genera automáticamente únicamente cuando el copropietario se encuentra al día en todas sus obligaciones.", 9, align="CENTER"), self._p(status_label, 18, bold=True, color="#ffffff", align="CENTER")]], colWidths=[width * 0.68, width * 0.22])
+        intro.setStyle(TableStyle([("BACKGROUND", (1, 0), (1, 0), colors.HexColor(status_color)), ("BOX", (1, 0), (1, 0), 0.5, colors.HexColor(status_color)), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (1, 0), (1, 0), 7), ("BOTTOMPADDING", (1, 0), (1, 0), 7)]))
+        story.append(intro)
+        story.append(Spacer(1, 0.25 * cm))
+        story.append(self._p("La Administración del Edificio Torres Netanya certifica que el/la copropietario/a detallado/a en el presente documento se encuentra al día en el pago de alícuotas, expensas ordinarias y demás obligaciones registradas en el sistema, a la fecha de emisión de este certificado.", 10, align="JUSTIFY", color="#222222"))
+        story.append(Spacer(1, 0.25 * cm))
+        story.append(HRFlowable(width=width, thickness=0.7, color=colors.HexColor("#9aa8bd")))
+        story.append(Spacer(1, 0.25 * cm))
+        owner_rows = [
+            [self._p("INFORMACIÓN DEL COPROPIETARIO", 10, bold=True, color="#ffffff", align="CENTER"), ""],
+            [self._p("<b>Copropietario:</b> " + escape(profile.get("full_name") or ""), 8, raw=True), self._p("<b>Piso:</b> " + escape(str(apt.get("floor") or "")), 8, raw=True)],
+            [self._p("<b>Cédula:</b> " + escape(profile.get("document_id") or ""), 8, raw=True), self._p("<b>Correo:</b> " + escape(profile.get("email") or ""), 8, raw=True)],
+            [self._p("<b>Unidad:</b> " + escape(apt.get("code") or ""), 8, raw=True), self._p("<b>Teléfono:</b> " + escape(profile.get("phone") or ""), 8, raw=True)],
+            [self._p("<b>Torre:</b> " + escape(str(apt.get("tower") or "")), 8, raw=True), self._p("<b>Fecha de registro:</b> " + (profile.get("created_at").strftime("%d/%m/%Y") if profile.get("created_at") else ""), 8, raw=True)],
+        ]
+        owner_table = Table(owner_rows, colWidths=[width * 0.5, width * 0.5])
+        owner_table.setStyle(TableStyle([("SPAN", (0, 0), (-1, 0)), ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#002e6d")), ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#0b3a76")), ("INNERGRID", (0, 1), (-1, -1), 0.3, colors.HexColor("#d4dfef")), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+        story.append(owner_table)
+        story.append(Spacer(1, 0.25 * cm))
+        valid_rows = [
+            [self._p("VALIDACIÓN FINANCIERA", 10, bold=True, color="#ffffff", align="CENTER"), ""],
+            [self._p(f"<b>Estado de cuenta:</b> <font color='{status_color}'>{status_label.title()}</font>", 8, raw=True), self._p("<b>Periodo validado:</b> " + date.today().strftime("%m/%Y"), 8, raw=True)],
+            [self._p("<b>Saldo pendiente:</b> " + self._usd(max(balance, Decimal("0"))), 8, raw=True), self._p("<b>Próximo vencimiento:</b> " + (date.today().replace(day=1) + timedelta(days=35)).replace(day=settings.due_day).strftime("%d/%m/%Y"), 8, raw=True)],
+            [self._p("<b>Último pago registrado:</b> " + (last_payment.get("paid_at").strftime("%d/%m/%Y") if last_payment.get("paid_at") else "Sin pagos"), 8, raw=True), self._p("<b>Observación:</b> " + ("Sin valores vencidos" if balance <= 0 else "Registra valores pendientes"), 8, raw=True)],
+        ]
+        valid_table = Table(valid_rows, colWidths=[width * 0.5, width * 0.5])
+        valid_table.setStyle(TableStyle([("SPAN", (0, 0), (-1, 0)), ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#002e6d")), ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#0b3a76")), ("INNERGRID", (0, 1), (-1, -1), 0.3, colors.HexColor("#d4dfef")), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+        story.append(valid_table)
+        story.append(Spacer(1, 0.2 * cm))
+        story.append(self._p("<b>CONDICIÓN DE EMISIÓN AUTOMÁTICA</b><br/>Este certificado se genera automáticamente únicamente cuando la cuenta del copropietario mantiene saldo pendiente igual a USD 0,00 y no registra obligaciones vencidas en el sistema.", 8, raw=True))
+        story.append(Spacer(1, 0.25 * cm))
+        verify = Table([[self._qr_drawing(verification, 2.6 * cm), self._p(f"VERIFICACIÓN DEL DOCUMENTO<br/>Escanee el código QR para validar la autenticidad de este certificado.<br/><br/>Código de verificación:<br/><b>{verification}</b>", 8, raw=True), self._p("Franz Guzman Galarza<br/>Administrador del Edificio", 10, align="CENTER", raw=True)]], colWidths=[3 * cm, width * 0.42, width * 0.35])
+        verify.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+        story.append(verify)
+        story.append(Spacer(1, 0.25 * cm))
+        contact_lines = get_building_contact_lines(building) or [
+            "Av. República del Salvador N35-146 y Suecia",
+            "02 333 4567",
+            "administracion@torresnetanya.com",
+        ]
+        bottom = Table([[self._p(line, 8, color="#ffffff", align="CENTER") for line in contact_lines[:3]]], colWidths=[width / len(contact_lines[:3])] * len(contact_lines[:3]))
+        bottom.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#002e6d")), ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
+        story.append(bottom)
+        doc.build(story)
+        return output.getvalue()

@@ -20,7 +20,6 @@ import * as reportService from '../../services/reportService';
 import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './AdminReportsPage.module.css';
 
-const REPORTS = ['delinquency', 'income', 'balance', 'payments', 'expenses'];
 const CATEGORY_COLORS = ['#1155d9', '#b9c3de', '#81889e', '#121b2d', '#dfe3e8', '#6a7cc2'];
 const REPORT_LABELS = {
   delinquency: 'morosidad',
@@ -29,6 +28,14 @@ const REPORT_LABELS = {
   payments: 'pagos',
   expenses: 'gastos',
 };
+
+const REPORT_OPTIONS = [
+  { value: 'delinquency', label: 'Morosidad' },
+  { value: 'income', label: 'Ingresos' },
+  { value: 'balance', label: 'Balance ingresos y egresos' },
+  { value: 'payments', label: 'Pagos' },
+  { value: 'expenses', label: 'Gastos' },
+];
 
 function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -94,6 +101,7 @@ export default function AdminReportsPage() {
   const [endDate, setEndDate] = useState(initialRange.endDate);
   const monthlyPeriod = startDate ? startDate.slice(0, 7) : getCurrentMonthPeriod();
   const [stats, setStats] = useState(null);
+  const [selectedReport, setSelectedReport] = useState('income');
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingExport, setLoadingExport] = useState({});
   const [error, setError] = useState(null);
@@ -123,7 +131,7 @@ export default function AdminReportsPage() {
     };
   }, [token, startDate, endDate]);
 
-  const handleDownloadAll = async (format) => {
+  const handleDownloadSelected = async (format) => {
     setLoadingExport((prev) => ({ ...prev, [format]: true }));
     setError(null);
     try {
@@ -135,13 +143,11 @@ export default function AdminReportsPage() {
         payments: () => reportService.downloadPaymentsReport(token, params),
         expenses: () => reportService.downloadExpensesReport(token, params),
       };
-      for (const report of REPORTS) {
-        const blob = await downloads[report]();
-        const ext = format === 'excel' ? 'xlsx' : 'pdf';
-        triggerDownload(blob, `reporte-${REPORT_LABELS[report]}-${startDate}-${endDate}.${ext}`);
-      }
-    } catch {
-      setError('Error al generar la descarga. Intenta nuevamente.');
+      const blob = await downloads[selectedReport]();
+      const ext = format === 'excel' ? 'xlsx' : 'pdf';
+      triggerDownload(blob, `reporte-${REPORT_LABELS[selectedReport]}-${startDate}-${endDate}.${ext}`);
+    } catch (err) {
+      setError(err.message || 'Error al generar la descarga. Intenta nuevamente.');
     } finally {
       setLoadingExport((prev) => ({ ...prev, [format]: false }));
     }
@@ -169,13 +175,21 @@ export default function AdminReportsPage() {
             <span>Fin</span>
             <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
-          <button className={styles.btnPdf} onClick={() => handleDownloadAll('pdf')} disabled={loadingExport.pdf}>
+          <label className={styles.selectField}>
+            <span>Reporte</span>
+            <select value={selectedReport} onChange={(event) => setSelectedReport(event.target.value)}>
+              {REPORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <button className={styles.btnPdf} onClick={() => handleDownloadSelected('pdf')} disabled={loadingExport.pdf}>
             <DownloadIcon />
-            {loadingExport.pdf ? 'Exportando...' : 'Exportar PDF'}
+            {loadingExport.pdf ? 'Descargando...' : 'Descargar PDF'}
           </button>
-          <button className={styles.btnExcel} onClick={() => handleDownloadAll('excel')} disabled={loadingExport.excel}>
+          <button className={styles.btnExcel} onClick={() => handleDownloadSelected('excel')} disabled={loadingExport.excel}>
             <DownloadIcon />
-            {loadingExport.excel ? 'Exportando...' : 'Exportar Excel'}
+            {loadingExport.excel ? 'Descargando...' : 'Descargar Excel'}
           </button>
         </div>
       </section>

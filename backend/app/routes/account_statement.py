@@ -11,7 +11,6 @@ from app.config.database import get_db
 from app.repositories.delinquency_repository import DelinquencyRepository
 from app.repositories.owner_repository import OwnerRepository
 from app.services.account_statement_service import AccountStatementService
-from app.services.pdf_branding import build_pdf_brand_header, get_default_building_config
 
 router = APIRouter(tags=["account-statement"])
 
@@ -94,58 +93,7 @@ async def export_account_statement(
         filename = "estado-cuenta.xlsx"
 
     elif format == "pdf":
-        import io
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib import colors
-        from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-
-        output = io.BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=landscape(A4), leftMargin=1.5 * cm, rightMargin=1.5 * cm, topMargin=2 * cm, bottomMargin=2 * cm)
-        elements = []
-        building = await get_default_building_config(db)
-
-        period_label = (
-            f"Periodo: {start_period} - {end_period}"
-            if start_period and end_period
-            else "Periodo: Todos"
-        )
-        elements.extend(
-            build_pdf_brand_header(
-                "Estado de Cuenta",
-                period_label,
-                building,
-                width=26.7 * cm,
-            )
-        )
-
-        table_data = [headers_row]
-        for row in rows:
-            table_data.append([
-                row["period"],
-                row["apartment_code"],
-                f"${row['esperado']:,.0f}",
-                f"${row['multas']:,.0f}",
-                f"${row['pagado']:,.0f}",
-                f"${row['saldo']:,.0f}",
-                row["status"],
-            ])
-
-        col_widths = [3 * cm, 4 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm]
-        t = Table(table_data, colWidths=col_widths, repeatRows=1)
-        t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123c7a")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
-            ("FONTSIZE", (0, 1), (-1, -1), 9),
-        ]))
-        elements.append(t)
-        doc.build(elements)
-        content = output.getvalue()
+        content = await service.statement_pdf(resolved_id, start_period, end_period)
         media_type = "application/pdf"
         filename = "estado-cuenta.pdf"
 
@@ -174,4 +122,28 @@ async def export_account_statement(
         content=content,
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/account-statement/expense-certificate")
+async def export_expense_certificate(
+    owner_id: Optional[UUID] = None,
+    user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    service = AccountStatementService(DelinquencyRepository(db), OwnerRepository(db))
+    resolved_id = await service.resolve_owner_id(user, owner_id)
+    if not resolved_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Propietario no encontrado para este usuario",
+        )
+    try:
+        content = await service.expense_certificate_pdf(resolved_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="certificado-expensas.pdf"'},
     )

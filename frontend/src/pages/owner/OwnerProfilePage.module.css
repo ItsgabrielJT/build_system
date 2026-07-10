@@ -36,12 +36,21 @@
 /* Grid Layout */
 .grid {
   display: grid;
-  grid-template-columns: 360px minmax(620px, 1fr) 390px;
+  grid-template-columns: 280px 1fr 340px;
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
 }
 
-@media (max-width: 1024px) {
+.columnLeft,
+.columnMiddle,
+.columnRight {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  height: 100%;
+}
+
+@media (max-width: 1200px) {
   .grid {
     grid-template-columns: 1fr;
   }
@@ -58,6 +67,7 @@
   align-items: center;
   text-align: center;
   box-shadow: 0 10px 24px rgba(13, 39, 88, 0.07);
+  height: 100%;
 }
 
 .avatarContainer {
@@ -188,7 +198,7 @@
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
   box-shadow: 0 10px 24px rgba(13, 39, 88, 0.07);
   overflow: hidden;
 }
@@ -236,6 +246,18 @@
 
 .cardBodyNoPadding {
   padding: 0;
+}
+
+.cardsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .cardsRow {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Forms Elements */
@@ -460,7 +482,7 @@
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 1.25rem;
 }
@@ -554,37 +576,35 @@
   background-color: #0b2a59;
 }
 
-/* Sticky Bottom Bar */
-.bottomBar {
-  background: #ffffff;
-  border-top: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: flex-end;
-  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.03);
-}
-
-.saveChangesBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.5rem;
-  background-color: #123c7a;
+/* Save Changes Button inside columnRight */
+.saveChangesBtnColumn {
+  width: 100%;
+  height: 44px;
+  background-color: #0f2963;
   color: #ffffff;
   border: none;
   border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  margin-top: auto;
+  box-shadow: 0 4px 6px rgba(15, 41, 99, 0.15);
 }
 
-.saveChangesBtn:hover:not(:disabled) {
-  background-color: #0b2a59;
+.saveChangesBtnColumn:hover:not(:disabled) {
+  background-color: #0b1f4b;
+  box-shadow: 0 6px 12px rgba(15, 41, 99, 0.2);
 }
 
-.saveChangesBtn:disabled {
+.saveChangesBtnColumn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Modal Overlay styling */

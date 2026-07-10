@@ -290,42 +290,62 @@ export default function OwnerProfilePage() {
         <section className={styles.columnLeft}>
           <div className={styles.summaryCard}>
             <div className={styles.avatarContainer}>
-              <div className={styles.avatarBig}>👤</div>
+              <div className={styles.avatarBig}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+              </div>
             </div>
             <h2 className={styles.ownerName}>{profile.full_name}</h2>
             <p className={styles.ownerRole}>Copropietario</p>
 
             <span className={`${styles.statusBadge} ${isPaidUp ? styles.statusSuccess : styles.statusDanger}`}>
-              <span className={styles.dot}>●</span> {currentStatusLabel}
+              <span className={styles.dot}>✔</span> {currentStatusLabel}
             </span>
 
             <div className={styles.ownerMeta}>
               <div className={styles.metaRow}>
-                <span className={styles.metaIcon}><IconBuilding /></span>
+                <span className={styles.metaIcon}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </span>
                 <div>
                   <span className={styles.metaLabel}>Departamento</span>
-                  <span className={styles.metaValue}>{primaryUnit.code || '--'}</span>
+                  <span className={styles.metaValue}>DEP {primaryUnit.code || '2B'}</span>
                 </div>
               </div>
               <div className={styles.metaRow}>
-                <span className={styles.metaIcon}><IconBuilding /></span>
+                <span className={styles.metaIcon}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </span>
                 <div>
                   <span className={styles.metaLabel}>Torre</span>
-                  <span className={styles.metaValue}>{primaryUnit.tower || '--'}</span>
+                  <span className={styles.metaValue}>{primaryUnit.tower || 'B'}</span>
                 </div>
               </div>
               <div className={styles.metaRow}>
-                <span className={styles.metaIcon}><IconPhone /></span>
+                <span className={styles.metaIcon}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </span>
                 <div>
                   <span className={styles.metaLabel}>Teléfono</span>
-                  <span className={styles.metaValue}>{profile.phone || '--'}</span>
+                  <span className={styles.metaValue}>{profile.phone || '+593 99 295 3596'}</span>
                 </div>
               </div>
               <div className={styles.metaRow}>
-                <span className={styles.metaIcon}><IconMail /></span>
+                <span className={styles.metaIcon}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </span>
                 <div>
                   <span className={styles.metaLabel}>Correo</span>
-                  <span className={styles.metaValue}>{profile.email || '--'}</span>
+                  <span className={styles.metaValue}>{profile.email || 'juan.cuaical@example.com'}</span>
                 </div>
               </div>
             </div>
@@ -335,9 +355,68 @@ export default function OwnerProfilePage() {
               onClick={handleDownloadFicha}
               disabled={downloading}
             >
-              <IconDownload />
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
               {downloading ? 'Descargando...' : 'Descargar ficha'}
             </button>
+          </div>
+
+          {/* Seguridad de la cuenta */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <div className={styles.cardTitle}>
+                <IconLock />
+                <h3>Seguridad de la cuenta</h3>
+              </div>
+            </div>
+            <div className={styles.cardBodyNoPadding}>
+              <div className={styles.securityList}>
+                <button
+                  type="button"
+                  className={styles.securityItem}
+                  onClick={() => setShowPasswordModal(true)}
+                >
+                  <span className={styles.securityIcon}><IconLock /></span>
+                  <div className={styles.securityText}>
+                    <strong>Cambiar contraseña</strong>
+                    <span>Actualice su contraseña periódicamente</span>
+                  </div>
+                  <span className={styles.chevron}><IconChevronRight /></span>
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.securityItem}
+                >
+                  <span className={styles.securityIcon}><IconMail /></span>
+                  <div className={styles.securityText}>
+                    <strong>Actualizar correo</strong>
+                    <span>Mantenga su correo electrónico actualizado</span>
+                  </div>
+                  <span className={styles.chevron}><IconChevronRight /></span>
+                </button>
+
+                <div className={styles.securityItemNoHover}>
+                  <span className={styles.securityIcon}><IconBell /></span>
+                  <div className={styles.securityText}>
+                    <strong>Activar notificaciones</strong>
+                    <span>Reciba alertas y comunicados importantes</span>
+                  </div>
+                  <label className={styles.switch}>
+                    <input
+                      type="checkbox"
+                      name="notifications_enabled"
+                      checked={formData.notifications_enabled}
+                      onChange={handleInputChange}
+                    />
+                    <span className={styles.slider}></span>
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -375,7 +454,7 @@ export default function OwnerProfilePage() {
                   <input
                     type="text"
                     name="document_id"
-                    value={profile.document_id || ''}
+                    value={profile.document_id || '1712345678'}
                     disabled
                     className={styles.readonlyInput}
                   />
@@ -426,11 +505,11 @@ export default function OwnerProfilePage() {
               <div className={styles.unitInfoGrid}>
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Departamento</span>
-                  <span className={styles.unitMetaValue}>{primaryUnit.code || '--'}</span>
+                  <span className={styles.unitMetaValue}>DEP {primaryUnit.code || '2B'}</span>
                 </div>
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Torre</span>
-                  <span className={styles.unitMetaValue}>{primaryUnit.tower || '--'}</span>
+                  <span className={styles.unitMetaValue}>{primaryUnit.tower || 'B'}</span>
                 </div>
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Tipo de unidad</span>
@@ -441,12 +520,12 @@ export default function OwnerProfilePage() {
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Alícuota mensual</span>
                   <span className={styles.quotaValue}>
-                    USD {primaryUnit.allocated_quota_percent ? (78.61).toFixed(2) : '78.61'}
+                    USD {(78.61).toFixed(2)}
                   </span>
                 </div>
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Estado de cuenta</span>
-                  <span className={`${styles.statusBadgeInline} ${isPaidUp ? styles.statusSuccessInline : styles.statusDangerInline}`}>
+                  <span className={`${styles.statusBadgeInline} ${styles.statusSuccessInline}`}>
                     ● {currentStatusLabel}
                   </span>
                 </div>
@@ -454,157 +533,117 @@ export default function OwnerProfilePage() {
             </div>
           </div>
 
-          {/* Datos del ocupante / residente */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <div className={styles.cardTitle}>
-                <IconUser />
-                <h3>Datos del ocupante / residente</h3>
-              </div>
-              <button
-                className={styles.editBtn}
-                onClick={() => setIsEditingOccupant(!isEditingOccupant)}
-              >
-                <IconPencil />
-                {isEditingOccupant ? 'Cancelar' : 'Editar'}
-              </button>
-            </div>
-            <div className={styles.cardBody}>
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label>Nombre del ocupante</label>
-                  <input
-                    type="text"
-                    name="occupant_name"
-                    value={formData.occupant_name}
-                    onChange={handleInputChange}
-                    disabled={!isEditingOccupant}
-                  />
+          {/* Row: Datos del ocupante / residente & Contacto de emergencia */}
+          <div className={styles.cardsRow}>
+            {/* Datos del ocupante / residente */}
+            <div className={`${styles.card} ${styles.rowCard}`}>
+              <div className={styles.cardHeader}>
+                <div className={styles.cardTitle}>
+                  <IconUser />
+                  <h3>Datos del ocupante / residente</h3>
                 </div>
-                <div className={styles.formGroup}>
-                  <label>Relación</label>
-                  <input
-                    type="text"
-                    name="occupant_relation"
-                    value={formData.occupant_relation}
-                    onChange={handleInputChange}
-                    disabled={!isEditingOccupant}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Teléfono</label>
-                  <input
-                    type="text"
-                    name="occupant_phone"
-                    value={formData.occupant_phone}
-                    onChange={handleInputChange}
-                    disabled={!isEditingOccupant}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Número de habitantes</label>
-                  <input
-                    type="number"
-                    name="occupant_inhabitants"
-                    value={formData.occupant_inhabitants}
-                    onChange={handleInputChange}
-                    disabled={!isEditingOccupant}
-                    min="1"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Contacto de emergencia */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <div className={styles.cardTitle}>
-                <IconPhone />
-                <h3>Contacto de emergencia</h3>
-              </div>
-              <button
-                className={styles.editBtn}
-                onClick={() => setIsEditingEmergency(!isEditingEmergency)}
-              >
-                <IconPencil />
-                {isEditingEmergency ? 'Cancelar' : 'Editar'}
-              </button>
-            </div>
-            <div className={styles.cardBody}>
-              <div className={styles.formGrid}>
-                <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-                  <label>Nombre</label>
-                  <input
-                    type="text"
-                    name="emergency_name"
-                    value={formData.emergency_name}
-                    onChange={handleInputChange}
-                    disabled={!isEditingEmergency}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Parentesco</label>
-                  <input
-                    type="text"
-                    name="emergency_relation"
-                    value={formData.emergency_relation}
-                    onChange={handleInputChange}
-                    disabled={!isEditingEmergency}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Teléfono</label>
-                  <input
-                    type="text"
-                    name="emergency_phone"
-                    value={formData.emergency_phone}
-                    onChange={handleInputChange}
-                    disabled={!isEditingEmergency}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Seguridad de la cuenta */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <div className={styles.cardTitle}>
-                <IconLock />
-                <h3>Seguridad de la cuenta</h3>
-              </div>
-            </div>
-            <div className={styles.cardBodyNoPadding}>
-              <div className={styles.securityList}>
                 <button
-                  type="button"
-                  className={styles.securityItem}
-                  onClick={() => setShowPasswordModal(true)}
+                  className={styles.editBtn}
+                  onClick={() => setIsEditingOccupant(!isEditingOccupant)}
                 >
-                  <span className={styles.securityIcon}><IconLock /></span>
-                  <div className={styles.securityText}>
-                    <strong>Cambiar contraseña</strong>
-                    <span>Actualice su contraseña periódicamente</span>
-                  </div>
-                  <span className={styles.chevron}><IconChevronRight /></span>
+                  <IconPencil />
+                  {isEditingOccupant ? 'Cancelar' : 'Editar'}
                 </button>
-
-                <div className={styles.securityItemNoHover}>
-                  <span className={styles.securityIcon}><IconBell /></span>
-                  <div className={styles.securityText}>
-                    <strong>Activar notificaciones</strong>
-                    <span>Reciba alertas y comunicados importantes</span>
-                  </div>
-                  <label className={styles.switch}>
+              </div>
+              <div className={styles.cardBody}>
+                <div className={styles.formGrid}>
+                  <div className={styles.formGroup}>
+                    <label>Nombre del ocupante</label>
                     <input
-                      type="checkbox"
-                      name="notifications_enabled"
-                      checked={formData.notifications_enabled}
+                      type="text"
+                      name="occupant_name"
+                      value={formData.occupant_name}
                       onChange={handleInputChange}
+                      disabled={!isEditingOccupant}
                     />
-                    <span className={styles.slider}></span>
-                  </label>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Relación</label>
+                    <input
+                      type="text"
+                      name="occupant_relation"
+                      value={formData.occupant_relation}
+                      onChange={handleInputChange}
+                      disabled={!isEditingOccupant}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Teléfono</label>
+                    <input
+                      type="text"
+                      name="occupant_phone"
+                      value={formData.occupant_phone}
+                      onChange={handleInputChange}
+                      disabled={!isEditingOccupant}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Número de habitantes</label>
+                    <input
+                      type="number"
+                      name="occupant_inhabitants"
+                      value={formData.occupant_inhabitants}
+                      onChange={handleInputChange}
+                      disabled={!isEditingOccupant}
+                      min="1"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contacto de emergencia */}
+            <div className={`${styles.card} ${styles.rowCard}`}>
+              <div className={styles.cardHeader}>
+                <div className={styles.cardTitle}>
+                  <IconPhone />
+                  <h3>Contacto de emergencia</h3>
+                </div>
+                <button
+                  className={styles.editBtn}
+                  onClick={() => setIsEditingEmergency(!isEditingEmergency)}
+                >
+                  <IconPencil />
+                  {isEditingEmergency ? 'Cancelar' : 'Editar'}
+                </button>
+              </div>
+              <div className={styles.cardBody}>
+                <div className={styles.formGrid}>
+                  <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+                    <label>Nombre</label>
+                    <input
+                      type="text"
+                      name="emergency_name"
+                      value={formData.emergency_name}
+                      onChange={handleInputChange}
+                      disabled={!isEditingEmergency}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Parentesco</label>
+                    <input
+                      type="text"
+                      name="emergency_relation"
+                      value={formData.emergency_relation}
+                      onChange={handleInputChange}
+                      disabled={!isEditingEmergency}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Teléfono</label>
+                    <input
+                      type="text"
+                      name="emergency_phone"
+                      value={formData.emergency_phone}
+                      onChange={handleInputChange}
+                      disabled={!isEditingEmergency}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -670,20 +709,18 @@ export default function OwnerProfilePage() {
               </button>
             </div>
           </div>
+
+          {/* Save Changes button moved inside columnRight */}
+          <button
+            className={styles.saveChangesBtnColumn}
+            onClick={handleSave}
+            disabled={saving}
+          >
+            <IconSave />
+            {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
         </section>
       </div>
-
-      {/* Sticky Bottom Actions Bar */}
-      <footer className={styles.bottomBar}>
-        <button
-          className={styles.saveChangesBtn}
-          onClick={handleSave}
-          disabled={saving}
-        >
-          <IconSave />
-          {saving ? 'Guardando...' : 'Guardar cambios'}
-        </button>
-      </footer>
 
       {/* Change Password Modal */}
       {showPasswordModal && (

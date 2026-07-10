@@ -44,3 +44,34 @@ export async function getOwnerDirectory(token, params = {}) {
   });
   return res.data;
 }
+
+export async function getOwnerProfile(token) {
+  const res = await axios.get(`${API_BASE}/api/v1/owners/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export async function getOwnerProfileDetail(token) {
+  const res = await axios.get(`${API_BASE}/api/v1/owner/profile`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export async function updateOwnerProfileDetail(data, token) {
+  const res = await axios.put(`${API_BASE}/api/v1/owner/profile`, data, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export async function downloadOwnerFicha(token) {
+  const res = await axios.get(`${API_BASE}/api/v1/owner/ficha`, {
+    headers: { Authorization: `Bearer ${token}` },
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
+

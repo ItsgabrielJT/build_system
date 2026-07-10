@@ -68,7 +68,7 @@ export default function LoginPage() {
       navigate('/admin/reports', { replace: true });
     }
     if (role === 'PROPIETARIO') {
-      navigate('/owner/apartments', { replace: true });
+      navigate('/owner/inicio', { replace: true });
     }
   }, [navigate, role]);
 

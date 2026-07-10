@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from app.models.schemas import OwnerCreate, OwnerUpdate
+from app.models.schemas import OwnerCreate, OwnerUpdate, OwnerProfileUpdate
 from app.repositories.owner_repository import OwnerRepository
 
 
@@ -64,3 +64,13 @@ class OwnerService:
     async def get_owner_detail(self, owner_id: UUID) -> dict | None:
         """Get owner details with recent transactions."""
         return await self._repo.get_detail_with_transactions(owner_id)
+
+    async def get_profile_by_user_id(self, user_id: UUID) -> dict | None:
+        owner = await self._repo.get_by_user_id(user_id)
+        if not owner:
+            return None
+        return await self._repo.get_by_id_with_apartments(owner["id"])
+
+    async def update_profile(self, owner_id: UUID, data: OwnerProfileUpdate) -> dict | None:
+        return await self._repo.update_profile(owner_id, data)
+

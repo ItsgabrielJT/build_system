@@ -597,6 +597,15 @@ class OwnerUnitResponse(BaseModel):
     code: str
     tower: Optional[str] = None
     floor: Optional[int] = None
+    area_sqm: Optional[float] = None
+    allocated_quota_percent: Optional[float] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[float] = None
+    parking: Optional[str] = None
+    storage: Optional[str] = None
+    acquisition_date: Optional[date] = None
+    use_type: Optional[str] = None
+
 
 
 class OwnerDirectoryItemResponse(BaseModel):
@@ -668,3 +677,42 @@ class PeriodsSummaryResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class OwnerProfileResponse(BaseModel):
+    id: UUID
+    full_name: str
+    document_id: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    status: str
+    birth_date: Optional[date] = None
+    occupant_name: Optional[str] = None
+    occupant_relation: Optional[str] = None
+    occupant_phone: Optional[str] = None
+    occupant_inhabitants: Optional[int] = None
+    emergency_name: Optional[str] = None
+    emergency_relation: Optional[str] = None
+    emergency_phone: Optional[str] = None
+    notifications_enabled: bool = True
+    last_update_date: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    units: List[OwnerUnitResponse] = []
+
+
+class OwnerProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    document_id: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    birth_date: Optional[date] = None
+    occupant_name: Optional[str] = None
+    occupant_relation: Optional[str] = None
+    occupant_phone: Optional[str] = None
+    occupant_inhabitants: Optional[int] = None
+    emergency_name: Optional[str] = None
+    emergency_relation: Optional[str] = None
+    emergency_phone: Optional[str] = None
+    notifications_enabled: Optional[bool] = None
+

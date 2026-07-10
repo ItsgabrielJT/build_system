@@ -7,6 +7,19 @@ vi.mock('../../hooks/useMonthlyBalance', () => ({
   useMonthlyBalance: vi.fn(),
 }));
 
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ token: 'mock-token' }),
+}));
+
+vi.mock('../../context/NotificationContext', () => ({
+  useNotification: () => ({
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+  }),
+}));
+
 describe('OwnerMonthlyBalancePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();

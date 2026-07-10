@@ -4,9 +4,9 @@ from datetime import date
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 
-from app.auth.dependencies import get_current_user, require_admin
+from app.auth.dependencies import get_current_user, require_admin, require_owner
 from app.config.database import get_db
 from app.models.schemas import (
     OwnerCreate,
@@ -16,11 +16,35 @@ from app.models.schemas import (
     OwnerUpdate,
     OwnerUnitResponse,
     TransactionResponse,
+    OwnerProfileResponse,
+    OwnerProfileUpdate,
 )
 from app.repositories.owner_repository import OwnerRepository
 from app.services.owner_service import OwnerService
 
 router = APIRouter(tags=["owners"])
+
+
+@router.get("/owners/me")
+async def get_current_owner_profile(
+    user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Obtiene el detalle y balance consolidado del propietario actual autenticado."""
+    repo = OwnerRepository(db)
+    owner = await repo.get_by_user_id(user["user_id"])
+    if not owner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Propietario no encontrado para este usuario",
+        )
+    result = await repo.get_detail_with_transactions(owner["id"], limit_transactions=10)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Propietario no encontrado",
+        )
+    return result
 
 
 # ─── DASHBOARD ENDPOINTS (v1 API) ────────────────────────────────────────────
@@ -216,3 +240,97 @@ async def delete_owner(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Propietario no encontrado",
         )
+
+
+@router.get("/owner/profile", response_model=OwnerProfileResponse)
+async def get_owner_profile(
+    user: dict = Depends(require_owner),
+    db=Depends(get_db),
+):
+    service = OwnerService(OwnerRepository(db))
+    profile = await service.get_profile_by_user_id(user["user_id"])
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil de propietario no encontrado para este usuario",
+        )
+    profile["units"] = profile.get("apartments", [])
+    return profile
+
+
+@router.put("/owner/profile", response_model=OwnerProfileResponse)
+async def update_owner_profile(
+    body: OwnerProfileUpdate,
+    user: dict = Depends(require_owner),
+    db=Depends(get_db),
+):
+    service = OwnerService(OwnerRepository(db))
+    owner = await db.fetchrow(
+        "SELECT id FROM owners WHERE firebase_uid = $1 AND status = 'ACTIVO'",
+        str(user["user_id"]),
+    )
+    if not owner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil de propietario no encontrado para este usuario",
+        )
+    profile = await service.update_profile(owner["id"], body)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Error al actualizar el perfil",
+        )
+    profile["units"] = profile.get("apartments", [])
+    return profile
+
+
+@router.get("/owner/ficha")
+async def download_owner_ficha(
+    user: dict = Depends(require_owner),
+    db=Depends(get_db),
+):
+    from app.services.report_service import ReportService
+    from app.services.delinquency_service import DelinquencyService
+    from app.repositories.payment_repository import PaymentRepository
+    from app.repositories.expense_repository import ExpenseRepository
+    from app.repositories.delinquency_repository import DelinquencyRepository
+    
+    # 1. Resolve owner ID
+    owner = await db.fetchrow(
+        "SELECT id, full_name FROM owners WHERE firebase_uid = $1 AND status = 'ACTIVO'",
+        str(user["user_id"]),
+    )
+    if not owner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil de propietario no encontrado para este usuario",
+        )
+        
+    # 2. Build ReportService and generate PDF
+    delinquency_repo = DelinquencyRepository(db)
+    delinquency_service = DelinquencyService(delinquency_repo)
+    payment_repo = PaymentRepository(db)
+    expense_repo = ExpenseRepository(db)
+    
+    report_service = ReportService(
+        delinquency_service=delinquency_service,
+        payment_repo=payment_repo,
+        expense_repo=expense_repo,
+    )
+    
+    try:
+        pdf_bytes = await report_service.owner_ficha_pdf(owner["id"])
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar la ficha PDF: {str(e)}",
+        )
+        
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="ficha-{owner["full_name"].replace(" ", "_")}.pdf"'
+        },
+    )
+

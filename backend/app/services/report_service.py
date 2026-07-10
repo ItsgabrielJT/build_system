@@ -1466,3 +1466,563 @@ class ReportService:
         output = io.BytesIO()
         wb.save(output)
         return output.getvalue()
+
+    async def owner_ficha_pdf(self, owner_id: UUID) -> bytes:
+        # 1. Fetch data
+        conn = self._payment_repo._conn
+        owner = await conn.fetchrow("SELECT * FROM owners WHERE id = $1", owner_id)
+        if not owner:
+            raise ValueError("Propietario no encontrado")
+        owner = dict(owner)
+        
+        building = await get_default_building_config(conn)
+        
+        # Get first apartment
+        apt = await conn.fetchrow(
+            """
+            SELECT a.* FROM apartments a
+            JOIN owner_apartments oa ON a.id = oa.apartment_id
+            WHERE oa.owner_id = $1
+            ORDER BY oa.is_primary DESC, a.code
+            LIMIT 1
+            """,
+            owner_id,
+        )
+        apt = dict(apt) if apt else {}
+
+        # 2. Financial calculation
+        total_pagado = await conn.fetchval(
+            "SELECT COALESCE(SUM(amount), 0.0) FROM payments WHERE owner_id = $1 AND status = 'REGISTRADO'",
+            owner_id,
+        )
+        last_payment_date = await conn.fetchval(
+            "SELECT paid_at FROM payments WHERE owner_id = $1 AND status = 'REGISTRADO' ORDER BY paid_at DESC LIMIT 1",
+            owner_id,
+        )
+        
+        # Calculate balance
+        balance_row = await conn.fetchrow(
+            """
+            SELECT
+                COALESCE(SUM(fees_amount - payments_amount + fines_amount), 0.0) as total_balance
+            FROM (
+                SELECT
+                    COALESCE(af.amount, 0.0) as fees_amount,
+                    COALESCE(p.amount, 0.0) as payments_amount,
+                    COALESCE(f.amount, 0.0) as fines_amount
+                FROM apartment_fees af
+                FULL OUTER JOIN payments p ON p.apartment_id = af.apartment_id AND p.period = af.period AND p.status = 'REGISTRADO'
+                FULL OUTER JOIN fines f ON f.apartment_id = af.apartment_id AND f.period = f.period AND f.status = 'ACTIVA'
+                JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
+                WHERE oa.owner_id = $1
+            ) balance_calc
+            """,
+            owner_id,
+        )
+        saldo_actual = float(balance_row["total_balance"]) if balance_row else 0.0
+        
+        # Current month charges and payments
+        current_month = datetime.now().strftime("%Y-%m")
+        pagos_mes = await conn.fetchval(
+            "SELECT COALESCE(SUM(amount), 0.0) FROM payments WHERE owner_id = $1 AND period = $2 AND status = 'REGISTRADO'",
+            owner_id,
+            current_month,
+        )
+        cargos_mes = await conn.fetchval(
+            """
+            SELECT COALESCE(SUM(af.amount), 0.0) FROM apartment_fees af
+            JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
+            WHERE oa.owner_id = $1 AND af.period = $2
+            """,
+            owner_id,
+            current_month,
+        )
+        saldo_anterior = saldo_actual - float(cargos_mes) + float(pagos_mes)
+        
+        # Recent 3 payments
+        recent_payments = await conn.fetch(
+            """
+            SELECT paid_at, period, amount
+            FROM payments
+            WHERE owner_id = $1 AND status = 'REGISTRADO'
+            ORDER BY paid_at DESC
+            LIMIT 3
+            """,
+            owner_id,
+        )
+        recent_payments = [dict(p) for p in recent_payments]
+        
+        # Settings
+        due_day = 5
+        settings_row = await conn.fetchrow("SELECT due_day FROM settings LIMIT 1")
+        if settings_row:
+            due_day = settings_row["due_day"]
+        
+        # Next due date
+        now = datetime.now()
+        if now.month == 12:
+            next_due = date(now.year + 1, 1, due_day)
+        else:
+            next_due = date(now.year, now.month + 1, due_day)
+
+        # 3. Setup PDF document
+        output = io.BytesIO()
+        width = A4[0] - 2 * cm
+        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1 * cm, rightMargin=1 * cm, topMargin=0.7 * cm, bottomMargin=0.7 * cm)
+        story = []
+        
+        # Add QR Code widget to reportlab graphics
+        def _qr_drawing(value: str, size: float = 2.0 * cm) -> Drawing:
+            from reportlab.graphics.barcode import qr
+            from reportlab.graphics.shapes import Drawing
+            code = qr.QrCodeWidget(value)
+            bounds = code.getBounds()
+            drawing = Drawing(size, size, transform=[size / (bounds[2] - bounds[0]), 0, 0, size / (bounds[3] - bounds[1]), 0, 0])
+            drawing.add(code)
+            return drawing
+            
+        # Branded Header (specific to Ficha del copropietario as in the screenshot)
+        building_logo = get_building_logo(building, max_width=2.5 * cm, max_height=2.2 * cm)
+        if not building_logo:
+            # Styled building title as fallback
+            building_logo = Paragraph(
+                "<font size='10' color='#123c7a'><b>EDIFICIO</b></font><br/>"
+                "<font size='15' color='#123c7a'><b>TORRES NETANYA</b></font><br/>"
+                "<font size='7' color='#6b7280'>Sistema de administración</font>",
+                ParagraphStyle("HeaderLogoFallback", fontName="Helvetica", leading=11)
+            )
+            
+        # Emission date and sheet number block
+        emission_date = datetime.now().strftime("%d/%m/%Y")
+        sheet_number = f"FTN-{datetime.now().year}-{str(owner['document_id'])[-6:].zfill(6)}"
+        
+        info_headers = Table(
+            [
+                [Paragraph("<font size='7' color='#4b5563'>Fecha de emisión: " + emission_date + "</font>", ParagraphStyle("H1", fontName="Helvetica", align="RIGHT"))],
+                [Paragraph("<font size='7' color='#4b5563'><b>Ficha N.°: " + sheet_number + "</b></font>", ParagraphStyle("H2", fontName="Helvetica-Bold", align="RIGHT"))]
+            ],
+            colWidths=[4.5 * cm]
+        )
+        info_headers.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        
+        qr_draw = _qr_drawing(f"FICHA-{owner['id']}-{sheet_number}", size=1.8 * cm)
+        
+        # Combine Logo, Title center, and QR/Info right
+        header_table = Table(
+            [[building_logo, Spacer(1,1), qr_draw, info_headers]],
+            colWidths=[5 * cm, width - 11.8 * cm, 2 * cm, 4.8 * cm]
+        )
+        header_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LINEBELOW", (0, 0), (-1, -1), 1.2, colors.HexColor("#123c7a")),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 0.3 * cm))
+        
+        # Centered document title
+        story.append(Paragraph("<font size='14' color='#123c7a'><b>FICHA DEL COPROPIETARIO</b></font>", ParagraphStyle("DocTitle", fontName="Helvetica-Bold", alignment=1)))
+        story.append(Spacer(1, 0.4 * cm))
+        
+        # Helper for sections titles
+        def make_section_title(title_text: str):
+            t = Table(
+                [[Paragraph(f"<font size='9' color='#123c7a'><b>{title_text}</b></font>", ParagraphStyle("SecTitle", fontName="Helvetica-Bold", leading=11))]],
+                colWidths=[width]
+            )
+            t.setStyle(TableStyle([
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor("#123c7a")),
+            ]))
+            return t
+
+        # SECTION 1: DATOS DEL COPROPIETARIO
+        story.append(make_section_title("1. DATOS DEL COPROPIETARIO"))
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # Left side: owner info
+        avatar_placeholder = Paragraph("<font size='28' color='#9ca3af'><b>👤</b></font>", ParagraphStyle("Avatar", fontName="Helvetica", alignment=1))
+        
+        reg_date_str = self._spanish_date(owner.get("created_at").date()) if owner.get("created_at") else "--"
+        birth_date_str = self._spanish_date(owner.get("birth_date")) if owner.get("birth_date") else "--"
+        
+        owner_text = (
+            f"<font size='10' color='#1f2937'><b>{escape(owner['full_name'])}</b></font><br/>"
+            f"<font size='7.5' color='#6b7280'>Copropietario</font><br/><br/>"
+            f"<font size='7.5' color='#4b5563'>✉ {escape(owner.get('email') or '--')}</font><br/>"
+            f"<font size='7.5' color='#4b5563'>📞 {escape(owner.get('phone') or '--')}</font><br/>"
+            f"<font size='7.5' color='#4b5563'>📇 C.I.: {escape(owner.get('document_id') or '--')}</font><br/>"
+            f"<font size='7.5' color='#4b5563'>📅 Fecha de registro: {reg_date_str}</font>"
+        )
+        owner_info_p = Paragraph(owner_text, ParagraphStyle("OwnerInfoText", fontName="Helvetica", leading=11))
+        
+        # Right side: unit general info
+        apt_code = apt.get("code") or "--"
+        apt_tower = apt.get("tower") or "--"
+        apt_floor = str(apt.get("floor") or "--")
+        apt_area = f"{apt.get('area_sqm'):,.2f} m²" if apt.get("area_sqm") else "--"
+        apt_quota = f"{apt.get('allocated_quota_percent'):,.2f} %" if apt.get("allocated_quota_percent") else "--"
+        apt_status_label = "Al día" if saldo_actual <= 0 else "Con deuda"
+        apt_status_color = "#1f8f4d" if saldo_actual <= 0 else "#c74444"
+        
+        unit_summary_data = [
+            [Paragraph("<font size='7.5' color='#4b5563'>🏢 Departamento:</font>", ParagraphStyle("L1")), Paragraph(f"<font size='7.5' color='#1f2937'><b>{apt_code}</b></font>", ParagraphStyle("R1"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>🗼 Torre:</font>", ParagraphStyle("L2")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_tower}</font>", ParagraphStyle("R2"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>📍 Piso:</font>", ParagraphStyle("L3")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_floor}</font>", ParagraphStyle("R3"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>📐 Área del depto:</font>", ParagraphStyle("L4")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_area}</font>", ParagraphStyle("R4"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>% Porcentaje alícuota:</font>", ParagraphStyle("L5")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_quota}</font>", ParagraphStyle("R5"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>📊 Estado:</font>", ParagraphStyle("L6")), Paragraph(f"<font size='7.5' color='{apt_status_color}'><b>● {apt_status_label}</b></font>", ParagraphStyle("R6"))],
+        ]
+        
+        unit_summary_table = Table(unit_summary_data, colWidths=[width * 0.22, width * 0.22])
+        unit_summary_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.4, colors.HexColor("#e5e7eb")),
+        ]))
+        
+        # Combine Left & Right
+        sec1_table = Table(
+            [[avatar_placeholder, owner_info_p, unit_summary_table]],
+            colWidths=[1.8 * cm, width * 0.48, width * 0.44]
+        )
+        sec1_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#f8fafc")),
+            ("BOX", (2, 0), (2, 0), 0.6, colors.HexColor("#e5e7eb")),
+        ]))
+        story.append(sec1_table)
+        story.append(Spacer(1, 0.3 * cm))
+        
+        # SECTION 2: INFORMACIÓN DEL DEPARTAMENTO
+        story.append(make_section_title("2. INFORMACIÓN DEL DEPARTAMENTO"))
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # Replicating department details table (two-column key-value format without image)
+        apt_bedrooms = str(apt.get("bedrooms") or "3")
+        apt_bathrooms = f"{float(apt.get('bathrooms') or 2.5):g}"
+        apt_parking = apt.get("parking") or "1 (P-28)"
+        apt_storage = apt.get("storage") or "B-12"
+        apt_acquisition = self._spanish_date(apt.get("acquisition_date")) if apt.get("acquisition_date") else "15 de junio de 2022"
+        apt_use = apt.get("use_type") or "Departamento residencial"
+        
+        sec2_data = [
+            [
+                Paragraph("<font size='7.5' color='#4b5563'>Código del departamento:</font>", ParagraphStyle("K1")),
+                Paragraph(f"<font size='7.5' color='#1f2937'><b>{apt_code}</b></font>", ParagraphStyle("V1")),
+                Paragraph("<font size='7.5' color='#4b5563'>Bodega:</font>", ParagraphStyle("K4")),
+                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_storage}</font>", ParagraphStyle("V4"))
+            ],
+            [
+                Paragraph("<font size='7.5' color='#4b5563'>Tipo de unidad:</font>", ParagraphStyle("K2")),
+                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_use}</font>", ParagraphStyle("V2")),
+                Paragraph("<font size='7.5' color='#4b5563'>Fecha de adquisición:</font>", ParagraphStyle("K5")),
+                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_acquisition}</font>", ParagraphStyle("V5"))
+            ],
+            [
+                Paragraph("<font size='7.5' color='#4b5563'>Número de habitaciones:</font>", ParagraphStyle("K3")),
+                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_bedrooms}</font>", ParagraphStyle("V3")),
+                Paragraph("<font size='7.5' color='#4b5563'>Uso del departamento:</font>", ParagraphStyle("K6")),
+                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_use}</font>", ParagraphStyle("V6"))
+            ],
+            [
+                Paragraph("<font size='7.5' color='#4b5563'>Número de baños:</font>", ParagraphStyle("K3_1")),
+                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_bathrooms}</font>", ParagraphStyle("V3_1")),
+                Paragraph("<font size='7.5' color='#4b5563'>Estado actual:</font>", ParagraphStyle("K7")),
+                Paragraph(f"<font size='7.5' color='{apt_status_color}'><b>● {apt_status_label}</b></font>", ParagraphStyle("V7"))
+            ],
+            [
+                Paragraph("<font size='7.5' color='#4b5563'>Parqueaderos:</font>", ParagraphStyle("K3_2")),
+                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_parking}</font>", ParagraphStyle("V3_2")),
+                Spacer(1,1), Spacer(1,1)
+            ]
+        ]
+        sec2_table = Table(sec2_data, colWidths=[width * 0.28, width * 0.22, width * 0.28, width * 0.22])
+        sec2_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#e5e7eb")),
+        ]))
+        story.append(sec2_table)
+        story.append(Spacer(1, 0.3 * cm))
+        
+        # SECTION 3: INFORMACIÓN FINANCIERA
+        story.append(make_section_title("3. INFORMACIÓN FINANCIERA"))
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # Column 1: Resumen de pagos
+        last_pay_str = self._spanish_date(last_payment_date) if last_payment_date else "--"
+        next_due_str = self._spanish_date(next_due)
+        
+        resumen_data = [
+            [Paragraph("<font size='8' color='#123c7a'><b>Resumen de pagos</b></font>", ParagraphStyle("ResT"))],
+            [Paragraph(f"<font size='7' color='#4b5563'>Estado actual:</font><br/><font size='8.5' color='{apt_status_color}'><b>{apt_status_label}</b></font>", ParagraphStyle("Item1"))],
+            [Paragraph(f"<font size='7' color='#4b5563'>Último pago:</font><br/><font size='7.5' color='#1f2937'>{last_pay_str}</font>", ParagraphStyle("Item2"))],
+            [Paragraph(f"<font size='7' color='#4b5563'>Próximo vencimiento:</font><br/><font size='7.5' color='#1f2937'>{next_due_str}</font>", ParagraphStyle("Item3"))],
+            [Paragraph(f"<font size='7' color='#4b5563'>Total alícuotas pagadas:</font><br/><font size='8' color='#1f2937'><b>{self._money(total_pagado)}</b></font>", ParagraphStyle("Item4"))],
+            [Paragraph(f"<font size='7' color='#4b5563'>Total en mora:</font><br/><font size='8.5' color='{apt_status_color}'><b>{self._money(saldo_actual)}</b></font>", ParagraphStyle("Item5"))],
+            [Paragraph(f"<font size='6.5' color='#1f8f4d'><b>✓ El copropietario se encuentra al día con sus obligaciones.</b></font>" if saldo_actual <= 0 else f"<font size='6.5' color='#c74444'><b>⚠️ El copropietario registra saldo pendiente de pago.</b></font>", ParagraphStyle("AlertText"))]
+        ]
+        resumen_table = Table(resumen_data, colWidths=[width * 0.32])
+        resumen_table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("LINEBELOW", (0, 0), (0, 0), 0.8, colors.HexColor("#123c7a")),
+            ("BACKGROUND", (0, -1), (0, -1), colors.HexColor("#edf9f0") if saldo_actual <= 0 else colors.HexColor("#fdf2f2")),
+            ("BOX", (0, -1), (0, -1), 0.4, colors.HexColor("#1f8f4d") if saldo_actual <= 0 else colors.HexColor("#f87171")),
+        ]))
+        
+        # Column 2: Últimos 3 pagos registrados
+        pagos_headers = [
+            Paragraph("<b>Fecha</b>", ParagraphStyle("PH1", fontName="Helvetica-Bold", size=7, color="#ffffff")),
+            Paragraph("<b>Concepto</b>", ParagraphStyle("PH2", fontName="Helvetica-Bold", size=7, color="#ffffff")),
+            Paragraph("<b>Valor (USD)</b>", ParagraphStyle("PH3", fontName="Helvetica-Bold", size=7, color="#ffffff", align="RIGHT")),
+        ]
+        pagos_rows = [pagos_headers]
+        
+        sum_last_3 = Decimal("0.00")
+        for p in recent_payments:
+            pay_date = p["paid_at"].strftime("%d/%m/%Y") if isinstance(p["paid_at"], (date, datetime)) else str(p["paid_at"])
+            pay_period = self._period_name(p["period"]).capitalize()
+            pay_concept = f"Alícuota - {pay_period}"
+            pay_amount = Decimal(str(p["amount"]))
+            sum_last_3 += pay_amount
+            
+            pagos_rows.append([
+                Paragraph(f"<font size='7' color='#374151'>{pay_date}</font>", ParagraphStyle("PD1")),
+                Paragraph(f"<font size='7' color='#374151'>{pay_concept}</font>", ParagraphStyle("PD2")),
+                Paragraph(f"<font size='7' color='#374151'>{self._money(pay_amount)}</font>", ParagraphStyle("PD3", align="RIGHT")),
+            ])
+            
+        while len(pagos_rows) < 4:
+            pagos_rows.append([
+                Paragraph("<font size='7' color='#9ca3af'>--</font>", ParagraphStyle("PD1")),
+                Paragraph("<font size='7' color='#9ca3af'>Sin registro</font>", ParagraphStyle("PD2")),
+                Paragraph("<font size='7' color='#9ca3af'>$0.00</font>", ParagraphStyle("PD3", align="RIGHT")),
+            ])
+            
+        # Total row
+        pagos_rows.append([
+            Paragraph("<b>Total pagado en el período</b>", ParagraphStyle("PTT", fontName="Helvetica-Bold", size=7, color="#123c7a")),
+            Spacer(1,1),
+            Paragraph(f"<b>{self._usd(sum_last_3)}</b>", ParagraphStyle("PTA", fontName="Helvetica-Bold", size=7, color="#123c7a", align="RIGHT")),
+        ])
+        
+        pagos_table = Table(pagos_rows, colWidths=[width * 0.10, width * 0.13, width * 0.10])
+        pagos_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123c7a")),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -2), 0.4, colors.HexColor("#e5e7eb")),
+            ("SPAN", (0, -1), (1, -1)),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#dbe7f7")),
+            ("BOX", (0, -1), (-1, -1), 0.6, colors.HexColor("#123c7a")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        
+        # Column 3: Estado de cuenta actual
+        fin_rows = [
+            [Paragraph("<b>Concepto</b>", ParagraphStyle("FH1", fontName="Helvetica-Bold", size=7, color="#ffffff")), Paragraph("<b>Monto (USD)</b>", ParagraphStyle("FH2", fontName="Helvetica-Bold", size=7, color="#ffffff", align="RIGHT"))],
+            [Paragraph("<font size='7' color='#4b5563'>Saldo anterior:</font>", ParagraphStyle("FL1")), Paragraph(f"<font size='7' color='#1f2937'>{self._money(saldo_anterior)}</font>", ParagraphStyle("FV1", align="RIGHT"))],
+            [Paragraph("<font size='7' color='#4b5563'>Cargos del mes:</font>", ParagraphStyle("FL2")), Paragraph(f"<font size='7' color='#1f2937'>{self._money(cargos_mes)}</font>", ParagraphStyle("FV2", align="RIGHT"))],
+            [Paragraph("<font size='7' color='#4b5563'>Pagos del mes:</font>", ParagraphStyle("FL3")), Paragraph(f"<font size='7' color='#c74444'>-{self._money(pagos_mes)}</font>", ParagraphStyle("FV3", align="RIGHT"))],
+            [Paragraph("<b>Saldo actual:</b>", ParagraphStyle("FL4", fontName="Helvetica-Bold", size=7.5, color="#123c7a")), Paragraph(f"<b>{self._money(saldo_actual)}</b>", ParagraphStyle("FV4", fontName="Helvetica-Bold", size=7.5, color=apt_status_color, align="RIGHT"))]
+        ]
+        fin_table = Table(fin_rows, colWidths=[width * 0.18, width * 0.15])
+        fin_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123c7a")),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -2), 0.4, colors.HexColor("#e5e7eb")),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#edf9f0") if saldo_actual <= 0 else colors.HexColor("#fdf2f2")),
+            ("BOX", (0, -1), (-1, -1), 0.6, colors.HexColor("#1f8f4d") if saldo_actual <= 0 else colors.HexColor("#f87171")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4.8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4.8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        
+        # Combine the 3 columns into Section 3 table
+        sec3_table = Table([[resumen_table, pagos_table, fin_table]], colWidths=[width * 0.34, width * 0.33, width * 0.33])
+        sec3_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(sec3_table)
+        story.append(Spacer(1, 0.3 * cm))
+        
+        # SECTION 4: CONTACTOS DE EMERGENCIA
+        story.append(make_section_title("4. CONTACTOS DE EMERGENCIA"))
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # Three cards
+        contact1_text = (
+            f"<font size='8' color='#123c7a'><b>Contacto principal</b></font><br/><br/>"
+            f"<font size='7.5' color='#1f2937'><b>{escape(owner['full_name'])}</b></font><br/>"
+            f"<font size='7' color='#4b5563'>📞 {escape(owner.get('phone') or '--')}</font><br/>"
+            f"<font size='7' color='#4b5563'>✉ {escape(owner.get('email') or '--')}</font>"
+        )
+        contact2_text = (
+            f"<font size='8' color='#123c7a'><b>Contacto alterno</b></font><br/><br/>"
+            f"<font size='7.5' color='#1f2937'><b>{escape(owner.get('occupant_name') or '--')}</b></font><br/>"
+            f"<font size='7' color='#4b5563'>Relación: {escape(owner.get('occupant_relation') or '--')}</font><br/>"
+            f"<font size='7' color='#4b5563'>📞 {escape(owner.get('occupant_phone') or '--')}</font>"
+        )
+        contact3_text = (
+            f"<font size='8' color='#123c7a'><b>Uso exclusivo de emergencia</b></font><br/><br/>"
+            f"<font size='7.5' color='#1f2937'><b>Administración</b></font><br/>"
+            f"<font size='7' color='#4b5563'>📞 +593 2 398 4500</font><br/>"
+            f"<font size='7' color='#4b5563'>✉ administracion@torresnetanya.com</font>"
+        )
+        
+        c1_table = Table([[Paragraph(contact1_text, ParagraphStyle("C1T", leading=10))]], colWidths=[width * 0.32])
+        c1_table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        
+        c2_table = Table([[Paragraph(contact2_text, ParagraphStyle("C2T", leading=10))]], colWidths=[width * 0.32])
+        c2_table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        
+        c3_table = Table([[Paragraph(contact3_text, ParagraphStyle("C3T", leading=10))]], colWidths=[width * 0.32])
+        c3_table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        
+        sec4_table = Table([[c1_table, c2_table, c3_table]], colWidths=[width * 0.34, width * 0.33, width * 0.33])
+        sec4_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(sec4_table)
+        story.append(Spacer(1, 0.3 * cm))
+        
+        # SECTION 5: OBSERVACIONES
+        story.append(make_section_title("5. OBSERVACIONES"))
+        story.append(Spacer(1, 0.15 * cm))
+        
+        obs_box = Table(
+            [[Paragraph("<font size='7.5' color='#4b5563'>Ninguna observación registrada.</font>", ParagraphStyle("ObsText"))]],
+            colWidths=[width]
+        )
+        obs_box.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(obs_box)
+        story.append(Spacer(1, 0.5 * cm))
+        
+        # Signatures
+        sig_admin = Table(
+            [
+                [Spacer(1, 0.8 * cm)],
+                [HRFlowable(width="60%", thickness=0.8, color=colors.HexColor("#9ca3af"), spaceAfter=2)],
+                [Paragraph("<b>Franz Guzman G.</b>", ParagraphStyle("SigN", size=7.5, fontName="Helvetica-Bold", alignment=1))],
+                [Paragraph("Firma de la administración", ParagraphStyle("SigL", size=6.5, fontName="Helvetica", color="#6b7280", alignment=1))],
+            ],
+            colWidths=[width * 0.45]
+        )
+        sig_admin.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        
+        official_logo = get_building_logo(building, max_width=1.5 * cm, max_height=1.2 * cm)
+        if not official_logo:
+            official_logo = Paragraph("🏛️", ParagraphStyle("OffLogo", size=22, alignment=1))
+            
+        sig_official = Table(
+            [
+                [official_logo],
+                [Paragraph("<b>Documento oficial</b>", ParagraphStyle("SigON", size=7.5, fontName="Helvetica-Bold", alignment=1))],
+                [Paragraph("Sistema de Administración", ParagraphStyle("SigOL", size=6.5, fontName="Helvetica", color="#6b7280", alignment=1))],
+            ],
+            colWidths=[width * 0.45]
+        )
+        sig_official.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        
+        signatures_table = Table([[sig_admin, Spacer(1, 1), sig_official]], colWidths=[width * 0.45, width * 0.1, width * 0.45])
+        signatures_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+        ]))
+        story.append(signatures_table)
+        story.append(Spacer(1, 0.4 * cm))
+        
+        # Footer
+        footer_table = Table(
+            [[
+                Paragraph("<b>EDIFICIO TORRES NETANYA</b>", ParagraphStyle("FL11", size=7, fontName="Helvetica-Bold", color="#ffffff")),
+                Paragraph("Este documento es válido únicamente con el código QR y sello de verificación.", ParagraphStyle("FL22", size=6, fontName="Helvetica", color="#ffffff", alignment=1)),
+                Paragraph("Página 1 de 1", ParagraphStyle("FL33", size=6.5, fontName="Helvetica", color="#ffffff", alignment=2))
+            ]],
+            colWidths=[width * 0.3, width * 0.5, width * 0.2]
+        )
+        footer_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#092b62")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(footer_table)
+        
+        doc.build(story)
+        return output.getvalue()
+

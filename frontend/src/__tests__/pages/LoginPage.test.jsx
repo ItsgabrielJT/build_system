@@ -357,7 +357,7 @@ describe('LoginPage', () => {
       });
     });
 
-    it('deve redirecionar para /owner/apartments se user é PROPIETARIO', async () => {
+    it('deve redirecionar para /owner/inicio se user é PROPIETARIO', async () => {
       // Arrange
       localStorage.setItem('auth_token', MOCK_TOKEN);
       vi.mocked(authService.getToken).mockReturnValue(MOCK_TOKEN);
@@ -370,7 +370,7 @@ describe('LoginPage', () => {
 
       // Assert
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/owner/apartments', {
+        expect(mockNavigate).toHaveBeenCalledWith('/owner/inicio', {
           replace: true,
         });
       });

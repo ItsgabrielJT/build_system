@@ -152,6 +152,7 @@ async def test_get_apartment_pending_debts_endpoint(async_client, admin_headers,
                 "id": uuid4(),
                 "period": "2026-05",
                 "amount": Decimal("150.00"),
+                "paid_amount": Decimal("0.00"),
             }
         ],
         # Fines response

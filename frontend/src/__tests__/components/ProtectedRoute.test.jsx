@@ -283,7 +283,7 @@ describe('ProtectedRoute', () => {
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<LoginComponent />} />
-              <Route path="/owner/apartments" element={<OwnerComponent />} />
+              <Route path="/owner/inicio" element={<OwnerComponent />} />
               <Route
                 path="/admin/*"
                 element={
@@ -300,7 +300,7 @@ describe('ProtectedRoute', () => {
       // Assert
       await waitFor(() => {
         expect(screen.queryByTestId('admin-content')).not.toBeInTheDocument();
-        // Deve redirecionar para /owner/apartments
+        // Deve redirecionar para /owner/inicio
         expect(screen.getByTestId('owner-content')).toBeInTheDocument();
       });
     });
@@ -317,7 +317,7 @@ describe('ProtectedRoute', () => {
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<LoginComponent />} />
-              <Route path="/admin/owners" element={<AdminComponent />} />
+              <Route path="/admin/reports" element={<AdminComponent />} />
               <Route
                 path="/owner/*"
                 element={

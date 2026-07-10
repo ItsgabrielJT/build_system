@@ -18,11 +18,19 @@ import OwnerMonthlyBalancePage from './pages/owner/OwnerMonthlyBalancePage';
 import OwnerPaymentsPage from './pages/owner/OwnerPaymentsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 
+// Nuevas páginas
+import OwnerInicioPage from './pages/owner/OwnerInicioPage';
+import OwnerCamerasPage from './pages/owner/OwnerCamerasPage';
+import OwnerHelpPage from './pages/owner/OwnerHelpPage';
+import OwnerProfilePage from './pages/owner/OwnerProfilePage';
+import AdminAnnouncementsPage from './pages/admin/AdminAnnouncementsPage';
+import AdminEventsPage from './pages/admin/AdminEventsPage';
+
 function RootRedirect() {
   const { role, loading } = useAuth();
   if (loading) return null;
   if (role === 'ADMIN') return <Navigate to="/admin/reports" replace />;
-  if (role === 'PROPIETARIO') return <Navigate to="/owner/apartments" replace />;
+  if (role === 'PROPIETARIO') return <Navigate to="/owner/inicio" replace />;
   return <Navigate to="/login" replace />;
 }
 
@@ -48,6 +56,8 @@ export default function App() {
         <Route path="payments" element={<AdminPaymentsPage />} />
         <Route path="fines" element={<AdminFinesPage />} />
         <Route path="expenses" element={<AdminExpensesPage />} />
+        <Route path="announcements" element={<AdminAnnouncementsPage />} />
+        <Route path="events" element={<AdminEventsPage />} />
         <Route index element={<Navigate to="reports" replace />} />
       </Route>
 
@@ -59,11 +69,15 @@ export default function App() {
           </ProtectedRoute>
         }
       >
+        <Route path="inicio" element={<OwnerInicioPage />} />
         <Route path="apartments" element={<OwnerApartmentsPage />} />
         <Route path="account-statement" element={<OwnerAccountStatementPage />} />
         <Route path="monthly-balance" element={<OwnerMonthlyBalancePage />} />
         <Route path="payments" element={<OwnerPaymentsPage />} />
-        <Route index element={<Navigate to="apartments" replace />} />
+        <Route path="cameras" element={<OwnerCamerasPage />} />
+        <Route path="help" element={<OwnerHelpPage />} />
+        <Route path="profile" element={<OwnerProfilePage />} />
+        <Route index element={<Navigate to="inicio" replace />} />
       </Route>
 
       <Route path="/" element={<RootRedirect />} />
@@ -71,3 +85,4 @@ export default function App() {
     </Routes>
   );
 }
+

@@ -251,3 +251,46 @@ class EmailService:
             html_content,
         )
         return await EmailService.send_email(owner_email, subject, text_content, html_content, owner_name)
+
+    @staticmethod
+    async def send_event_assigned_email(
+        owner_email: str | None,
+        owner_name: str,
+        event_title: str,
+        event_date: str,
+        start_time: str,
+        end_time: str,
+        description: str,
+    ) -> bool:
+        """Notifica al propietario que tiene un evento asignado."""
+        if not owner_email:
+            return False
+        subject = f"Nuevo Evento Asignado — {event_title}"
+        text_content = (
+            f"Hola {owner_name},\n\n"
+            f"Te informamos que se te ha asignado un nuevo evento en el edificio.\n\n"
+            f"Detalles del evento:\n"
+            f"  - Título: {event_title}\n"
+            f"  - Descripción: {description}\n"
+            f"  - Fecha: {event_date}\n"
+            f"  - Hora: {start_time} - {end_time}\n\n"
+            f"Saludos,\nAdministración de HabitaUIO"
+        )
+        html_content = (
+            f"<h3>Nuevo Evento Asignado</h3>"
+            f"<p>Hola {owner_name},</p>"
+            f"<p>Te notificamos que tienes un nuevo evento asignado:</p>"
+            f"<ul>"
+            f"  <li><strong>Título:</strong> {event_title}</li>"
+            f"  <li><strong>Descripción:</strong> {description}</li>"
+            f"  <li><strong>Fecha:</strong> {event_date}</li>"
+            f"  <li><strong>Hora:</strong> {start_time} - {end_time}</li>"
+            f"</ul>"
+            f"<br/><p>Saludos,<br/>Administración de HabitaUIO</p>"
+        )
+        text_content, html_content = EmailService._append_system_link(
+            text_content,
+            html_content,
+        )
+        return await EmailService.send_email(owner_email, subject, text_content, html_content, owner_name)
+

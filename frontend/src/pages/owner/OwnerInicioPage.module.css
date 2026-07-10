@@ -1,0 +1,593 @@
+.container {
+  padding: 1.5rem 2rem;
+  background-color: #f8fafc;
+  min-height: 100vh;
+  font-family: inherit;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  font-size: 1.1rem;
+  color: #64748b;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 0.5rem 0;
+}
+
+.subtitle {
+  color: #64748b;
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Row 1: Top Metrics */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.metricCard {
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+}
+
+.iconCircle {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bgSuccess { background-color: #dcfce7; color: #15803d; }
+.bgDanger { background-color: #fee2e2; color: #b91c1c; }
+.bgBlue { background-color: #e0f2fe; color: #0369a1; }
+.bgPurple { background-color: #f3e8ff; color: #6b21a8; }
+.bgOrange { background-color: #ffedd5; color: #c2410c; }
+
+.metricInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.metricLabel {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 0.15rem;
+}
+
+.metricInfo strong {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.textSuccess { color: #15803d !important; }
+.textDanger { color: #b91c1c !important; }
+.textBlue { color: #0369a1 !important; }
+.textPurple { color: #6b21a8 !important; }
+
+.metricSub {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 0.1rem;
+}
+
+/* Main Grid Layout */
+.mainGrid {
+  display: grid;
+  grid-template-columns: 260px 1fr 340px;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 1200px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Left Column: Profile Card */
+.profileCard {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+}
+
+.profileAvatarSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.profileAvatar {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background-color: #f1f5f9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  border: 4px solid #e2e8f0;
+}
+
+.profileName {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.2rem 0;
+}
+
+.profileRole {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.profileDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.profileField {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.fieldIcon {
+  font-size: 1.1rem;
+  background-color: #f8fafc;
+  padding: 0.25rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.1rem;
+}
+
+.fieldValue {
+  font-size: 0.9rem;
+  color: #334155;
+  word-break: break-word;
+}
+
+/* Dashboard Cards (Middle & Right Columns) */
+.dashboardCard {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+  margin-bottom: 1.5rem;
+}
+
+.cardTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 1.25rem 0;
+}
+
+.cardHeaderFlex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.cardHeaderFlex .cardTitle {
+  margin-bottom: 0;
+}
+
+.headerLink {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #0b5bd3;
+  cursor: pointer;
+}
+
+.headerLink:hover {
+  text-decoration: underline;
+}
+
+/* Quick Access Grid */
+.quickAccessGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .quickAccessGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quickAccessItem {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.quickAccessItem:hover {
+  transform: translateY(-2px);
+  background-color: #f1f5f9;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border-color: #cbd5e1;
+}
+
+.qaIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.qaBgGreen { background-color: #dcfce7; color: #15803d; }
+.qaBgBlue { background-color: #e0f2fe; color: #0369a1; }
+.qaBgPurple { background-color: #f3e8ff; color: #6b21a8; }
+
+.qaContent {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.qaContent strong {
+  font-size: 0.85rem;
+  color: #1e293b;
+}
+
+.qaContent span {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.qaArrow {
+  font-size: 1.25rem;
+  color: #94a3b8;
+}
+
+/* Activity Table */
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.activityTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.activityTable th {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.activityTable td {
+  padding: 0.85rem 0.5rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #f8fafc;
+  color: #334155;
+}
+
+.activityName {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.activityDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #0b5bd3;
+  display: inline-block;
+}
+
+.activityDate {
+  color: #64748b;
+}
+
+.badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.badgeSuccess { background-color: #dcfce7; color: #15803d; }
+.badgeDanger { background-color: #fee2e2; color: #b91c1c; }
+.badgePurple { background-color: #f3e8ff; color: #6b21a8; }
+.badgeBlue { background-color: #e0f2fe; color: #0369a1; }
+
+.viewMoreLink {
+  background: none;
+  border: none;
+  color: #0b5bd3;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 1rem;
+  display: block;
+}
+
+.viewMoreLink:hover {
+  text-decoration: underline;
+}
+
+/* Event Items */
+.listContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.emptyText {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.eventItem {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.eventItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.eventIconCircle {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.eventDetails {
+  display: flex;
+  flex-direction: column;
+}
+
+.eventDetails strong {
+  font-size: 0.85rem;
+  color: #1e293b;
+  margin-bottom: 0.1rem;
+}
+
+.eventDetails span {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.1rem;
+}
+
+.eventDetails small {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+/* Notice Items */
+.noticeItem {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.noticeItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.noticeIcon {
+  font-size: 1.1rem;
+  color: #0b5bd3;
+  margin-top: 0.1rem;
+}
+
+.noticeDetails {
+  display: flex;
+  flex-direction: column;
+}
+
+.noticeDetails strong {
+  font-size: 0.85rem;
+  color: #1e293b;
+  margin-bottom: 0.15rem;
+}
+
+.noticeDetails p {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.35;
+}
+
+/* Support Items */
+.supportList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.supportItem {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.supportIcon {
+  font-size: 1.25rem;
+  color: #64748b;
+}
+
+.supportDetails {
+  display: flex;
+  flex-direction: column;
+}
+
+.supportDetails strong {
+  font-size: 0.85rem;
+  color: #1e293b;
+}
+
+.supportDetails span {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+/* Bottom Unit Summary Section */
+.summaryCard {
+  margin-top: 0.5rem;
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.summaryHeaderIcon {
+  font-size: 1.25rem;
+  color: #475569;
+}
+
+.summaryTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.summaryMetricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.summaryMetricItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sumIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.sumBgDanger { background-color: #fee2e2; color: #b91c1c; }
+.sumBgSuccess { background-color: #dcfce7; color: #15803d; }
+.sumBgBlue { background-color: #e0f2fe; color: #0369a1; }
+.sumBgPurple { background-color: #f3e8ff; color: #6b21a8; }
+
+.sumContent {
+  display: flex;
+  flex-direction: column;
+}
+
+.sumContent span {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-bottom: 0.05rem;
+}
+
+.sumContent strong {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sumContent small {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+/* Footer styling */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}

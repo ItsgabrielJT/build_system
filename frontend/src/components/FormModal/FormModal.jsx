@@ -17,7 +17,7 @@ export default function FormModal({ isOpen, title, fields = [], initialData, def
       const effectiveDefaults = defaultsRef.current ?? {};
       const initial = {};
       fieldsRef.current.forEach((f) => {
-        initial[f.name] = effectiveDefaults[f.name] ?? f.defaultValue ?? '';
+        initial[f.name] = effectiveDefaults[f.name] ?? f.defaultValue ?? (f.type === 'multiselect' ? [] : '');
       });
       setFormData(initial);
       setError(null);
@@ -106,6 +106,25 @@ export default function FormModal({ isOpen, title, fields = [], initialData, def
                         </option>
                       );
                     })}
+                  </select>
+                ) : field.type === 'multiselect' ? (
+                  <select
+                    id={fieldId}
+                    className={styles.input}
+                    multiple={true}
+                    value={formData[field.name] || []}
+                    onChange={(e) => {
+                      const values = Array.from(e.target.selectedOptions, (option) => option.value);
+                      handleChange(field.name, values);
+                    }}
+                    required={field.required}
+                    style={{ height: 'auto', minHeight: '120px', padding: '6px' }}
+                  >
+                    {(field.options || []).map((opt) => (
+                      <option key={opt.value} value={opt.value} style={{ padding: '4px 8px', borderRadius: '4px' }}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 ) : field.type === 'textarea' ? (
                   <textarea

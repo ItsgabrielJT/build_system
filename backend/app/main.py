@@ -10,11 +10,13 @@ from app.config.settings import settings
 from app.routes import (
     account_statement,
     admin_payment_review,
+    announcements,
     apartment_fees,
     apartments,
     auth,
     buildings,
     delinquency,
+    events,
     expenses,
     fines,
     owner_notifications,
@@ -36,6 +38,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,6 +72,8 @@ app.include_router(reports.router, prefix=PREFIX)
 app.include_router(owner_payments.router, prefix=PREFIX)
 app.include_router(owner_notifications.router, prefix=PREFIX)
 app.include_router(admin_payment_review.router, prefix=PREFIX)
+app.include_router(announcements.router, prefix=PREFIX)
+app.include_router(events.router, prefix=PREFIX)
 
 
 @app.get("/health", tags=["health"])

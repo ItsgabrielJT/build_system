@@ -28,7 +28,7 @@ describe('usePeriodsSummary', () => {
 
   it('fetches periods with default pagination', async () => {
     apartmentFeeService.getPeriodsSummary.mockResolvedValue({
-      items: [{ period: '2026-05', status: 'ABIERTO' }],
+      data: [{ period: '2026-05', status: 'ABIERTO' }],
       total: 1,
     });
 
@@ -46,7 +46,7 @@ describe('usePeriodsSummary', () => {
 
   it('updates page state when setPage is called', async () => {
     apartmentFeeService.getPeriodsSummary.mockResolvedValue({
-      items: [{ period: '2026-04', status: 'VENCIDO' }],
+      data: [{ period: '2026-04', status: 'VENCIDO' }],
       total: 20,
     });
 
@@ -62,7 +62,7 @@ describe('usePeriodsSummary', () => {
 
   it('filters by year when year param provided', async () => {
     apartmentFeeService.getPeriodsSummary.mockResolvedValue({
-      items: [{ period: '2026-03', status: 'CERRADO' }],
+      data: [{ period: '2026-03', status: 'CERRADO' }],
       total: 1,
     });
 

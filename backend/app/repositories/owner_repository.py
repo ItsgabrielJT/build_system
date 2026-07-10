@@ -5,7 +5,7 @@ from uuid import UUID
 
 import asyncpg
 
-from app.models.schemas import OwnerCreate, OwnerUpdate
+from app.models.schemas import OwnerCreate, OwnerUpdate, OwnerProfileUpdate
 
 
 class OwnerRepository:
@@ -53,7 +53,7 @@ class OwnerRepository:
         return dict(row) if row else None
 
     async def get_by_user_id(self, user_id: UUID) -> dict | None:
-        """Retorna el owner vinculado al user_id (almacenado en firebase_uid)."""
+        """Retorna el owner vinculado al user_id local."""
         row = await self._conn.fetchrow(
             "SELECT * FROM owners WHERE firebase_uid = $1 AND status = 'ACTIVO'",
             str(user_id),
@@ -265,22 +265,32 @@ class OwnerRepository:
             limit_transactions,
         )
 
-        # Calculate consolidated balance
+        # Calculate consolidated balance from the current owner/apartment model.
         balance_row = await self._conn.fetchrow(
             """
             SELECT
-                COALESCE(SUM(fees_amount - payments_amount + fines_amount), 0.0) as total_balance
-            FROM (
-                SELECT
-                    COALESCE(af.amount, 0.0) as fees_amount,
-                    COALESCE(p.amount, 0.0) as payments_amount,
-                    COALESCE(f.amount, 0.0) as fines_amount
+                COALESCE(fees.total, 0.0)
+                - COALESCE(payments.total, 0.0)
+                + COALESCE(fines.total, 0.0) AS total_balance
+            FROM (SELECT $1::uuid AS owner_id) current_owner
+            LEFT JOIN LATERAL (
+                SELECT SUM(af.amount) AS total
                 FROM apartment_fees af
-                FULL OUTER JOIN payments p ON p.apartment_id = af.apartment_id AND p.period = af.period
-                FULL OUTER JOIN fines f ON f.apartment_id = af.apartment_id AND f.period = af.period
-                JOIN apartments a ON af.apartment_id = a.id
-                WHERE a.owner_id = $1 OR p.owner_id = $1 OR f.owner_id = $1
-            ) balance_calc
+                JOIN owner_apartments oa ON oa.apartment_id = af.apartment_id
+                WHERE oa.owner_id = current_owner.owner_id
+            ) fees ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT SUM(p.amount) AS total
+                FROM payments p
+                WHERE p.owner_id = current_owner.owner_id
+                  AND p.status = 'REGISTRADO'
+            ) payments ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT SUM(f.amount) AS total
+                FROM fines f
+                WHERE f.owner_id = current_owner.owner_id
+                  AND f.status = 'ACTIVA'
+            ) fines ON TRUE
             """,
             owner_id,
         )
@@ -298,3 +308,44 @@ class OwnerRepository:
         query = "UPDATE owners SET firebase_uid = $1, updated_at = NOW() WHERE id = $2"
         await self._conn.execute(query, str(user_id), owner_id)
         return True
+
+    async def update_profile(self, owner_id: UUID, data: OwnerProfileUpdate) -> dict | None:
+        row = await self._conn.fetchrow(
+            """
+            UPDATE owners SET
+                full_name = COALESCE($2, full_name),
+                document_id = COALESCE($3, document_id),
+                phone = COALESCE($4, phone),
+                email = COALESCE($5, email),
+                birth_date = COALESCE($6, birth_date),
+                occupant_name = COALESCE($7, occupant_name),
+                occupant_relation = COALESCE($8, occupant_relation),
+                occupant_phone = COALESCE($9, occupant_phone),
+                occupant_inhabitants = COALESCE($10, occupant_inhabitants),
+                emergency_name = COALESCE($11, emergency_name),
+                emergency_relation = COALESCE($12, emergency_relation),
+                emergency_phone = COALESCE($13, emergency_phone),
+                notifications_enabled = COALESCE($14, notifications_enabled),
+                last_update_date = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            """,
+            owner_id,
+            data.full_name,
+            data.document_id,
+            data.phone,
+            data.email,
+            data.birth_date,
+            data.occupant_name,
+            data.occupant_relation,
+            data.occupant_phone,
+            data.occupant_inhabitants,
+            data.emergency_name,
+            data.emergency_relation,
+            data.emergency_phone,
+            data.notifications_enabled,
+        )
+        if row:
+            return await self.get_by_id_with_apartments(owner_id)
+        return None

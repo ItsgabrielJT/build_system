@@ -445,45 +445,50 @@ class OwnerPaymentService:
         )
         return owner_table
 
-    def _build_building_photo_asset(self, building: dict) -> Image | Drawing:
+    def _build_building_photo_asset(self, building: dict, container_width: float, container_height: float):
         photo_path = building.get("photo_storage_path")
-        max_width = 3.55 * inch
-        max_height = 2.25 * inch
         if photo_path and Path(photo_path).exists():
             image = Image(photo_path)
-            image.drawWidth = max_width
-            image.drawHeight = max_height
+            image.drawWidth = container_width
+            image.drawHeight = container_height
             image.hAlign = "LEFT"
             return image
 
-        drawing = Drawing(max_width, max_height)
-        drawing.add(Rect(0, 0, 255, 158, strokeColor=colors.HexColor("#d1dae8"), fillColor=colors.HexColor("#f8fafc"), rx=8, ry=8))
-        drawing.add(String(127, 82, "Foto del edificio", fontName="Helvetica-Bold", fontSize=12, fillColor=colors.HexColor("#64748b"), textAnchor="middle"))
+        drawing = Drawing(container_width, container_height)
+        drawing.add(Rect(0, 0, container_width, container_height, strokeColor=colors.HexColor("#d1dae8"), fillColor=colors.HexColor("#f8fafc")))
+        drawing.add(String(container_width / 2, container_height / 2, "Foto del edificio", fontName="Helvetica-Bold", fontSize=12, fillColor=colors.HexColor("#64748b"), textAnchor="middle"))
         return drawing
 
     def _build_owner_photo_section(self, owner: dict, payment: dict, building: dict, styles: dict) -> Table:
+        card_width = 2.78 * inch
+        photo_col_width = _PAYMENT_CONTENT_WIDTH - card_width
+
+        owner_table = self._build_owner_info_table(owner, payment, styles)
+        # Medir la altura real del owner_table para igualar el contenedor de la foto
+        owner_table.wrap(card_width, 9999)
+        _, owner_height = owner_table.wrap(card_width, 9999)
+
+        photo_asset = self._build_building_photo_asset(building, photo_col_width, owner_height)
         photo_box = Table(
-            [[self._build_building_photo_asset(building)]],
-            colWidths=[3.55 * inch],
-            rowHeights=[2.25 * inch],
+            [[photo_asset]],
+            colWidths=[photo_col_width],
+            rowHeights=[owner_height],
         )
         photo_box.setStyle(
             TableStyle(
                 [
-                    ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#d1dae8")),
-                    ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
                     ("LEFTPADDING", (0, 0), (-1, -1), 0),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ]
             )
         )
         section = Table(
-            [[self._build_owner_info_table(owner, payment, styles), photo_box]],
-            colWidths=[2.85 * inch, 3.7 * inch],
+            [[owner_table, photo_box]],
+            colWidths=[card_width, photo_col_width],
         )
         section.setStyle(
             TableStyle(

@@ -188,6 +188,74 @@ class ReportService:
         ]))
         return [header, Spacer(1, 0.25 * cm)]
 
+    async def _three_column_report_header(
+        self,
+        title: str,
+        subtitle: str,
+        width: float,
+        *,
+        building: Optional[dict] = None,
+        right_text: Optional[str] = None,
+    ) -> list:
+        building = building if building is not None else await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+        logo = get_building_logo(building, max_width=2.8 * cm, max_height=2.4 * cm)
+        if not logo:
+            logo = self._p(
+                f"<b>{escape(get_building_name(building).upper())}</b>",
+                10,
+                bold=True,
+                align="CENTER",
+                raw=True,
+            )
+
+        title_block = Paragraph(
+            f"<font size='18'><b>{escape(title)}</b></font><br/><font size='9'>{escape(subtitle)}</font>",
+            ParagraphStyle(
+                "PdfHeaderTitle",
+                fontName="Helvetica",
+                fontSize=12,
+                leading=22,
+                textColor="#082f6f",
+                alignment=1,
+            ),
+        )
+
+        info_table = Table(
+            [
+                [self._p("Formatos: Habittauio", 8, bold=True, align="LEFT", raw=True)],
+                [self._p("Fecha de impresión", 8, bold=True, align="LEFT", raw=True)],
+                [self._p(self._spanish_date(datetime.now().date()), 8, align="LEFT", raw=True)],
+                [self._p(escape(right_text or ""), 8, align="LEFT", raw=True)] if right_text else [self._p("", 8, align="LEFT", raw=True)],
+            ],
+            colWidths=[4.3 * cm],
+        )
+        info_table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+        ]))
+
+        header = Table(
+            [[logo, title_block, info_table]],
+            colWidths=[3.2 * cm, width - 7.5 * cm, 4.3 * cm],
+        )
+        header.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (1, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LINEAFTER", (0, 0), (0, 0), 0.8, _PDF_BLUE),
+            ("LINEAFTER", (1, 0), (1, 0), 0.8, _PDF_BLUE),
+            ("LINEBELOW", (0, 0), (-1, -1), 1.2, _PDF_BLUE),
+        ]))
+        return [header, Spacer(1, 0.28 * cm)]
+
     def _metric_cards(self, cards: list[tuple[str, str, str]], width: float) -> Table:
         row = []
         col_width = width / len(cards)
@@ -227,6 +295,16 @@ class ReportService:
             Spacer(1, 0.18 * cm),
             build_pdf_footer_bar(building or {}, width=width),
         ]
+
+    def _footer_callback(self, building: Optional[dict], width: float):
+        def draw_footer(canvas, doc):
+            canvas.saveState()
+            footer = build_pdf_footer_bar(building or {}, width=doc.width, page_text=f"Página {doc.page}")
+            _, footer_height = footer.wrap(doc.width, doc.bottomMargin)
+            footer.drawOn(canvas, doc.leftMargin, doc.bottomMargin - footer_height)
+            canvas.restoreState()
+
+        return draw_footer
 
     def _styled_table(self, data: list[list], col_widths: list[float], *, font_size: int = 7, total_rows: Optional[list[int]] = None) -> Table:
         table = Table(data, colWidths=col_widths, repeatRows=1)
@@ -355,14 +433,14 @@ class ReportService:
         )
         return [dict(row) for row in rows]
 
-    async def _pdf_header(self, title: str, subtitle: str) -> list:
+    async def _pdf_header(self, title: str, subtitle: str, width: float) -> list:
         conn = getattr(self._payment_repo, "_conn", None)
         building = await get_default_building_config(conn)
         return build_pdf_brand_header(
             title,
             subtitle,
             building,
-            width=7.5 * inch,
+            width=width,
         )
 
     async def _payments(
@@ -713,11 +791,14 @@ class ReportService:
         doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
         story = []
 
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         story.extend(
-            await self._modern_report_header(
+            await self._three_column_report_header(
                 "Reporte Detallado de Ingresos",
                 f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
                 width,
+                building=building,
+                right_text=f"Período: {self._date_label(period, start_date, end_date)}",
             )
         )
         departments = len({p.get("apartment_code") for p in payments if p.get("apartment_code")})
@@ -755,8 +836,8 @@ class ReportService:
         final = Table([[self._p("Ingresos totales registrados en el período", 11, bold=True, color="#ffffff", align="LEFT"), self._p(self._usd(total), 14, bold=True, color="#ffffff")]], colWidths=[width * 0.72, width * 0.28])
         final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("LEFTPADDING", (0, 0), (-1, -1), 10)]))
         story.append(final)
-        story.extend(self._report_footer(width))
-        doc.build(story)
+        footer = self._footer_callback(building, width)
+        doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
     async def balance_pdf(
@@ -779,11 +860,14 @@ class ReportService:
         width = A4[0] - 2.2 * cm
         doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
         story = []
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         story.extend(
-            await self._modern_report_header(
+            await self._three_column_report_header(
                 "Balance de Fin de Mes - Ingresos y Egresos",
                 f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
                 width,
+                building=building,
+                right_text=f"Total ingresos: {self._usd(total_income)}",
             )
         )
         story.append(self._metric_cards([
@@ -823,8 +907,8 @@ class ReportService:
             {"label": "Total egresos", "current": total_expenses, "previous": 0},
             {"label": "Balance neto", "current": abs(balance), "previous": 0},
         ], width))
-        story.extend(self._report_footer(width))
-        doc.build(story)
+        footer = self._footer_callback(building, width)
+        doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
     async def payments_pdf(
@@ -839,12 +923,16 @@ class ReportService:
         by_method = self._build_breakdown(payments, "method", "Sin método")
 
         output = io.BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.8*inch)
         story = []
         styles = getSampleStyleSheet()
-        story.extend(await self._pdf_header(
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+        story.extend(await self._three_column_report_header(
             "Reporte Detallado de Pagos",
             f"Rango: {self._date_label(period, start_date, end_date)} | Estado: {status or 'Todos'}",
+            width=doc.width,
+            building=building,
+            right_text=f"Total recaudado: {self._money(total)}",
         ))
         summary = Table(
             [["Pagos", "Total recaudado", "Métodos"], [str(len(payments)), self._money(total), str(len(by_method))]],
@@ -869,8 +957,8 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 1.1*inch, 0.55*inch, 0.7*inch, 0.75*inch, 0.75*inch, 0.85*inch, 1.05*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
-        doc.build(story)
+        footer = self._footer_callback(building, doc.width)
+        doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
     async def expenses_pdf(
@@ -889,10 +977,13 @@ class ReportService:
         width = A4[0] - 2.2 * cm
         doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
         story = []
-        story.extend(await self._modern_report_header(
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+        story.extend(await self._three_column_report_header(
             "Reporte Detallado de Gastos",
             f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
             width,
+            building=building,
+            right_text=f"Total egresos: {self._money(total)}",
         ))
         story.append(self._metric_cards([
             ("Gastos", str(len(expenses)), "▣"),
@@ -927,8 +1018,8 @@ class ReportService:
                 for row in by_category[:4]
             ],
         ], width))
-        story.extend(self._report_footer(width))
-        doc.build(story)
+        footer = self._footer_callback(building, width)
+        doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
     async def delinquency_pdf(self) -> bytes:
@@ -943,6 +1034,7 @@ class ReportService:
             await self._pdf_header(
                 "Reporte de Morosidad",
                 f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                width=doc.width,
             )
         )
         
@@ -973,9 +1065,9 @@ class ReportService:
         story.append(table)
         story.append(Spacer(1, 0.3*inch))
         story.append(Paragraph("Reporte generado automáticamente", styles['Normal']))
-        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
+        footer = self._footer_callback(await get_default_building_config(getattr(self._payment_repo, "_conn", None)), doc.width)
         
-        doc.build(story)
+        doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
     # ─── EXCEL REPORTS ───────────────────────────────────────────────────────
@@ -1305,7 +1397,7 @@ class ReportService:
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
         styles = getSampleStyleSheet()
-        story.extend(await self._pdf_header("Reporte Detallado de Cuotas", f"Rango: {self._date_label(None, start_date, end_date)}"))
+        story.extend(await self._pdf_header("Reporte Detallado de Cuotas", f"Rango: {self._date_label(None, start_date, end_date)}", width=doc.width))
         summary = Table([["Cuotas", "Emitido", "Recaudado", "Pendiente"], [str(len(rows)), self._money(total), self._money(collected), self._money(total - collected)]])
         summary.setStyle(self._table_style(8))
         story.extend([summary, Spacer(1, 0.2*inch), Paragraph("Detalle de cuotas", styles["Heading3"])])
@@ -1342,7 +1434,7 @@ class ReportService:
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
         styles = getSampleStyleSheet()
-        story.extend(await self._pdf_header("Reporte Detallado de Multas", f"Rango: {self._date_label(period, start_date, end_date)} | Estado: {status or 'Todos'}"))
+        story.extend(await self._pdf_header("Reporte Detallado de Multas", f"Rango: {self._date_label(period, start_date, end_date)} | Estado: {status or 'Todos'}", width=doc.width))
         summary = Table([["Multas", "Monto total"], [str(len(rows)), self._money(total)]], colWidths=[2*inch, 2*inch])
         summary.setStyle(self._table_style(8))
         story.extend([summary, Spacer(1, 0.2*inch), Paragraph("Detalle de multas", styles["Heading3"])])
@@ -1378,7 +1470,7 @@ class ReportService:
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
         styles = getSampleStyleSheet()
-        story.extend(await self._pdf_header("Reporte de Propietarios", f"Rango: {self._date_label(None, start_date, end_date)} | Estado: {status or 'Todos'}"))
+        story.extend(await self._pdf_header("Reporte de Propietarios", f"Rango: {self._date_label(None, start_date, end_date)} | Estado: {status or 'Todos'}", width=doc.width))
         story.extend([Paragraph(f"Total de propietarios: {len(rows)}", styles["Heading3"]), Spacer(1, 0.15*inch)])
         data = [["Ingreso", "Propietario", "Documento", "Email", "Teléfono", "Unidades", "Estado"]]
         data.extend([[str(r.get("created_at").date() if r.get("created_at") else ""), r.get("full_name", ""), r.get("document_id", ""), r.get("email", ""), r.get("phone", ""), r.get("units") or "", r.get("status", "")] for r in rows])
@@ -1412,7 +1504,7 @@ class ReportService:
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
         styles = getSampleStyleSheet()
-        story.extend(await self._pdf_header("Reporte de Edificios", f"Rango: {self._date_label(None, start_date, end_date)}"))
+        story.extend(await self._pdf_header("Reporte de Edificios", f"Rango: {self._date_label(None, start_date, end_date)}", width=doc.width))
         story.extend([Paragraph(f"Total de edificios: {len(rows)}", styles["Heading3"]), Spacer(1, 0.15*inch)])
         data = [["Creado", "Edificio", "Dirección", "Teléfono", "Email", "Departamentos"]]
         data.extend([[str(r.get("created_at").date() if r.get("created_at") else ""), r.get("name", ""), r.get("address", ""), r.get("phone", ""), r.get("email", ""), str(r.get("apartments_count", 0))] for r in rows])
@@ -1635,18 +1727,19 @@ class ReportService:
         
         # Title block next to logo
         header_title = Paragraph(
-            "<font size='13' color='#123c7a'><b>FICHA DEL COPROPIETARIO</b></font>",
-            ParagraphStyle("HeaderTitle", fontName="Helvetica-Bold", leading=14, alignment=0)
+            "<font size='14' color='#123c7a'><b>FICHA DEL COPROPIETARIO</b></font>",
+            ParagraphStyle("HeaderTitle", fontName="Helvetica-Bold", leading=16, alignment=1)
         )
         
         header_table = Table(
             [[building_logo, header_title, qr_draw, info_headers]],
-            colWidths=[2.8 * cm, width * 0.45, 2 * cm, width - (2.8 * cm + width * 0.45 + 2 * cm)]
+            colWidths=[2.8 * cm, width * 0.44, 2 * cm, width - (2.8 * cm + width * 0.44 + 2 * cm)]
         )
         header_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ALIGN", (1, 0), (1, 0), "LEFT"),
-            ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+            ("ALIGN", (1, 0), (1, 0), "CENTER"),
+            ("ALIGN", (2, 0), (2, 0), "CENTER"),
+            ("ALIGN", (3, 0), (3, 0), "RIGHT"),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ("LINEBELOW", (0, 0), (-1, -1), 0.6, colors.HexColor("#123c7a")),
         ]))
@@ -2027,9 +2120,11 @@ class ReportService:
         story.append(Spacer(1, 0.18 * cm))
         
         def draw_footer(canvas, doc):
-            footer = build_pdf_footer_bar(building, width=width, page_text="Página %d de 1" % doc.page)
-            footer.wrapOn(canvas, doc.width, doc.bottomMargin)
-            footer.drawOn(canvas, doc.leftMargin, doc.bottomMargin - 1.3 * cm)
+            canvas.saveState()
+            footer = build_pdf_footer_bar(building, width=doc.width, page_text=f"Página {doc.page}")
+            _, footer_height = footer.wrap(doc.width, doc.bottomMargin)
+            footer.drawOn(canvas, doc.leftMargin, doc.bottomMargin - footer_height)
+            canvas.restoreState()
 
         doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
         return output.getvalue()

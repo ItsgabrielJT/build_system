@@ -282,10 +282,14 @@ class OwnerPaymentService:
         return f"{months.get(month_str, month_str)} de {year_str}"
 
     def _build_document_number(self, payment: dict, prefix: str) -> str:
-        import random
-        import string
-        suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        return f"{prefix}-{payment['period']}-{suffix}"
+        period = str(payment.get("period") or "")
+        apartment_code = str(payment.get("apartment_code") or payment.get("apartment_id") or "")
+        apartment_code = apartment_code.replace(" ", "").upper()
+        if not period:
+            period = datetime.now().strftime("%Y-%m")
+        if apartment_code:
+            return f"{prefix}-{period}-{apartment_code}"
+        return f"{prefix}-{period}-{str(payment.get('id') or '')[:8].upper()}"
 
     async def _get_building_config(self, payment: dict) -> dict:
         conn = getattr(self._payment_repo, "_conn", None)
@@ -445,11 +449,10 @@ class OwnerPaymentService:
         photo_path = building.get("photo_storage_path")
         if photo_path and Path(photo_path).exists():
             image = Image(photo_path)
-            max_width = 3.55 * inch
-            max_height = 2.2 * inch
-            ratio = min(max_width / image.imageWidth, max_height / image.imageHeight)
-            image.drawWidth = image.imageWidth * ratio
-            image.drawHeight = image.imageHeight * ratio
+            max_width = 3.7 * inch
+            max_height = 2.25 * inch
+            image.drawWidth = max_width
+            image.drawHeight = max_height
             return image
 
         drawing = Drawing(255, 158)

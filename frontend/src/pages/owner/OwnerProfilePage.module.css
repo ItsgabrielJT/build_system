@@ -3,7 +3,6 @@
   max-width: none;
   margin: 0 auto;
   min-height: calc(100vh - var(--navbar-height));
-  padding-bottom: 5.5rem; /* Space for the bottom sticky bar */
   font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
 }
 
@@ -557,17 +556,11 @@
 
 /* Sticky Bottom Bar */
 .bottomBar {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  left: 0;
   background: #ffffff;
   border-top: 1px solid #e5e7eb;
-  padding: 0.85rem 1.5rem;
   display: flex;
   justify-content: flex-end;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.03);
-  z-index: 100;
 }
 
 .saveChangesBtn {

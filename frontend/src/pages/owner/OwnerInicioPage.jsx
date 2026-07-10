@@ -4,17 +4,29 @@ import { useAuth } from '../../hooks/useAuth';
 import { getOwnerProfile } from '../../services/ownerService';
 import { getRecentAnnouncements } from '../../services/announcementService';
 import { getMyEvents } from '../../services/eventService';
+import { getBuildingAssetBlob, getBuildingConfig } from '../../services/buildingService';
 import { useNotification } from '../../context/NotificationContext';
 import styles from './OwnerInicioPage.module.css';
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function OwnerInicioPage() {
   const navigate = useNavigate();
   const { token } = useAuth();
-  const { error: toastError } = useNotification();
+  const { success: toastSuccess, error: toastError } = useNotification();
 
   const [profile, setProfile] = useState(null);
+  const [buildingConfig, setBuildingConfig] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [events, setEvents] = useState([]);
+  const [downloadingRegulation, setDownloadingRegulation] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,10 +34,11 @@ export default function OwnerInicioPage() {
       if (!token) return;
       try {
         setLoading(true);
-        const [profileResult, announcementsResult, eventsResult] = await Promise.allSettled([
+        const [profileResult, announcementsResult, eventsResult, buildingConfigResult] = await Promise.allSettled([
           getOwnerProfile(token),
           getRecentAnnouncements(token, 5),
           getMyEvents(token),
+          getBuildingConfig(token),
         ]);
 
         if (profileResult.status === 'fulfilled') {
@@ -46,7 +59,13 @@ export default function OwnerInicioPage() {
           console.error('Error loading events:', eventsResult.reason);
         }
 
-        if ([profileResult, announcementsResult, eventsResult].some((result) => result.status === 'rejected')) {
+        if (buildingConfigResult.status === 'fulfilled') {
+          setBuildingConfig(buildingConfigResult.value);
+        } else {
+          console.error('Error loading building config:', buildingConfigResult.reason);
+        }
+
+        if ([profileResult, announcementsResult, eventsResult, buildingConfigResult].some((result) => result.status === 'rejected')) {
           toastError('No se pudo cargar toda la información del panel');
         }
       } catch (err) {
@@ -121,6 +140,24 @@ export default function OwnerInicioPage() {
 
   // Get first 2 announcements
   const displayAnnouncements = announcements.slice(0, 2);
+
+  const handleDownloadRegulation = async () => {
+    if (!token || !buildingConfig?.id) {
+      toastError('No se encontró la configuración del edificio.');
+      return;
+    }
+
+    setDownloadingRegulation(true);
+    try {
+      const blob = await getBuildingAssetBlob(buildingConfig.id, 'regulation', token);
+      triggerDownload(blob, buildingConfig.regulation_file_name || 'reglamento-edificio.pdf');
+      toastSuccess('Reglamento descargado correctamente.');
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'No se pudo descargar el reglamento.');
+    } finally {
+      setDownloadingRegulation(false);
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -261,6 +298,24 @@ export default function OwnerInicioPage() {
                     <strong className={`${styles.fieldValue} ${styles.textSuccess}`}>Al día</strong>
                   </div>
                 </div>
+              </div>
+
+              <div className={styles.profileRegulationSection}>
+                <span className={styles.profileRegulationTitle}>Descargar reglamento</span>
+                <p className={styles.profileRegulationDescription}>
+                  Obtenga el PDF oficial cargado por administración.
+                </p>
+                <button
+                  type="button"
+                  className={styles.profileRegulationButton}
+                  onClick={handleDownloadRegulation}
+                  disabled={downloadingRegulation || !buildingConfig?.regulation_file_name}
+                >
+                  {downloadingRegulation ? 'Descargando...' : 'Descargar PDF'}
+                </button>
+                {!buildingConfig?.regulation_file_name ? (
+                  <small className={styles.profileRegulationHint}>Aún no hay reglamento disponible.</small>
+                ) : null}
               </div>
             </aside>
 

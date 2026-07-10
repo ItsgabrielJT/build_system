@@ -6,6 +6,7 @@ import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
+from uuid import UUID
 from xml.sax.saxutils import escape
 
 from openpyxl import Workbook
@@ -13,6 +14,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm, inch
+from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import HRFlowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
@@ -973,54 +975,86 @@ class ReportService:
         previous_by_category = {row["label"]: row["amount"] for row in self._build_breakdown(previous_expenses, "category", "Sin categoría")}
         by_category = self._build_breakdown(expenses, "category", "Sin categoría")
 
-        output = io.BytesIO()
-        width = A4[0] - 2.2 * cm
-        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
-        story = []
-        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
-        story.extend(await self._three_column_report_header(
-            "Reporte Detallado de Gastos",
-            f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-            width,
-            building=building,
-            right_text=f"Total egresos: {self._money(total)}",
-        ))
-        story.append(self._metric_cards([
-            ("Gastos", str(len(expenses)), "▣"),
-            ("Total", self._money(total), "$"),
-            ("Categorías", str(len(by_category)), "▦"),
-        ], width))
-        story.append(Spacer(1, 0.25 * cm))
-        story.append(self._section_title("Detalle de gastos", width))
-        data = [["Fecha", "Proveedor", "Categoría", "Concepto", "Monto", "Comprobante"]]
-        for e in expenses:
-            data.append([
-                str(e.get("date") or ""),
-                self._p(e.get("provider") or "", 6),
-                self._p(e.get("category") or "Sin categoría", 6),
-                self._p(e.get("concept") or "", 6),
-                self._money(e.get("amount", 0)),
-                self._p(e.get("receipt_file_name") or "Sin adjunto", 6),
-            ])
-        if len(data) == 1:
-            data.append(["-", "-", "-", "Sin gastos registrados", self._money(0), "-"])
-        story.append(self._styled_table(data[:14], [2 * cm, 3.8 * cm, 2.8 * cm, 5.2 * cm, 2 * cm, 3.1 * cm], font_size=6))
-        story.append(Spacer(1, 0.22 * cm))
-        final = Table([[self._p("Egresos totales registrados en el período", 11, bold=True, color="#ffffff", align="LEFT"), self._p(self._money(total), 16, bold=True, color="#ffffff")]], colWidths=[width * 0.76, width * 0.24])
-        final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("LEFTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
-        story.append(final)
-        story.append(Spacer(1, 0.22 * cm))
-        story.append(self._section_title("Comparativo respecto al mes anterior", width))
-        story.append(self._comparison_table([
-            {"label": "Egresos totales registrados en el período", "current": total, "previous": sum(previous_by_category.values())},
-            *[
-                {"label": row["label"], "current": row["amount"], "previous": previous_by_category.get(row["label"], 0)}
-                for row in by_category[:4]
-            ],
-        ], width))
-        footer = self._footer_callback(building, width)
-        doc.build(story, onFirstPage=footer, onLaterPages=footer)
-        return output.getvalue()
+        try:
+            output = io.BytesIO()
+            width = A4[0] - 2.2 * cm
+            doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
+            story = []
+            building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+            story.extend(await self._three_column_report_header(
+                "Reporte Detallado de Gastos",
+                f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                width,
+                building=building,
+                right_text=f"Total egresos: {self._money(total)}",
+            ))
+            story.append(self._metric_cards([
+                ("Gastos", str(len(expenses)), "▣"),
+                ("Total", self._money(total), "$"),
+                ("Categorías", str(len(by_category)), "▦"),
+            ], width))
+            story.append(Spacer(1, 0.25 * cm))
+            story.append(self._section_title("Detalle de gastos", width))
+            data = [["Fecha", "Proveedor", "Categoría", "Concepto", "Monto", "Comprobante"]]
+            for e in expenses:
+                data.append([
+                    str(e.get("date") or ""),
+                    self._p(e.get("provider") or "", 6),
+                    self._p(e.get("category") or "Sin categoría", 6),
+                    self._p(e.get("concept") or "", 6),
+                    self._money(e.get("amount", 0)),
+                    self._p(e.get("receipt_file_name") or "Sin adjunto", 6),
+                ])
+            if len(data) == 1:
+                data.append(["-", "-", "-", "Sin gastos registrados", self._money(0), "-"])
+            story.append(self._styled_table(data[:14], [2 * cm, 3.8 * cm, 2.8 * cm, 5.2 * cm, 2 * cm, 3.1 * cm], font_size=6))
+            story.append(Spacer(1, 0.22 * cm))
+            final = Table([[self._p("Egresos totales registrados en el período", 11, bold=True, color="#ffffff", align="LEFT"), self._p(self._money(total), 16, bold=True, color="#ffffff")]], colWidths=[width * 0.76, width * 0.24])
+            final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("LEFTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
+            story.append(final)
+            story.append(Spacer(1, 0.22 * cm))
+            story.append(self._section_title("Comparativo respecto al mes anterior", width))
+            story.append(self._comparison_table([
+                {"label": "Egresos totales registrados en el período", "current": total, "previous": sum(previous_by_category.values())},
+                *[
+                    {"label": row["label"], "current": row["amount"], "previous": previous_by_category.get(row["label"], 0)}
+                    for row in by_category[:4]
+                ],
+            ], width))
+            footer = self._footer_callback(building, width)
+            doc.build(story, onFirstPage=footer, onLaterPages=footer)
+            return output.getvalue()
+        except Exception:
+            # Fallback resiliente para evitar errores 500 por problemas de layout PDF.
+            output = io.BytesIO()
+            doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.6 * inch, bottomMargin=0.6 * inch)
+            styles = getSampleStyleSheet()
+            story = [
+                Paragraph("Reporte de Gastos", styles["Title"]),
+                Spacer(1, 0.14 * inch),
+                Paragraph(f"Rango: {self._date_label(period, start_date, end_date)}", styles["Normal"]),
+                Paragraph(f"Total egresos: {self._money(total)}", styles["Normal"]),
+                Spacer(1, 0.2 * inch),
+            ]
+
+            table_data = [["Fecha", "Proveedor", "Categoría", "Concepto", "Monto"]]
+            for item in expenses[:40]:
+                table_data.append([
+                    str(item.get("date") or ""),
+                    str(item.get("provider") or "")[:40],
+                    str(item.get("category") or "Sin categoría")[:30],
+                    str(item.get("concept") or "")[:60],
+                    self._money(item.get("amount", 0)),
+                ])
+
+            if len(table_data) == 1:
+                table_data.append(["-", "-", "-", "Sin gastos registrados", self._money(0)])
+
+            table = Table(table_data, colWidths=[1.1 * inch, 1.4 * inch, 1.2 * inch, 2.5 * inch, 1.0 * inch], repeatRows=1)
+            table.setStyle(self._table_style(7))
+            story.append(table)
+            doc.build(story)
+            return output.getvalue()
 
     async def delinquency_pdf(self) -> bytes:
         owners = await self._delinquency.list_owners()
@@ -1693,57 +1727,45 @@ class ReportService:
             drawing.add(code)
             return drawing
             
-        # Branded Header (specific to Ficha del copropietario as in the screenshot)
-        building_logo = get_building_logo(building, max_width=2.5 * cm, max_height=2.2 * cm)
-        if not building_logo:
-            # Styled building title as fallback
-            building_logo = Paragraph(
-                "<font size='10' color='#123c7a'><b>EDIFICIO</b></font><br/>"
-                "<font size='15' color='#123c7a'><b>TORRES NETANYA</b></font><br/>"
-                "<font size='7' color='#6b7280'>Sistema de administración</font>",
-                ParagraphStyle("HeaderLogoFallback", fontName="Helvetica", leading=11)
-            )
-            
         # Emission date and sheet number block
         emission_date = datetime.now().strftime("%d/%m/%Y")
         sheet_number = f"FTN-{datetime.now().year}-{str(owner['document_id'])[-6:].zfill(6)}"
-        
-        info_headers = Table(
-            [
-                [Paragraph("<font size='7' color='#4b5563'>Fecha de emisión: " + emission_date + "</font>", ParagraphStyle("H1", fontName="Helvetica", align="RIGHT"))],
-                [Paragraph("<font size='7' color='#4b5563'><b>Ficha N.°: " + sheet_number + "</b></font>", ParagraphStyle("H2", fontName="Helvetica-Bold", align="RIGHT"))]
-            ],
-            colWidths=[4.5 * cm]
-        )
-        info_headers.setStyle(TableStyle([
-            ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ("TOPPADDING", (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-        ]))
-        
+
         qr_draw = _qr_drawing(f"FICHA-{owner['id']}-{sheet_number}", size=1.8 * cm)
-        
-        # Title block next to logo
-        header_title = Paragraph(
-            "<font size='14' color='#123c7a'><b>FICHA DEL COPROPIETARIO</b></font>",
-            ParagraphStyle("HeaderTitle", fontName="Helvetica-Bold", leading=16, alignment=1)
+        story.extend(
+            build_pdf_brand_header(
+                "FICHA DEL COPROPIETARIO",
+                f"Ficha N.°: {sheet_number}",
+                building,
+                width=width,
+            )
         )
-        
-        header_table = Table(
-            [[building_logo, header_title, qr_draw, info_headers]],
-            colWidths=[2.8 * cm, width * 0.44, 2 * cm, width - (2.8 * cm + width * 0.44 + 2 * cm)]
+
+        header_info = Table(
+            [
+                [
+                    qr_draw,
+                    Paragraph(
+                        "<font size='8' color='#123c7a'><b>DATOS DE EMISION</b></font><br/>"
+                        f"<font size='8' color='#4b5563'>Fecha de emisión: {emission_date}</font><br/>"
+                        f"<font size='8' color='#4b5563'><b>Ficha N.°: {sheet_number}</b></font>",
+                        ParagraphStyle("FichaHeaderInfo", fontName="Helvetica", leading=11),
+                    ),
+                ]
+            ],
+            colWidths=[2.1 * cm, width - 2.1 * cm],
         )
-        header_table.setStyle(TableStyle([
+        header_info.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#123c7a")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#d4dfef")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ALIGN", (1, 0), (1, 0), "CENTER"),
-            ("ALIGN", (2, 0), (2, 0), "CENTER"),
-            ("ALIGN", (3, 0), (3, 0), "RIGHT"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-            ("LINEBELOW", (0, 0), (-1, -1), 0.6, colors.HexColor("#123c7a")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ]))
-        story.append(header_table)
+        story.append(header_info)
         story.append(Spacer(1, 0.08 * cm))
         
         # Helper for sections titles

@@ -36,7 +36,7 @@
 /* Grid Layout */
 .grid {
   display: grid;
-  grid-template-columns: 280px 1fr 340px;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(280px, 340px);
   gap: 1.5rem;
   align-items: stretch;
 }
@@ -48,11 +48,12 @@
   flex-direction: column;
   gap: 1.25rem;
   height: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 1200px) {
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -250,11 +251,12 @@
 
 .cardsRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 1.25rem;
+  min-width: 0;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1280px) {
   .cardsRow {
     grid-template-columns: 1fr;
   }
@@ -290,6 +292,8 @@
 }
 
 .formGroup input {
+  width: 100%;
+  min-width: 0;
   padding: 0.5rem 0.75rem;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
@@ -358,6 +362,83 @@
 
 .statusDangerInline {
   color: #c74444;
+}
+
+.rowCard .cardHeader {
+  gap: 0.75rem;
+}
+
+.rowCard .cardTitle {
+  min-width: 0;
+}
+
+.rowCard .cardTitle h3 {
+  overflow-wrap: anywhere;
+}
+
+.rowCard .formGrid {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1480px) {
+  .rowCard .formGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.inlineSaveBar {
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #dbe5f2;
+  border-radius: 10px;
+  background: #f7faff;
+}
+
+.inlineSaveText {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #35537f;
+  font-weight: 600;
+}
+
+.inlineSaveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: none;
+  border-radius: 8px;
+  padding: 0.58rem 0.9rem;
+  background: #123c7a;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.inlineSaveBtn:hover:not(:disabled) {
+  background: #0b2a59;
+}
+
+.inlineSaveBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .inlineSaveBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inlineSaveBtn {
+    width: 100%;
+  }
 }
 
 /* Security List styling */

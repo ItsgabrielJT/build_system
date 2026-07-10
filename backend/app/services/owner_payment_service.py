@@ -389,6 +389,68 @@ class OwnerPaymentService:
         )
         return header
 
+    def _build_report_style_header(
+        self,
+        title: str,
+        subtitle: str,
+        document_number: str,
+        building: dict,
+    ) -> list:
+        title_block = Paragraph(
+            f'<font size="18" color="#082f6f"><b>{escape(title)}</b></font><br/><font size="9" color="#4b5563">{escape(subtitle)}</font>',
+            ParagraphStyle(
+                "ReceiptHeaderTitle",
+                fontName="Helvetica",
+                fontSize=12,
+                leading=20,
+                alignment=1,
+                textColor=_PRIMARY_BLUE,
+            ),
+        )
+
+        info_box = Table(
+            [
+                [Paragraph('<font size="8" color="#5f6b7a">Documento No.</font>', ParagraphStyle("ReceiptHeaderLabel", fontName="Helvetica"))],
+                [Paragraph(f'<font size="12" color="#123c7a"><b>{escape(document_number)}</b></font>', ParagraphStyle("ReceiptHeaderDocNo", fontName="Helvetica-Bold"))],
+                [Paragraph(f'<font size="8" color="#5f6b7a">Emitido: {datetime.now().strftime("%d/%m/%Y")}</font>', ParagraphStyle("ReceiptHeaderDate", fontName="Helvetica"))],
+            ],
+            colWidths=[2.35 * inch],
+        )
+        info_box.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.9, _PRIMARY_BLUE),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#d8e3f2")),
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ]
+            )
+        )
+
+        header = Table(
+            [[self._build_logo_asset(building), title_block, info_box]],
+            colWidths=[1.75 * inch, 2.45 * inch, 2.35 * inch],
+        )
+        header.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("ALIGN", (0, 0), (1, 0), "CENTER"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                    ("LINEAFTER", (0, 0), (0, 0), 0.8, colors.HexColor("#d8e3f2")),
+                    ("LINEBELOW", (0, 0), (-1, -1), 1.2, _PRIMARY_BLUE),
+                ]
+            )
+        )
+        return [header, Spacer(1, 0.12 * inch)]
+
     def _build_section_title(self, title: str, width: float = _PAYMENT_CONTENT_WIDTH) -> Table:
         table = Table([[Paragraph(title, self._base_pdf_styles()["section"])]], colWidths=[width])
         table.setStyle(
@@ -610,11 +672,17 @@ class OwnerPaymentService:
         signer_label: str,
         building: dict,
         ok: bool = True,
+        use_report_style_header: bool = False,
     ) -> list:
         styles = self._base_pdf_styles()
+        header_blocks = (
+            self._build_report_style_header(title, subtitle, document_number, building)
+            if use_report_style_header
+            else [self._build_header_table(title, subtitle, document_number, building)]
+        )
         story = [
-            self._build_header_table(title, subtitle, document_number, building),
-            Spacer(1, 0.14 * inch),
+            *header_blocks,
+            Spacer(1, 0.12 * inch),
             Table([["" ]], colWidths=[_PAYMENT_CONTENT_WIDTH], rowHeights=[0.03 * inch], style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PRIMARY_BLUE)])),
             Spacer(1, 0.14 * inch),
             self._build_owner_photo_section(owner, payment, building, styles),
@@ -720,6 +788,7 @@ class OwnerPaymentService:
             status_text="Pago aprobado",
             signer_label=payment.get("approved_by") or "Administracion",
             building=building,
+            use_report_style_header=True,
         )
         doc.build(story)
         return output.getvalue()

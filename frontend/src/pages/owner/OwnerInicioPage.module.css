@@ -186,6 +186,56 @@
   padding-top: 1.25rem;
 }
 
+.profileRegulationSection {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed #dbeafe;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profileRegulationTitle {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f2963;
+}
+
+.profileRegulationDescription {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.profileRegulationButton {
+  border: 1px solid #3b82f6;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profileRegulationButton:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.profileRegulationButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.profileRegulationHint {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
 .profileField {
   display: flex;
   gap: 12px;

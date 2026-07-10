@@ -7,8 +7,6 @@ import {
   getBuildingConfig,
   updateBuildingConfig,
 } from '../../services/buildingService';
-import { downloadBuildingsReport } from '../../services/reportService';
-import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './AdminSettingsPage.module.css';
 
 const initialForm = {
@@ -18,29 +16,9 @@ const initialForm = {
   email: '',
 };
 
-function getCurrentMonthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-  };
-}
-
-function triggerDownload(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 export default function AdminSettingsPage() {
   const { token } = useAuth();
   const { success, error: toastError } = useNotification();
-  const initialRange = getCurrentMonthRange();
   const layoutContext = useOutletContext() || {};
   const [building, setBuilding] = useState(layoutContext.building || null);
   const [formData, setFormData] = useState(initialForm);
@@ -60,9 +38,6 @@ export default function AdminSettingsPage() {
     signature: null,
     seal: null,
   });
-  const [reportStartDate, setReportStartDate] = useState(initialRange.startDate);
-  const [reportEndDate, setReportEndDate] = useState(initialRange.endDate);
-  const [exportingReport, setExportingReport] = useState(null);
 
   useEffect(() => {
     if (layoutContext.building) {
@@ -118,6 +93,8 @@ export default function AdminSettingsPage() {
     setAssetPreviews((prev) => ({
       photo: nextUrls.photo || prev.photo,
       logo: nextUrls.logo || prev.logo,
+      signature: nextUrls.signature || prev.signature,
+      seal: nextUrls.seal || prev.seal,
     }));
 
     return () => {
@@ -216,27 +193,6 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleDownloadReport = async (format) => {
-    setExportingReport(format);
-    setError(null);
-    try {
-      const blob = await downloadBuildingsReport(token, {
-        format,
-        start_date: reportStartDate,
-        end_date: reportEndDate,
-      });
-      const ext = format === 'excel' ? 'xlsx' : 'pdf';
-      triggerDownload(blob, `reporte-edificios-${reportStartDate}-${reportEndDate}.${ext}`);
-      success(`Reporte de edificios descargado en ${format === 'excel' ? 'Excel' : 'PDF'}`);
-    } catch (err) {
-      const message = err.response?.data?.detail || 'Error al descargar el reporte de edificios.';
-      setError(message);
-      toastError(message);
-    } finally {
-      setExportingReport(null);
-    }
-  };
-
   if (loading) {
     return <div className={styles.loading}>Cargando configuración...</div>;
   }
@@ -248,24 +204,6 @@ export default function AdminSettingsPage() {
           <div className={styles.breadcrumb}>Admin / Configuración</div>
           <h1>Configuración del edificio</h1>
           <p>Estos datos se usan en el título del sistema, comprobantes y PDFs generados.</p>
-        </div>
-        <div className={styles.reportActions}>
-          <label className={styles.dateField}>
-            <span>Inicio</span>
-            <input type="date" value={reportStartDate} onChange={(event) => setReportStartDate(event.target.value)} />
-          </label>
-          <label className={styles.dateField}>
-            <span>Fin</span>
-            <input type="date" value={reportEndDate} onChange={(event) => setReportEndDate(event.target.value)} />
-          </label>
-          <button type="button" className={styles.btnReport} onClick={() => handleDownloadReport('pdf')} disabled={exportingReport === 'pdf'}>
-            <DownloadIcon />
-            {exportingReport === 'pdf' ? 'Generando...' : 'PDF'}
-          </button>
-          <button type="button" className={styles.btnReportSecondary} onClick={() => handleDownloadReport('excel')} disabled={exportingReport === 'excel'}>
-            <DownloadIcon />
-            {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
-          </button>
         </div>
       </section>
 

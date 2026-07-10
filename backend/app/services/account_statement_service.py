@@ -182,6 +182,60 @@ class AccountStatementService:
         ]))
         return header
 
+    def _report_style_doc_header(self, title: str, doc_no: str, building: dict | None, width: float) -> list:
+        logo = get_building_logo(building, max_width=2.8 * cm, max_height=2.4 * cm)
+        if not logo:
+            logo = self._p(
+                f"<b>{escape(get_building_name(building).upper())}</b>",
+                10,
+                bold=True,
+                align="CENTER",
+                raw=True,
+            )
+
+        title_block = Paragraph(
+            f"<font size='18'><b>{escape(title)}</b></font><br/><font size='9'>Emitido el {escape(self._spanish_date(date.today()))}</font>",
+            ParagraphStyle(
+                "AccountHeaderTitle",
+                fontName="Helvetica",
+                fontSize=12,
+                leading=22,
+                textColor="#082f6f",
+                alignment=1,
+            ),
+        )
+
+        info_table = Table(
+            [
+                [self._p("Documento", 8, bold=True, color="#123c7a", align="LEFT")],
+                [self._p(doc_no, 10, bold=True, color="#123c7a", align="LEFT")],
+                [self._p("Documento emitido automaticamente", 8, color="#4b5563", align="LEFT")],
+            ],
+            colWidths=[4.3 * cm],
+        )
+        info_table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#123c7a")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#d4dfef")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        header = Table([[logo, title_block, info_table]], colWidths=[3.2 * cm, width - 7.5 * cm, 4.3 * cm])
+        header.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ALIGN", (0, 0), (1, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LINEAFTER", (0, 0), (0, 0), 0.8, colors.HexColor("#123c7a")),
+            ("LINEAFTER", (1, 0), (1, 0), 0.8, colors.HexColor("#123c7a")),
+            ("LINEBELOW", (0, 0), (-1, -1), 1.2, colors.HexColor("#123c7a")),
+        ]))
+        return [header, Spacer(1, 0.2 * cm)]
+
     def _blue_table(self, data: list[list], col_widths: list[float], *, font_size: int = 7, total_rows: Optional[list[int]] = None) -> Table:
         table = Table(data, colWidths=col_widths, repeatRows=1)
         style = [
@@ -228,9 +282,8 @@ class AccountStatementService:
             footer.drawOn(canvas, pdf_doc.leftMargin, footer_y)
             canvas.restoreState()
 
-        story = [self._doc_header("Estado de Cuenta", f"N. EC-{date.today().year}-000245", building, width)]
-        story.append(self._p("<font size='16'><b>ESTADO DE CUENTA</b></font>", 14, align="RIGHT", raw=True))
-        story.append(Spacer(1, 0.3 * cm))
+        story = [*self._report_style_doc_header("Estado de Cuenta", f"N. EC-{date.today().year}-000245", building, width)]
+        story.append(Spacer(1, 0.18 * cm))
         owner = profile or {}
         apt = (owner.get("apartments") or [{}])[0]
         owner_box = Table(

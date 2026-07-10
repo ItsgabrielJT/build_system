@@ -162,6 +162,8 @@ export default function OwnerProfilePage() {
   });
   const [changingPassword, setChangingPassword] = useState(false);
 
+  const isAnySectionEditing = isEditingPersonal || isEditingOccupant || isEditingEmergency;
+
   useEffect(() => {
     async function loadProfile() {
       try {
@@ -196,6 +198,56 @@ export default function OwnerProfilePage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const resetPersonalFields = () => {
+    setFormData((prev) => ({
+      ...prev,
+      full_name: profile?.full_name || '',
+      phone: profile?.phone || '',
+      birth_date: profile?.birth_date ? profile.birth_date.split('T')[0] : '',
+      email: profile?.email || ''
+    }));
+  };
+
+  const resetOccupantFields = () => {
+    setFormData((prev) => ({
+      ...prev,
+      occupant_name: profile?.occupant_name || '',
+      occupant_relation: profile?.occupant_relation || '',
+      occupant_phone: profile?.occupant_phone || '',
+      occupant_inhabitants: profile?.occupant_inhabitants || 1
+    }));
+  };
+
+  const resetEmergencyFields = () => {
+    setFormData((prev) => ({
+      ...prev,
+      emergency_name: profile?.emergency_name || '',
+      emergency_relation: profile?.emergency_relation || '',
+      emergency_phone: profile?.emergency_phone || ''
+    }));
+  };
+
+  const togglePersonalEdit = () => {
+    if (isEditingPersonal) {
+      resetPersonalFields();
+    }
+    setIsEditingPersonal((prev) => !prev);
+  };
+
+  const toggleOccupantEdit = () => {
+    if (isEditingOccupant) {
+      resetOccupantFields();
+    }
+    setIsEditingOccupant((prev) => !prev);
+  };
+
+  const toggleEmergencyEdit = () => {
+    if (isEditingEmergency) {
+      resetEmergencyFields();
+    }
+    setIsEditingEmergency((prev) => !prev);
   };
 
   const handleSave = async () => {
@@ -363,61 +415,6 @@ export default function OwnerProfilePage() {
               {downloading ? 'Descargando...' : 'Descargar ficha'}
             </button>
           </div>
-
-          {/* Seguridad de la cuenta */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <div className={styles.cardTitle}>
-                <IconLock />
-                <h3>Seguridad de la cuenta</h3>
-              </div>
-            </div>
-            <div className={styles.cardBodyNoPadding}>
-              <div className={styles.securityList}>
-                <button
-                  type="button"
-                  className={styles.securityItem}
-                  onClick={() => setShowPasswordModal(true)}
-                >
-                  <span className={styles.securityIcon}><IconLock /></span>
-                  <div className={styles.securityText}>
-                    <strong>Cambiar contraseña</strong>
-                    <span>Actualice su contraseña periódicamente</span>
-                  </div>
-                  <span className={styles.chevron}><IconChevronRight /></span>
-                </button>
-
-                <button
-                  type="button"
-                  className={styles.securityItem}
-                >
-                  <span className={styles.securityIcon}><IconMail /></span>
-                  <div className={styles.securityText}>
-                    <strong>Actualizar correo</strong>
-                    <span>Mantenga su correo electrónico actualizado</span>
-                  </div>
-                  <span className={styles.chevron}><IconChevronRight /></span>
-                </button>
-
-                <div className={styles.securityItemNoHover}>
-                  <span className={styles.securityIcon}><IconBell /></span>
-                  <div className={styles.securityText}>
-                    <strong>Activar notificaciones</strong>
-                    <span>Reciba alertas y comunicados importantes</span>
-                  </div>
-                  <label className={styles.switch}>
-                    <input
-                      type="checkbox"
-                      name="notifications_enabled"
-                      checked={formData.notifications_enabled}
-                      onChange={handleInputChange}
-                    />
-                    <span className={styles.slider}></span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
         </section>
 
         {/* Middle Column - Profile Information Cards */}
@@ -431,7 +428,7 @@ export default function OwnerProfilePage() {
               </div>
               <button
                 className={styles.editBtn}
-                onClick={() => setIsEditingPersonal(!isEditingPersonal)}
+                onClick={togglePersonalEdit}
               >
                 <IconPencil />
                 {isEditingPersonal ? 'Cancelar' : 'Editar'}
@@ -544,7 +541,7 @@ export default function OwnerProfilePage() {
                 </div>
                 <button
                   className={styles.editBtn}
-                  onClick={() => setIsEditingOccupant(!isEditingOccupant)}
+                  onClick={toggleOccupantEdit}
                 >
                   <IconPencil />
                   {isEditingOccupant ? 'Cancelar' : 'Editar'}
@@ -606,7 +603,7 @@ export default function OwnerProfilePage() {
                 </div>
                 <button
                   className={styles.editBtn}
-                  onClick={() => setIsEditingEmergency(!isEditingEmergency)}
+                  onClick={toggleEmergencyEdit}
                 >
                   <IconPencil />
                   {isEditingEmergency ? 'Cancelar' : 'Editar'}
@@ -648,10 +645,79 @@ export default function OwnerProfilePage() {
               </div>
             </div>
           </div>
+
+          {isAnySectionEditing && (
+            <div className={styles.inlineSaveBar}>
+              <span className={styles.inlineSaveText}>Tiene cambios en edición. Guarde para aplicarlos.</span>
+              <button
+                className={styles.inlineSaveBtn}
+                onClick={handleSave}
+                disabled={saving}
+              >
+                <IconSave />
+                {saving ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Right Column - Status & Help Info */}
         <section className={styles.columnRight}>
+          {/* Seguridad de la cuenta */}
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <div className={styles.cardTitle}>
+                <IconLock />
+                <h3>Seguridad de la cuenta</h3>
+              </div>
+            </div>
+            <div className={styles.cardBodyNoPadding}>
+              <div className={styles.securityList}>
+                <button
+                  type="button"
+                  className={styles.securityItem}
+                  onClick={() => setShowPasswordModal(true)}
+                >
+                  <span className={styles.securityIcon}><IconLock /></span>
+                  <div className={styles.securityText}>
+                    <strong>Cambiar contraseña</strong>
+                    <span>Actualice su contraseña periódicamente</span>
+                  </div>
+                  <span className={styles.chevron}><IconChevronRight /></span>
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.securityItem}
+                >
+                  <span className={styles.securityIcon}><IconMail /></span>
+                  <div className={styles.securityText}>
+                    <strong>Actualizar correo</strong>
+                    <span>Mantenga su correo electrónico actualizado</span>
+                  </div>
+                  <span className={styles.chevron}><IconChevronRight /></span>
+                </button>
+
+                <div className={styles.securityItemNoHover}>
+                  <span className={styles.securityIcon}><IconBell /></span>
+                  <div className={styles.securityText}>
+                    <strong>Activar notificaciones</strong>
+                    <span>Reciba alertas y comunicados importantes</span>
+                  </div>
+                  <label className={styles.switch}>
+                    <input
+                      type="checkbox"
+                      name="notifications_enabled"
+                      checked={formData.notifications_enabled}
+                      onChange={handleInputChange}
+                    />
+                    <span className={styles.slider}></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Verification Status */}
           <div className={styles.infoCard}>
             <div className={styles.infoCardHeader}>

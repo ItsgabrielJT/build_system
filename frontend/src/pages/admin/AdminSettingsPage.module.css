@@ -7,35 +7,8 @@
 .header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 18px;
-}
-
-.reportActions {
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.dateField {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  color: var(--color-gray-600);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.dateField input {
-  min-height: 38px;
-  padding: 8px 12px;
-  border: 1px solid var(--color-gray-300);
-  border-radius: var(--border-radius-sm);
-  background: #fff;
-  color: var(--color-gray-800);
-  font-size: 14px;
 }
 
 .breadcrumb {
@@ -60,55 +33,6 @@
   font-size: 14px;
 }
 
-.btnReport {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
-  white-space: nowrap;
-}
-
-.btnReportSecondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: #eef4ff;
-  color: var(--color-primary);
-  border: 1px solid #c7d7fe;
-  border-radius: var(--border-radius);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
-  white-space: nowrap;
-}
-
-.btnReport:disabled,
-.btnReportSecondary:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.btnReport:hover:not(:disabled) {
-  background: var(--color-primary-dark);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-}
-
-.btnReportSecondary:hover:not(:disabled) {
-  background: #dbeafe;
-}
-
 .form {
   display: flex;
   flex-direction: column;
@@ -127,7 +51,16 @@
 .sideColumn {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
+}
+
+.sideColumn .panel {
+  padding: 18px 20px;
+}
+
+.sideColumn .panel h2 {
+  margin-bottom: 12px;
+  font-size: 18px;
 }
 
 .panel {
@@ -155,7 +88,7 @@
 .singleAssetGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 18px;
+  gap: 10px;
 }
 
 .field,
@@ -230,7 +163,7 @@
 
 .documentPreviewBox {
   display: flex;
-  min-height: 120px;
+  min-height: 84px;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
@@ -239,6 +172,20 @@
   border-radius: var(--border-radius);
   background: var(--color-gray-50);
   padding: 16px;
+}
+
+.sideColumn .previewBox {
+  aspect-ratio: 16 / 5;
+}
+
+.sideColumn .logoPreview img {
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
+}
+
+.sideColumn .documentPreviewBox {
+  min-height: 72px;
+  padding: 12px;
 }
 
 .documentPreviewBox strong {

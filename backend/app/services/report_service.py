@@ -23,6 +23,7 @@ from app.repositories.payment_repository import PaymentRepository
 from app.services.pdf_branding import (
     build_pdf_brand_header,
     build_pdf_footer_bar,
+    build_pdf_signature_seal_qr_grid,
     get_building_contact_lines,
     get_building_logo,
     get_building_name,
@@ -297,6 +298,13 @@ class ReportService:
             Spacer(1, 0.18 * cm),
             build_pdf_footer_bar(building or {}, width=width),
         ]
+
+    def _signature_grid(self, width: float, building: Optional[dict], document_tag: str) -> Table:
+        qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
+        return build_pdf_signature_seal_qr_grid(building or {}, width=width, qr_value=qr_value)
+
+    def _append_signature_grid(self, story: list, *, width: float, building: Optional[dict], document_tag: str) -> None:
+        story.extend([Spacer(1, 0.24 * cm), self._signature_grid(width, building, document_tag)])
 
     def _footer_callback(self, building: Optional[dict], width: float):
         def draw_footer(canvas, doc):
@@ -838,6 +846,7 @@ class ReportService:
         final = Table([[self._p("Ingresos totales registrados en el período", 11, bold=True, color="#ffffff", align="LEFT"), self._p(self._usd(total), 14, bold=True, color="#ffffff")]], colWidths=[width * 0.72, width * 0.28])
         final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("LEFTPADDING", (0, 0), (-1, -1), 10)]))
         story.append(final)
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-INGRESOS")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -909,6 +918,7 @@ class ReportService:
             {"label": "Total egresos", "current": total_expenses, "previous": 0},
             {"label": "Balance neto", "current": abs(balance), "previous": 0},
         ], width))
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-BALANCE")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -959,6 +969,7 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 1.1*inch, 0.55*inch, 0.7*inch, 0.75*inch, 0.75*inch, 0.85*inch, 1.05*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PAGOS")
         footer = self._footer_callback(building, doc.width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -1021,6 +1032,7 @@ class ReportService:
                     for row in by_category[:4]
                 ],
             ], width))
+            self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-GASTOS")
             footer = self._footer_callback(building, width)
             doc.build(story, onFirstPage=footer, onLaterPages=footer)
             return output.getvalue()
@@ -1053,6 +1065,8 @@ class ReportService:
             table = Table(table_data, colWidths=[1.1 * inch, 1.4 * inch, 1.2 * inch, 2.5 * inch, 1.0 * inch], repeatRows=1)
             table.setStyle(self._table_style(7))
             story.append(table)
+            self._append_signature_grid(story, width=doc.width, building={}, document_tag="REPORTE-GASTOS")
+            story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=doc.width)])
             doc.build(story)
             return output.getvalue()
 
@@ -1099,7 +1113,9 @@ class ReportService:
         story.append(table)
         story.append(Spacer(1, 0.3*inch))
         story.append(Paragraph("Reporte generado automáticamente", styles['Normal']))
-        footer = self._footer_callback(await get_default_building_config(getattr(self._payment_repo, "_conn", None)), doc.width)
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MOROSIDAD")
+        footer = self._footer_callback(building, doc.width)
         
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -1427,6 +1443,7 @@ class ReportService:
         rows = await self._fees_report_rows(start_date, end_date)
         total = sum(Decimal(str(row.get("amount", 0))) for row in rows)
         collected = sum(Decimal(str(row.get("paid_amount", 0))) for row in rows)
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         output = io.BytesIO()
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
@@ -1440,7 +1457,8 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 0.65*inch, 1.55*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-CUOTAS")
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
 
@@ -1464,6 +1482,7 @@ class ReportService:
     async def fines_pdf(self, period: Optional[str] = None, start_date: Optional[date] = None, end_date: Optional[date] = None, status: Optional[str] = None, reason: Optional[str] = None, search: Optional[str] = None) -> bytes:
         rows = await self._fines_report_rows(period, start_date, end_date, status, reason, search)
         total = sum(Decimal(str(row.get("amount", 0))) for row in rows)
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         output = io.BytesIO()
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
@@ -1477,7 +1496,8 @@ class ReportService:
         table = Table(data, colWidths=[0.8*inch, 0.55*inch, 1.1*inch, 0.65*inch, 1.8*inch, 0.75*inch, 0.75*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MULTAS")
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
 
@@ -1500,6 +1520,7 @@ class ReportService:
 
     async def owners_pdf(self, start_date: Optional[date] = None, end_date: Optional[date] = None, status: Optional[str] = None) -> bytes:
         rows = await self._owners_report_rows(start_date, end_date, status)
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         output = io.BytesIO()
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
@@ -1511,7 +1532,8 @@ class ReportService:
         table = Table(data, colWidths=[0.7*inch, 1.25*inch, 0.85*inch, 1.35*inch, 0.8*inch, 0.9*inch, 0.65*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PROPIETARIOS")
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
 
@@ -1534,6 +1556,7 @@ class ReportService:
 
     async def buildings_pdf(self, start_date: Optional[date] = None, end_date: Optional[date] = None) -> bytes:
         rows = await self._buildings_report_rows(start_date, end_date)
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         output = io.BytesIO()
         doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
         story = []
@@ -1545,7 +1568,8 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 1.35*inch, 1.5*inch, 0.85*inch, 1.4*inch, 0.75*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-EDIFICIOS")
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
 
@@ -2099,46 +2123,7 @@ class ReportService:
         story.append(obs_box)
         story.append(Spacer(1, 0.14 * cm))
         
-        # Signatures
-        sig_admin = Table(
-            [
-                [Spacer(1, 0.8 * cm)],
-                [HRFlowable(width="60%", thickness=0.8, color=colors.HexColor("#9ca3af"), spaceAfter=2)],
-                [Paragraph("<b>Franz Guzman G.</b>", ParagraphStyle("SigN", size=7.5, fontName="Helvetica-Bold", alignment=1))],
-                [Paragraph("Firma de la administración", ParagraphStyle("SigL", size=6.5, fontName="Helvetica", color="#6b7280", alignment=1))],
-            ],
-            colWidths=[width * 0.45]
-        )
-        sig_admin.setStyle(TableStyle([
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        
-        official_logo = get_building_logo(building, max_width=1.5 * cm, max_height=1.2 * cm)
-        if not official_logo:
-            official_logo = Paragraph("🏛️", ParagraphStyle("OffLogo", size=22, alignment=1))
-            
-        sig_official = Table(
-            [
-                [official_logo],
-                [Paragraph("<b>Documento oficial</b>", ParagraphStyle("SigON", size=7.5, fontName="Helvetica-Bold", alignment=1))],
-                [Paragraph("Sistema de Administración", ParagraphStyle("SigOL", size=6.5, fontName="Helvetica", color="#6b7280", alignment=1))],
-            ],
-            colWidths=[width * 0.45]
-        )
-        sig_official.setStyle(TableStyle([
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ]))
-        
-        signatures_table = Table([[sig_admin, Spacer(1, 1), sig_official]], colWidths=[width * 0.45, width * 0.1, width * 0.45])
-        signatures_table.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
-        ]))
-        story.append(signatures_table)
+        self._append_signature_grid(story, width=width, building=building, document_tag=f"FICHA-{sheet_number}")
         story.append(Spacer(1, 0.18 * cm))
         
         def draw_footer(canvas, doc):

@@ -23,7 +23,7 @@ from app.repositories.notification_repository import NotificationRepository
 from app.repositories.owner_repository import OwnerRepository
 from app.repositories.payment_proof_repository import PaymentProofRepository
 from app.repositories.payment_repository import PaymentRepository
-from app.services.pdf_branding import build_pdf_footer_bar
+from app.services.pdf_branding import build_pdf_footer_bar, build_pdf_signature_seal_qr_grid, get_building_name
 
 _STATUS_APROBADO = "REGISTRADO"
 _PRIMARY_BLUE = colors.HexColor("#123c7a")
@@ -653,11 +653,19 @@ class OwnerPaymentService:
                 [[Paragraph("Documento emitido electronicamente con fines de control administrativo.", styles["muted"]) ]],
                 colWidths=[_PAYMENT_CONTENT_WIDTH],
             ),
-            Spacer(1, 0.48 * inch),
+            Spacer(1, 0.24 * inch),
             signature,
             Spacer(1, 0.16 * inch),
             build_pdf_footer_bar(building, width=_PAYMENT_CONTENT_WIDTH),
         ]
+
+    def _build_signature_grid(self, *, building: dict, document_tag: str) -> Table:
+        qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
+        return build_pdf_signature_seal_qr_grid(
+            building,
+            width=_PAYMENT_CONTENT_WIDTH,
+            qr_value=qr_value,
+        )
 
     def _build_payment_story(
         self,
@@ -691,6 +699,8 @@ class OwnerPaymentService:
             self._build_detail_table(detail_rows),
             Spacer(1, 0.16 * inch),
             self._build_status_banner(status_text, ok=ok),
+            Spacer(1, 0.16 * inch),
+            self._build_signature_grid(building=building, document_tag=document_number),
             Spacer(1, 0.16 * inch),
         ]
         story.extend(self._build_footer(styles, signer_label, building))

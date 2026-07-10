@@ -13,6 +13,7 @@ from app.repositories.owner_repository import OwnerRepository
 from app.services.delinquency_service import _period_status, _saldo
 from app.services.pdf_branding import (
     build_pdf_footer_bar,
+    build_pdf_signature_seal_qr_grid,
     get_building_contact_lines,
     get_building_logo,
     get_building_name,
@@ -266,6 +267,10 @@ class AccountStatementService:
         drawing.add(code)
         return drawing
 
+    def _signature_grid(self, *, width: float, building: dict | None, document_tag: str) -> Table:
+        qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
+        return build_pdf_signature_seal_qr_grid(building, width=width, qr_value=qr_value)
+
     async def statement_pdf(self, owner_id: UUID, start_period: Optional[str], end_period: Optional[str]) -> bytes:
         rows = await self.get_statement(owner_id, start_period, end_period)
         profile = await self._owner_profile(owner_id)
@@ -323,14 +328,9 @@ class AccountStatementService:
         story.append(important)
         story.append(Spacer(1, 0.35 * cm))
         story.append(self._p("Gracias por contribuir al bienestar de nuestra comunidad.", 8, color="#667085", align="CENTER"))
-        story.append(Spacer(1, 0.3 * cm))
-        footer_logo = get_building_logo(building, max_width=2.2 * cm, max_height=1.5 * cm)
-        if not footer_logo:
-            footer_logo = self._p(f"<b>{escape(get_building_name(building).upper())}</b>", 8, align="CENTER", raw=True)
-        footer = Table([[self._p("Franz Guzman G.<br/>Administrador del Edificio", 9, align="CENTER", raw=True), footer_logo]], colWidths=[width * 0.5, width * 0.5])
-        footer.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
-        story.append(footer)
-        story.append(Spacer(1, 0.35 * cm))
+        story.append(Spacer(1, 0.25 * cm))
+        story.append(self._signature_grid(width=width, building=building, document_tag=f"ESTADO-CUENTA-{owner_id}"))
+        story.append(Spacer(1, 0.28 * cm))
         doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
         return output.getvalue()
 
@@ -386,6 +386,8 @@ class AccountStatementService:
         verify.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
         story.append(verify)
         story.append(Spacer(1, 0.25 * cm))
+        story.append(self._signature_grid(width=width, building=building, document_tag=verification))
+        story.append(Spacer(1, 0.2 * cm))
         story.append(build_pdf_footer_bar(building, width=width, page_text="Página 1 de 1"))
         doc.build(story)
         return output.getvalue()

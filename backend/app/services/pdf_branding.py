@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import escape
 
+from reportlab.graphics.barcode import qr
+from reportlab.graphics.shapes import Drawing
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.platypus import Image, Paragraph, Spacer, Table, TableStyle
@@ -42,6 +44,126 @@ def get_building_logo(building: dict | None, *, max_width: float, max_height: fl
     logo.drawWidth = logo.imageWidth * ratio
     logo.drawHeight = logo.imageHeight * ratio
     return logo
+
+
+def get_building_asset_image(
+    building: dict | None,
+    *,
+    storage_key: str,
+    max_width: float,
+    max_height: float,
+):
+    building = building or {}
+    path_value = building.get(storage_key)
+    if not path_value:
+        return ""
+
+    path = Path(path_value)
+    if not path.exists():
+        return ""
+
+    image = Image(str(path))
+    ratio = min(max_width / image.imageWidth, max_height / image.imageHeight)
+    image.drawWidth = image.imageWidth * ratio
+    image.drawHeight = image.imageHeight * ratio
+    return image
+
+
+def build_pdf_qr(value: str, *, size: float = 0.42 * inch) -> Drawing:
+    code = qr.QrCodeWidget(value)
+    bounds = code.getBounds()
+    drawing = Drawing(
+        size,
+        size,
+        transform=[
+            size / (bounds[2] - bounds[0]),
+            0,
+            0,
+            size / (bounds[3] - bounds[1]),
+            0,
+            0,
+        ],
+    )
+    drawing.add(code)
+    return drawing
+
+
+def build_pdf_signature_seal_qr_grid(
+    building: dict | None,
+    *,
+    width: float,
+    qr_value: str,
+) -> Table:
+    building = building or {}
+
+    signature_cell = get_building_asset_image(
+        building,
+        storage_key="signature_storage_path",
+        max_width=1.55 * inch,
+        max_height=0.72 * inch,
+    )
+    if not signature_cell:
+        signature_cell = Paragraph(
+            '<font size="8" color="#4b5563">Firma no cargada</font>',
+            ParagraphStyle(
+                "PdfSignGridSignatureFallback",
+                fontName="Helvetica",
+                fontSize=8,
+                leading=10,
+                alignment=1,
+                textColor=colors.HexColor("#4b5563"),
+            ),
+        )
+
+    seal_cell = get_building_asset_image(
+        building,
+        storage_key="seal_storage_path",
+        max_width=1.55 * inch,
+        max_height=0.72 * inch,
+    )
+    if not seal_cell:
+        seal_cell = Paragraph(
+            '<font size="8" color="#4b5563">Sello no cargado</font>',
+            ParagraphStyle(
+                "PdfSignGridSealFallback",
+                fontName="Helvetica",
+                fontSize=8,
+                leading=10,
+                alignment=1,
+                textColor=colors.HexColor("#4b5563"),
+            ),
+        )
+
+    qr_cell = build_pdf_qr(qr_value, size=0.95 * inch)
+    col_width = width / 3
+    grid = Table(
+        [
+            [
+                Paragraph('<font size="9" color="#123c7a"><b>Firma</b></font>', ParagraphStyle("PdfSignGridHeader1", fontName="Helvetica-Bold", alignment=1)),
+                Paragraph('<font size="9" color="#123c7a"><b>Sello</b></font>', ParagraphStyle("PdfSignGridHeader2", fontName="Helvetica-Bold", alignment=1)),
+                Paragraph('<font size="9" color="#123c7a"><b>Validación QR</b></font>', ParagraphStyle("PdfSignGridHeader3", fontName="Helvetica-Bold", alignment=1)),
+            ],
+            [signature_cell, seal_cell, qr_cell],
+        ],
+        colWidths=[col_width, col_width, col_width],
+        rowHeights=[0.28 * inch, 0.98 * inch],
+    )
+    grid.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#edf4ff")),
+                ("BOX", (0, 0), (-1, -1), 0.8, _PRIMARY_BLUE),
+                ("INNERGRID", (0, 0), (-1, -1), 0.45, colors.HexColor("#c9d8ef")),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
+    return grid
 
 
 def get_building_contact_lines(building: dict | None) -> list[str]:

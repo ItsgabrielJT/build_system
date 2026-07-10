@@ -339,16 +339,16 @@ class OwnerPaymentService:
         title_block = Table(
             [[
                 Paragraph(
-                    f'<font size="22"><b>{title}</b></font><br/><font size="9">{subtitle}</font>',
+                    f'<font size="20"><b>{title}</b></font><br/><font size="9">{subtitle}</font>',
                     ParagraphStyle(
                         "HeaderTitle",
                         fontName="Helvetica",
-                        leading=16,
+                        leading=20,
                         textColor=_PRIMARY_BLUE,
                     ),
                 )
             ]],
-            colWidths=[2.9 * inch],
+            colWidths=[3.2 * inch],
         )
         title_block.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
 
@@ -447,15 +447,16 @@ class OwnerPaymentService:
 
     def _build_building_photo_asset(self, building: dict) -> Image | Drawing:
         photo_path = building.get("photo_storage_path")
+        max_width = 3.55 * inch
+        max_height = 2.25 * inch
         if photo_path and Path(photo_path).exists():
             image = Image(photo_path)
-            max_width = 3.7 * inch
-            max_height = 2.25 * inch
             image.drawWidth = max_width
             image.drawHeight = max_height
+            image.hAlign = "LEFT"
             return image
 
-        drawing = Drawing(255, 158)
+        drawing = Drawing(max_width, max_height)
         drawing.add(Rect(0, 0, 255, 158, strokeColor=colors.HexColor("#d1dae8"), fillColor=colors.HexColor("#f8fafc"), rx=8, ry=8))
         drawing.add(String(127, 82, "Foto del edificio", fontName="Helvetica-Bold", fontSize=12, fillColor=colors.HexColor("#64748b"), textAnchor="middle"))
         return drawing

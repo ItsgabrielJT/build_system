@@ -38,7 +38,7 @@ const ROLE_LABELS = {
   PROPIETARIO: 'PROPIETARIO',
 };
 
-export default function Navbar({ buildingName = 'Edificio Principal', onToggleSidebar }) {
+export default function Navbar({ buildingName = '', onToggleSidebar }) {
   const { user, role } = useAuth();
   const navigate = useNavigate();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);

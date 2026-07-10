@@ -47,6 +47,7 @@
   align-items: flex-end;
   display: flex;
   gap: 12px;
+  flex-wrap: nowrap;
 }
 
 .monthField {
@@ -68,24 +69,67 @@
   border: 1px solid #d0d5dd;
   border-radius: 10px;
   color: #111827;
-  min-width: 180px;
+  min-width: 160px;
   padding: 12px 14px;
 }
 
-.pdfButton {
-  background: #2563eb;
-  border: 0;
-  border-radius: 10px;
-  color: #fff;
-  cursor: pointer;
-  font-size: 14px;
+.selectField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selectField span {
+  color: #475467;
+  font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selectField select {
+  background: #fff;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  color: #111827;
+  min-width: 220px;
+  padding: 12px 14px;
+}
+
+.btnPdf,
+.btnExcel {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
   min-height: 45px;
   padding: 0 18px;
   white-space: nowrap;
 }
 
-.pdfButton:disabled {
+.btnPdf {
+  background: #fff;
+  border: 1.5px solid #111;
+  border-radius: 10px;
+  color: #111;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.btnExcel {
+  background: #2563eb;
+  border: 1.5px solid #2563eb;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
+}
+
+.btnPdf:disabled,
+.btnExcel:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
@@ -107,7 +151,9 @@
     width: 100%;
   }
 
-  .monthField input {
+  .monthField input,
+  .selectField,
+  .selectField select {
     width: 100%;
   }
 
@@ -117,7 +163,8 @@
     width: 100%;
   }
 
-  .pdfButton {
+  .btnPdf,
+  .btnExcel {
     width: 100%;
   }
 }

@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 
-from app.auth.dependencies import require_admin, require_owner
+from app.auth.dependencies import require_admin, require_admin_or_owner, require_owner
 from app.config.database import get_db
 from app.models.schemas import MonthlyBalanceResponse
 from app.repositories.delinquency_repository import DelinquencyRepository
@@ -115,7 +115,7 @@ async def report_income(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     format: str = "csv",
-    _user: dict = Depends(require_admin),
+    _user: dict = Depends(require_admin_or_owner),
     db=Depends(get_db),
 ):
     _validate_date_range_or_422(start_date, end_date)
@@ -204,7 +204,7 @@ async def report_expenses(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     format: str = "pdf",
-    _user: dict = Depends(require_admin),
+    _user: dict = Depends(require_admin_or_owner),
     db=Depends(get_db),
 ):
     _validate_date_range_or_422(start_date, end_date)

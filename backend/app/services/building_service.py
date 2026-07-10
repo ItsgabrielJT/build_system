@@ -56,6 +56,9 @@ class BuildingService:
         *,
         photo_meta: dict | None = None,
         logo_meta: dict | None = None,
+        signature_meta: dict | None = None,
+        seal_meta: dict | None = None,
+        regulation_meta: dict | None = None,
     ) -> dict:
         await self.get_by_id(building_id)
 
@@ -70,6 +73,27 @@ class BuildingService:
             logo_file_name=logo_meta["file_name"] if logo_meta else None,
             logo_content_type=logo_meta["content_type"] if logo_meta else None,
             logo_storage_path=logo_meta["storage_path"] if logo_meta else None,
+            signature_file_name=(
+                signature_meta["file_name"] if signature_meta else None
+            ),
+            signature_content_type=(
+                signature_meta["content_type"] if signature_meta else None
+            ),
+            signature_storage_path=(
+                signature_meta["storage_path"] if signature_meta else None
+            ),
+            seal_file_name=seal_meta["file_name"] if seal_meta else None,
+            seal_content_type=seal_meta["content_type"] if seal_meta else None,
+            seal_storage_path=seal_meta["storage_path"] if seal_meta else None,
+            regulation_file_name=(
+                regulation_meta["file_name"] if regulation_meta else None
+            ),
+            regulation_content_type=(
+                regulation_meta["content_type"] if regulation_meta else None
+            ),
+            regulation_storage_path=(
+                regulation_meta["storage_path"] if regulation_meta else None
+            ),
         )
         updated = await self._repo.update(building_id, payload)
         if not updated:
@@ -85,6 +109,9 @@ class BuildingService:
         *,
         photo_meta: dict | None = None,
         logo_meta: dict | None = None,
+        signature_meta: dict | None = None,
+        seal_meta: dict | None = None,
+        regulation_meta: dict | None = None,
     ) -> dict:
         building = await self.get_config()
         payload = SimpleNamespace(
@@ -98,6 +125,27 @@ class BuildingService:
             logo_file_name=logo_meta["file_name"] if logo_meta else None,
             logo_content_type=logo_meta["content_type"] if logo_meta else None,
             logo_storage_path=logo_meta["storage_path"] if logo_meta else None,
+            signature_file_name=(
+                signature_meta["file_name"] if signature_meta else None
+            ),
+            signature_content_type=(
+                signature_meta["content_type"] if signature_meta else None
+            ),
+            signature_storage_path=(
+                signature_meta["storage_path"] if signature_meta else None
+            ),
+            seal_file_name=seal_meta["file_name"] if seal_meta else None,
+            seal_content_type=seal_meta["content_type"] if seal_meta else None,
+            seal_storage_path=seal_meta["storage_path"] if seal_meta else None,
+            regulation_file_name=(
+                regulation_meta["file_name"] if regulation_meta else None
+            ),
+            regulation_content_type=(
+                regulation_meta["content_type"] if regulation_meta else None
+            ),
+            regulation_storage_path=(
+                regulation_meta["storage_path"] if regulation_meta else None
+            ),
         )
         updated = await self._repo.update(building["id"], payload)
         if not updated:

@@ -4,8 +4,21 @@ import MonthlyBalanceChart from '../../components/MonthlyBalanceChart/MonthlyBal
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useMonthlyBalance } from '../../hooks/useMonthlyBalance';
-import { downloadOwnerMonthlyBalancePdf } from '../../services/reportService';
+import {
+  downloadExpensesReport,
+  downloadIncomeReport,
+  downloadOwnerMonthlyBalancePdf,
+} from '../../services/reportService';
+import { exportAccountStatement } from '../../services/accountStatementService';
+import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './OwnerMonthlyBalancePage.module.css';
+
+const REPORT_OPTIONS = [
+  { value: 'income', label: 'Ingresos' },
+  { value: 'balance', label: 'Balance ingresos y egresos' },
+  { value: 'payments', label: 'Pagos' },
+  { value: 'expenses', label: 'Gastos' },
+];
 
 function getCurrentMonthPeriod() {
   return new Date().toISOString().slice(0, 7);
@@ -26,18 +39,58 @@ export default function OwnerMonthlyBalancePage() {
   const { token } = useAuth();
   const { error: notifyError } = useNotification();
   const [period, setPeriod] = useState(getCurrentMonthPeriod());
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [selectedReport, setSelectedReport] = useState('balance');
+  const [loadingExport, setLoadingExport] = useState({});
   const { data, loading, error } = useMonthlyBalance('PROPIETARIO', period);
 
-  const handleDownloadPdf = async () => {
-    setDownloadingPdf(true);
+  const REPORT_LABELS = {
+    income: 'ingresos',
+    balance: 'balance',
+    payments: 'pagos',
+    expenses: 'gastos',
+  };
+
+  const handleDownloadSelected = async (format) => {
+    setLoadingExport((prev) => ({ ...prev, [format]: true }));
     try {
-      const blob = await downloadOwnerMonthlyBalancePdf(period, token);
-      triggerDownload(blob, `balance-mensual-${period}.pdf`);
+      const extension = format === 'excel' ? 'xlsx' : 'pdf';
+
+      if (selectedReport === 'balance') {
+        if (format === 'excel') {
+          notifyError('El reporte de balance en Excel no está disponible para propietarios.');
+          return;
+        }
+        const blob = await downloadOwnerMonthlyBalancePdf(period, token);
+        triggerDownload(blob, `balance-mensual-${period}.pdf`);
+        return;
+      }
+
+      if (selectedReport === 'payments') {
+        const blob = await exportAccountStatement(token, format, {
+          start_period: period,
+          end_period: period,
+        });
+        triggerDownload(blob, `reporte-pagos-${period}.${extension}`);
+        return;
+      }
+
+      if (selectedReport === 'income') {
+        const blob = await downloadIncomeReport(token, { period, format });
+        triggerDownload(blob, `reporte-${REPORT_LABELS[selectedReport]}-${period}.${extension}`);
+        return;
+      }
+
+      if (selectedReport === 'expenses') {
+        const blob = await downloadExpensesReport(token, { period, format });
+        triggerDownload(blob, `reporte-${REPORT_LABELS[selectedReport]}-${period}.${extension}`);
+        return;
+      }
+
+      notifyError('Este reporte no está disponible para propietarios en este módulo.');
     } catch {
-      notifyError('No se pudo descargar el balance en PDF.');
+      notifyError('No se pudo descargar el reporte seleccionado.');
     } finally {
-      setDownloadingPdf(false);
+      setLoadingExport((prev) => ({ ...prev, [format]: false }));
     }
   };
 
@@ -60,13 +113,34 @@ export default function OwnerMonthlyBalancePage() {
               aria-label="Mes consultado"
             />
           </label>
+
+          <label className={styles.selectField}>
+            <span>Reporte</span>
+            <select value={selectedReport} onChange={(event) => setSelectedReport(event.target.value)}>
+              {REPORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+
           <button
             type="button"
-            className={styles.pdfButton}
-            onClick={handleDownloadPdf}
-            disabled={downloadingPdf || loading}
+            className={styles.btnPdf}
+            onClick={() => handleDownloadSelected('pdf')}
+            disabled={loadingExport.pdf || loading}
           >
-            {downloadingPdf ? 'Descargando...' : 'Descargar PDF'}
+            <DownloadIcon />
+            {loadingExport.pdf ? 'Descargando...' : 'Descargar PDF'}
+          </button>
+
+          <button
+            type="button"
+            className={styles.btnExcel}
+            onClick={() => handleDownloadSelected('excel')}
+            disabled={loadingExport.excel || loading}
+          >
+            <DownloadIcon />
+            {loadingExport.excel ? 'Descargando...' : 'Descargar Excel'}
           </button>
         </div>
       </section>

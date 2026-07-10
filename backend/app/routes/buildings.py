@@ -11,7 +11,11 @@ from fastapi.responses import Response
 
 from app.auth.dependencies import get_current_user, require_admin
 from app.config.database import get_db
-from app.config.storage import validate_and_store_building_asset
+from app.config.storage import (
+    BUILDING_ALLOWED_IMAGE_TYPES,
+    BUILDING_ALLOWED_PDF_TYPES,
+    validate_and_store_building_asset,
+)
 from app.models.schemas import BuildingCreate, BuildingUpdate
 from app.repositories.building_repository import BuildingRepository
 from app.services.building_service import BuildingService
@@ -70,10 +74,19 @@ async def update_building_config(
     email = str(form.get("email") or "")
     photo_file = form.get("photo_file")
     logo_file = form.get("logo_file")
+    signature_file = form.get("signature_file")
+    seal_file = form.get("seal_file")
+    regulation_file = form.get("regulation_file")
     if not getattr(photo_file, "filename", ""):
         photo_file = None
     if not getattr(logo_file, "filename", ""):
         logo_file = None
+    if not getattr(signature_file, "filename", ""):
+        signature_file = None
+    if not getattr(seal_file, "filename", ""):
+        seal_file = None
+    if not getattr(regulation_file, "filename", ""):
+        regulation_file = None
 
     photo_meta = (
         await validate_and_store_building_asset(photo_file, "building-photo")
@@ -83,6 +96,33 @@ async def update_building_config(
     logo_meta = (
         await validate_and_store_building_asset(logo_file, "building-logo")
         if logo_file is not None
+        else None
+    )
+    signature_meta = (
+        await validate_and_store_building_asset(
+            signature_file,
+            "building-signature",
+            allowed_content_types=frozenset({"image/png"}),
+        )
+        if signature_file is not None
+        else None
+    )
+    seal_meta = (
+        await validate_and_store_building_asset(
+            seal_file,
+            "building-seal",
+            allowed_content_types=BUILDING_ALLOWED_IMAGE_TYPES,
+        )
+        if seal_file is not None
+        else None
+    )
+    regulation_meta = (
+        await validate_and_store_building_asset(
+            regulation_file,
+            "building-regulation",
+            allowed_content_types=BUILDING_ALLOWED_PDF_TYPES,
+        )
+        if regulation_file is not None
         else None
     )
     payload = BuildingUpdate(
@@ -96,6 +136,9 @@ async def update_building_config(
         payload,
         photo_meta=photo_meta,
         logo_meta=logo_meta,
+        signature_meta=signature_meta,
+        seal_meta=seal_meta,
+        regulation_meta=regulation_meta,
     )
 
 
@@ -127,14 +170,17 @@ async def update_building_assets(
     building_id: UUID,
     photo_file: Optional[UploadFile] = File(None),
     logo_file: Optional[UploadFile] = File(None),
+    signature_file: Optional[UploadFile] = File(None),
+    seal_file: Optional[UploadFile] = File(None),
+    regulation_file: Optional[UploadFile] = File(None),
     _user: dict = Depends(require_admin),
     db=Depends(get_db),
 ):
     """Actualizar foto del edificio y logo usado en comprobantes/PDFs."""
-    if not photo_file and not logo_file:
+    if not photo_file and not logo_file and not signature_file and not seal_file and not regulation_file:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Debe adjuntar una foto o un logo",
+            detail="Debe adjuntar al menos un archivo de configuración",
         )
 
     photo_meta = (
@@ -147,11 +193,41 @@ async def update_building_assets(
         if logo_file is not None
         else None
     )
+    signature_meta = (
+        await validate_and_store_building_asset(
+            signature_file,
+            "building-signature",
+            allowed_content_types=frozenset({"image/png"}),
+        )
+        if signature_file is not None
+        else None
+    )
+    seal_meta = (
+        await validate_and_store_building_asset(
+            seal_file,
+            "building-seal",
+            allowed_content_types=BUILDING_ALLOWED_IMAGE_TYPES,
+        )
+        if seal_file is not None
+        else None
+    )
+    regulation_meta = (
+        await validate_and_store_building_asset(
+            regulation_file,
+            "building-regulation",
+            allowed_content_types=BUILDING_ALLOWED_PDF_TYPES,
+        )
+        if regulation_file is not None
+        else None
+    )
     service = BuildingService(BuildingRepository(db))
     return await service.update_assets(
         building_id,
         photo_meta=photo_meta,
         logo_meta=logo_meta,
+        signature_meta=signature_meta,
+        seal_meta=seal_meta,
+        regulation_meta=regulation_meta,
     )
 
 
@@ -163,7 +239,7 @@ async def get_building_asset(
     db=Depends(get_db),
 ):
     """Descargar la foto o el logo configurado para un edificio."""
-    if asset_type not in {"photo", "logo"}:
+    if asset_type not in {"photo", "logo", "signature", "seal", "regulation"}:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Archivo de edificio no encontrado",

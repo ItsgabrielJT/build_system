@@ -31,6 +31,9 @@ export async function updateBuildingConfig(data, token) {
   configData.append('email', data.email || '');
   if (data.photo_file) configData.append('photo_file', data.photo_file);
   if (data.logo_file) configData.append('logo_file', data.logo_file);
+  if (data.signature_file) configData.append('signature_file', data.signature_file);
+  if (data.seal_file) configData.append('seal_file', data.seal_file);
+  if (data.regulation_file) configData.append('regulation_file', data.regulation_file);
 
   const res = await axios.put(`${API_BASE}/api/v1/buildings/config`, configData, {
     headers: { Authorization: `Bearer ${token}` },
@@ -39,15 +42,25 @@ export async function updateBuildingConfig(data, token) {
 }
 
 export async function updateBuilding(buildingId, data, token) {
-  const { photo_file, logo_file, ...buildingData } = data;
+  const {
+    photo_file,
+    logo_file,
+    signature_file,
+    seal_file,
+    regulation_file,
+    ...buildingData
+  } = data;
   let res = await axios.put(`${API_BASE}/api/v1/buildings/${buildingId}`, buildingData, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  if (photo_file || logo_file) {
+  if (photo_file || logo_file || signature_file || seal_file || regulation_file) {
     const assetData = new FormData();
     if (photo_file) assetData.append('photo_file', photo_file);
     if (logo_file) assetData.append('logo_file', logo_file);
+    if (signature_file) assetData.append('signature_file', signature_file);
+    if (seal_file) assetData.append('seal_file', seal_file);
+    if (regulation_file) assetData.append('regulation_file', regulation_file);
 
     res = await axios.put(`${API_BASE}/api/v1/buildings/${buildingId}/assets`, assetData, {
       headers: {

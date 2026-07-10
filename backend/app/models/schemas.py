@@ -58,6 +58,15 @@ class BuildingCreate(BaseModel):
     logo_file_name: Optional[str] = None
     logo_content_type: Optional[str] = None
     logo_storage_path: Optional[str] = None
+    signature_file_name: Optional[str] = None
+    signature_content_type: Optional[str] = None
+    signature_storage_path: Optional[str] = None
+    seal_file_name: Optional[str] = None
+    seal_content_type: Optional[str] = None
+    seal_storage_path: Optional[str] = None
+    regulation_file_name: Optional[str] = None
+    regulation_content_type: Optional[str] = None
+    regulation_storage_path: Optional[str] = None
 
 
 class BuildingUpdate(BaseModel):
@@ -71,6 +80,15 @@ class BuildingUpdate(BaseModel):
     logo_file_name: Optional[str] = None
     logo_content_type: Optional[str] = None
     logo_storage_path: Optional[str] = None
+    signature_file_name: Optional[str] = None
+    signature_content_type: Optional[str] = None
+    signature_storage_path: Optional[str] = None
+    seal_file_name: Optional[str] = None
+    seal_content_type: Optional[str] = None
+    seal_storage_path: Optional[str] = None
+    regulation_file_name: Optional[str] = None
+    regulation_content_type: Optional[str] = None
+    regulation_storage_path: Optional[str] = None
 
 
 class BuildingResponse(BaseModel):
@@ -85,6 +103,15 @@ class BuildingResponse(BaseModel):
     logo_file_name: Optional[str] = None
     logo_content_type: Optional[str] = None
     logo_storage_path: Optional[str] = None
+    signature_file_name: Optional[str] = None
+    signature_content_type: Optional[str] = None
+    signature_storage_path: Optional[str] = None
+    seal_file_name: Optional[str] = None
+    seal_content_type: Optional[str] = None
+    seal_storage_path: Optional[str] = None
+    regulation_file_name: Optional[str] = None
+    regulation_content_type: Optional[str] = None
+    regulation_storage_path: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

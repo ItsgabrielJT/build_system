@@ -31,9 +31,19 @@ class BuildingRepository:
             INSERT INTO buildings (
                 name, address, phone, email,
                 photo_file_name, photo_content_type, photo_storage_path,
-                logo_file_name, logo_content_type, logo_storage_path
+                logo_file_name, logo_content_type, logo_storage_path,
+                signature_file_name, signature_content_type, signature_storage_path,
+                seal_file_name, seal_content_type, seal_storage_path,
+                regulation_file_name, regulation_content_type, regulation_storage_path
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES (
+                $1, $2, $3, $4,
+                $5, $6, $7,
+                $8, $9, $10,
+                $11, $12, $13,
+                $14, $15, $16,
+                $17, $18, $19
+            )
             RETURNING *
             """,
             data.name,
@@ -46,6 +56,15 @@ class BuildingRepository:
             getattr(data, "logo_file_name", None),
             getattr(data, "logo_content_type", None),
             getattr(data, "logo_storage_path", None),
+            getattr(data, "signature_file_name", None),
+            getattr(data, "signature_content_type", None),
+            getattr(data, "signature_storage_path", None),
+            getattr(data, "seal_file_name", None),
+            getattr(data, "seal_content_type", None),
+            getattr(data, "seal_storage_path", None),
+            getattr(data, "regulation_file_name", None),
+            getattr(data, "regulation_content_type", None),
+            getattr(data, "regulation_storage_path", None),
         )
         return dict(row)
 
@@ -63,6 +82,15 @@ class BuildingRepository:
                 logo_file_name = COALESCE($9, logo_file_name),
                 logo_content_type = COALESCE($10, logo_content_type),
                 logo_storage_path = COALESCE($11, logo_storage_path),
+                signature_file_name = COALESCE($12, signature_file_name),
+                signature_content_type = COALESCE($13, signature_content_type),
+                signature_storage_path = COALESCE($14, signature_storage_path),
+                seal_file_name = COALESCE($15, seal_file_name),
+                seal_content_type = COALESCE($16, seal_content_type),
+                seal_storage_path = COALESCE($17, seal_storage_path),
+                regulation_file_name = COALESCE($18, regulation_file_name),
+                regulation_content_type = COALESCE($19, regulation_content_type),
+                regulation_storage_path = COALESCE($20, regulation_storage_path),
                 updated_at  = NOW()
             WHERE id = $1
             RETURNING *
@@ -78,6 +106,15 @@ class BuildingRepository:
             getattr(data, "logo_file_name", None),
             getattr(data, "logo_content_type", None),
             getattr(data, "logo_storage_path", None),
+            getattr(data, "signature_file_name", None),
+            getattr(data, "signature_content_type", None),
+            getattr(data, "signature_storage_path", None),
+            getattr(data, "seal_file_name", None),
+            getattr(data, "seal_content_type", None),
+            getattr(data, "seal_storage_path", None),
+            getattr(data, "regulation_file_name", None),
+            getattr(data, "regulation_content_type", None),
+            getattr(data, "regulation_storage_path", None),
         )
         return dict(row)
 

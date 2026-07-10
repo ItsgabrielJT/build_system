@@ -13,6 +13,7 @@ _ALLOWED_CONTENT_TYPES: frozenset[str] = frozenset(
     t.strip() for t in settings.allowed_proof_types.split(",")
 )
 _ALLOWED_IMAGE_TYPES: frozenset[str] = frozenset({"image/jpeg", "image/png"})
+_ALLOWED_PDF_TYPES: frozenset[str] = frozenset({"application/pdf"})
 _MAX_BYTES: int = settings.max_proof_size_mb * 1024 * 1024
 
 
@@ -86,14 +87,19 @@ def _building_asset_upload_dir() -> Path:
     return path
 
 
-async def validate_and_store_building_asset(file: UploadFile, label: str) -> dict:
+async def validate_and_store_building_asset(
+    file: UploadFile,
+    label: str,
+    *,
+    allowed_content_types: frozenset[str] = _ALLOWED_IMAGE_TYPES,
+) -> dict:
     """Valida y persiste una imagen del edificio."""
-    if file.content_type not in _ALLOWED_IMAGE_TYPES:
+    if file.content_type not in allowed_content_types:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
                 f"Tipo de archivo no soportado para {label}: {file.content_type}. "
-                f"Tipos permitidos: {', '.join(sorted(_ALLOWED_IMAGE_TYPES))}"
+                f"Tipos permitidos: {', '.join(sorted(allowed_content_types))}"
             ),
         )
 
@@ -124,6 +130,10 @@ async def validate_and_store_building_asset(file: UploadFile, label: str) -> dic
         "content_type": file.content_type,
         "storage_path": str(storage_path),
     }
+
+
+BUILDING_ALLOWED_IMAGE_TYPES = _ALLOWED_IMAGE_TYPES
+BUILDING_ALLOWED_PDF_TYPES = _ALLOWED_PDF_TYPES
 
 
 async def validate_and_store_expense_receipt(file: UploadFile) -> dict:

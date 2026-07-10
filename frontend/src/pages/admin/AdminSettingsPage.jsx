@@ -47,6 +47,9 @@ export default function AdminSettingsPage() {
   const [assetFiles, setAssetFiles] = useState({
     photo_file: null,
     logo_file: null,
+    signature_file: null,
+    seal_file: null,
+    regulation_file: null,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,6 +57,8 @@ export default function AdminSettingsPage() {
   const [assetPreviews, setAssetPreviews] = useState({
     photo: null,
     logo: null,
+    signature: null,
+    seal: null,
   });
   const [reportStartDate, setReportStartDate] = useState(initialRange.startDate);
   const [reportEndDate, setReportEndDate] = useState(initialRange.endDate);
@@ -106,6 +111,8 @@ export default function AdminSettingsPage() {
     const nextUrls = {
       photo: assetFiles.photo_file ? URL.createObjectURL(assetFiles.photo_file) : null,
       logo: assetFiles.logo_file ? URL.createObjectURL(assetFiles.logo_file) : null,
+      signature: assetFiles.signature_file ? URL.createObjectURL(assetFiles.signature_file) : null,
+      seal: assetFiles.seal_file ? URL.createObjectURL(assetFiles.seal_file) : null,
     };
 
     setAssetPreviews((prev) => ({
@@ -116,8 +123,10 @@ export default function AdminSettingsPage() {
     return () => {
       if (nextUrls.photo) URL.revokeObjectURL(nextUrls.photo);
       if (nextUrls.logo) URL.revokeObjectURL(nextUrls.logo);
+      if (nextUrls.signature) URL.revokeObjectURL(nextUrls.signature);
+      if (nextUrls.seal) URL.revokeObjectURL(nextUrls.seal);
     };
-  }, [assetFiles.photo_file, assetFiles.logo_file]);
+  }, [assetFiles.photo_file, assetFiles.logo_file, assetFiles.signature_file, assetFiles.seal_file]);
 
   useEffect(() => {
     if (!building?.id || !token) return undefined;
@@ -129,6 +138,8 @@ export default function AdminSettingsPage() {
       const entries = [
         ['photo', building.photo_file_name],
         ['logo', building.logo_file_name],
+        ['signature', building.signature_file_name],
+        ['seal', building.seal_file_name],
       ];
 
       const previews = {};
@@ -159,9 +170,13 @@ export default function AdminSettingsPage() {
     building?.id,
     building?.photo_file_name,
     building?.logo_file_name,
+    building?.signature_file_name,
+    building?.seal_file_name,
     token,
     assetFiles.photo_file,
     assetFiles.logo_file,
+    assetFiles.signature_file,
+    assetFiles.seal_file,
   ]);
 
   const handleChange = (event) => {
@@ -183,7 +198,13 @@ export default function AdminSettingsPage() {
     try {
       const updated = await updateBuildingConfig({ ...formData, ...assetFiles }, token);
       setBuilding(updated);
-      setAssetFiles({ photo_file: null, logo_file: null });
+      setAssetFiles({
+        photo_file: null,
+        logo_file: null,
+        signature_file: null,
+        seal_file: null,
+        regulation_file: null,
+      });
       await layoutContext.refreshBuilding?.();
       success('Configuración del edificio guardada');
     } catch (err) {
@@ -254,97 +275,177 @@ export default function AdminSettingsPage() {
         <div className={styles.emptyState}>No hay un edificio configurado.</div>
       ) : (
         <form className={styles.form} onSubmit={handleSubmit}>
-          <section className={styles.panel}>
-            <h2>Datos generales</h2>
-            <div className={styles.grid}>
-              <label className={styles.field}>
-                <span>Nombre del edificio</span>
-                <input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  placeholder="Ej. Torres del Parque"
-                />
-              </label>
+          <div className={styles.settingsColumns}>
+            <div className={styles.mainColumn}>
+              <section className={styles.panel}>
+                <h2>Datos generales</h2>
+                <div className={styles.grid}>
+                  <label className={styles.field}>
+                    <span>Nombre del edificio</span>
+                    <input
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      placeholder="Ej. Torres del Parque"
+                    />
+                  </label>
 
-              <label className={styles.field}>
-                <span>Email</span>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="contacto@edificio.com"
-                />
-              </label>
+                  <label className={styles.field}>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      placeholder="contacto@edificio.com"
+                    />
+                  </label>
 
-              <label className={styles.field}>
-                <span>Dirección</span>
-                <input
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="Calle principal 123"
-                />
-              </label>
+                  <label className={styles.field}>
+                    <span>Dirección</span>
+                    <input
+                      name="address"
+                      value={formData.address}
+                      onChange={handleChange}
+                      placeholder="Calle principal 123"
+                    />
+                  </label>
 
-              <label className={styles.field}>
-                <span>Teléfono</span>
-                <input
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="+593 99 999 9999"
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className={styles.panel}>
-            <h2>Imagen institucional</h2>
-            <div className={styles.assetGrid}>
-              <label className={styles.fileField}>
-                <span>Foto del edificio</span>
-                <div className={styles.previewBox}>
-                  {assetPreviews.photo ? (
-                    <img src={assetPreviews.photo} alt="Foto del edificio" />
-                  ) : (
-                    <strong>Sin foto</strong>
-                  )}
+                  <label className={styles.field}>
+                    <span>Teléfono</span>
+                    <input
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      placeholder="+593 99 999 9999"
+                    />
+                  </label>
                 </div>
-                <input
-                  type="file"
-                  name="photo_file"
-                  accept="image/png,image/jpeg"
-                  onChange={handleFileChange}
-                />
-                <small>
-                  {assetFiles.photo_file?.name || building.photo_file_name || 'Sin foto configurada'}
-                </small>
-              </label>
+              </section>
 
-              <label className={styles.fileField}>
-                <span>Logo para comprobantes y PDFs</span>
-                <div className={`${styles.previewBox} ${styles.logoPreview}`}>
-                  {assetPreviews.logo ? (
-                    <img src={assetPreviews.logo} alt="Logo para comprobantes y PDFs" />
-                  ) : (
-                    <strong>Sin logo</strong>
-                  )}
+              <section className={styles.panel}>
+                <h2>Imagen institucional</h2>
+                <div className={styles.assetGrid}>
+                  <label className={styles.fileField}>
+                    <span>Foto del edificio</span>
+                    <div className={styles.previewBox}>
+                      {assetPreviews.photo ? (
+                        <img src={assetPreviews.photo} alt="Foto del edificio" />
+                      ) : (
+                        <strong>Sin foto</strong>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      name="photo_file"
+                      accept="image/png,image/jpeg"
+                      onChange={handleFileChange}
+                    />
+                    <small>
+                      {assetFiles.photo_file?.name || building.photo_file_name || 'Sin foto configurada'}
+                    </small>
+                  </label>
+
+                  <label className={styles.fileField}>
+                    <span>Logo para comprobantes y PDFs</span>
+                    <div className={`${styles.previewBox} ${styles.logoPreview}`}>
+                      {assetPreviews.logo ? (
+                        <img src={assetPreviews.logo} alt="Logo para comprobantes y PDFs" />
+                      ) : (
+                        <strong>Sin logo</strong>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      name="logo_file"
+                      accept="image/png,image/jpeg"
+                      onChange={handleFileChange}
+                    />
+                    <small>
+                      {assetFiles.logo_file?.name || building.logo_file_name || 'Sin logo configurado'}
+                    </small>
+                  </label>
                 </div>
-                <input
-                  type="file"
-                  name="logo_file"
-                  accept="image/png,image/jpeg"
-                  onChange={handleFileChange}
-                />
-                <small>
-                  {assetFiles.logo_file?.name || building.logo_file_name || 'Sin logo configurado'}
-                </small>
-              </label>
+              </section>
             </div>
-          </section>
+
+            <div className={styles.sideColumn}>
+              <section className={styles.panel}>
+                <h2>Firma autorizada</h2>
+                <div className={styles.singleAssetGrid}>
+                  <label className={styles.fileField}>
+                    <span>Firma para comprobantes (PNG)</span>
+                    <div className={`${styles.previewBox} ${styles.logoPreview}`}>
+                      {assetPreviews.signature ? (
+                        <img src={assetPreviews.signature} alt="Firma autorizada" />
+                      ) : (
+                        <strong>Sin firma</strong>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      name="signature_file"
+                      accept="image/png"
+                      onChange={handleFileChange}
+                    />
+                    <small>
+                      {assetFiles.signature_file?.name || building.signature_file_name || 'Sin firma configurada'}
+                    </small>
+                  </label>
+                </div>
+              </section>
+
+              <section className={styles.panel}>
+                <h2>Sello institucional</h2>
+                <div className={styles.singleAssetGrid}>
+                  <label className={styles.fileField}>
+                    <span>Sello para comprobantes y documentos</span>
+                    <div className={`${styles.previewBox} ${styles.logoPreview}`}>
+                      {assetPreviews.seal ? (
+                        <img src={assetPreviews.seal} alt="Sello institucional" />
+                      ) : (
+                        <strong>Sin sello</strong>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      name="seal_file"
+                      accept="image/png,image/jpeg"
+                      onChange={handleFileChange}
+                    />
+                    <small>
+                      {assetFiles.seal_file?.name || building.seal_file_name || 'Sin sello configurado'}
+                    </small>
+                  </label>
+                </div>
+              </section>
+
+              <section className={styles.panel}>
+                <h2>Reglamento del edificio</h2>
+                <div className={styles.singleAssetGrid}>
+                  <label className={styles.fileField}>
+                    <span>Documento oficial (PDF)</span>
+                    <div className={styles.documentPreviewBox}>
+                      <strong>
+                        {assetFiles.regulation_file?.name || building.regulation_file_name || 'Sin reglamento cargado'}
+                      </strong>
+                      <small>Solo formato PDF</small>
+                    </div>
+                    <input
+                      type="file"
+                      name="regulation_file"
+                      accept="application/pdf"
+                      onChange={handleFileChange}
+                    />
+                    <small>
+                      {assetFiles.regulation_file?.name || building.regulation_file_name || 'Sin reglamento configurado'}
+                    </small>
+                  </label>
+                </div>
+              </section>
+            </div>
+          </div>
 
           <div className={styles.actions}>
             <button type="submit" disabled={saving}>

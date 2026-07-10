@@ -1,11 +1,31 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar/Sidebar';
 import Navbar from '../components/Navbar/Navbar';
+import { useAuth } from '../hooks/useAuth';
+import { getBuildingConfig } from '../services/buildingService';
 import styles from './OwnerLayout.module.css';
 
 export default function OwnerLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const { token } = useAuth();
+  const [building, setBuilding] = useState(null);
+
+  const fetchPrimaryBuilding = useCallback(async () => {
+    if (!token) return null;
+    try {
+      const primary = await getBuildingConfig(token);
+      setBuilding(primary);
+      return primary;
+    } catch {
+      setBuilding(null);
+      return null;
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchPrimaryBuilding();
+  }, [fetchPrimaryBuilding]);
 
   return (
     <div className={styles.layout}>
@@ -14,9 +34,12 @@ export default function OwnerLayout() {
         className={styles.main}
         style={{ marginLeft: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)' }}
       >
-        <Navbar onToggleSidebar={() => setCollapsed(c => !c)} />
+        <Navbar
+          buildingName={building?.name || ''}
+          onToggleSidebar={() => setCollapsed(c => !c)}
+        />
         <main className={styles.content}>
-          <Outlet />
+          <Outlet context={{ building, refreshBuilding: fetchPrimaryBuilding }} />
         </main>
       </div>
     </div>

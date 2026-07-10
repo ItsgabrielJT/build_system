@@ -5,22 +5,18 @@ export default function OwnerCamerasPage() {
     {
       id: 1,
       name: 'Cámara 1 - Ingreso Principal',
-      image: 'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80',
     },
     {
       id: 2,
       name: 'Cámara 2 - Parqueadero',
-      image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1200&q=80',
     },
     {
       id: 3,
       name: 'Cámara 3 - Lobby Piso 2',
-      image: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80',
     },
     {
       id: 4,
       name: 'Cámara 4 - Terraza',
-      image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
     },
   ];
 
@@ -49,9 +45,9 @@ export default function OwnerCamerasPage() {
         <div className={styles.grid}>
           {cameras.map((camera) => (
             <article key={camera.id} className={styles.camera}>
-              <img src={camera.image} alt={camera.name} />
+              <div className={styles.skeletonBlock} aria-label={`Vista previa de ${camera.name} próximamente`} />
               <div className={styles.cameraName}><span /> {camera.name}</div>
-              <div className={styles.liveBadge}><span /> EN VIVO</div>
+              <div className={styles.comingSoonBadge}>Próximamente</div>
               <button className={styles.expandButton} type="button" aria-label={`Expandir ${camera.name}`}>↗</button>
             </article>
           ))}

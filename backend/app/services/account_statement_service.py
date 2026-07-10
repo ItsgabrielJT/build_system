@@ -102,7 +102,7 @@ class AccountStatementService:
                 f"AccountPdf{size}{bold}{align}",
                 fontName="Helvetica-Bold" if bold else "Helvetica",
                 fontSize=size,
-                leading=size + 2.5,
+                leading=size + 4,
                 alignment={"LEFT": 0, "CENTER": 1, "RIGHT": 2, "JUSTIFY": 4}.get(align, 0),
             ),
         )
@@ -194,8 +194,8 @@ class AccountStatementService:
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7faff")]),
             ("FONTSIZE", (0, 1), (-1, -1), font_size),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ]
         for row in total_rows or []:
             style.extend([
@@ -218,10 +218,19 @@ class AccountStatementService:
         building = await get_default_building_config(self._owner_repo._conn)
         output = io.BytesIO()
         width = A4[0] - 2 * cm
-        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1 * cm, rightMargin=1 * cm, topMargin=0.7 * cm, bottomMargin=0.7 * cm)
+        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1 * cm, rightMargin=1 * cm, topMargin=0.9 * cm, bottomMargin=2.3 * cm)
+
+        def draw_footer(canvas, pdf_doc):
+            canvas.saveState()
+            footer = build_pdf_footer_bar(building, width=pdf_doc.width, page_text=f"Página {canvas.getPageNumber()}")
+            _, footer_height = footer.wrap(pdf_doc.width, pdf_doc.bottomMargin)
+            footer_y = max(0.35 * cm, pdf_doc.bottomMargin - footer_height)
+            footer.drawOn(canvas, pdf_doc.leftMargin, footer_y)
+            canvas.restoreState()
+
         story = [self._doc_header("Estado de Cuenta", f"N. EC-{date.today().year}-000245", building, width)]
         story.append(self._p("<font size='16'><b>ESTADO DE CUENTA</b></font>", 14, align="RIGHT", raw=True))
-        story.append(Spacer(1, 0.18 * cm))
+        story.append(Spacer(1, 0.3 * cm))
         owner = profile or {}
         apt = (owner.get("apartments") or [{}])[0]
         owner_box = Table(
@@ -231,7 +240,7 @@ class AccountStatementService:
             ]],
             colWidths=[width * 0.49, width * 0.49],
         )
-        owner_box.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#c8d6e8")), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10)]))
+        owner_box.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#c8d6e8")), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 12), ("BOTTOMPADDING", (0, 0), (-1, -1), 12)]))
         story.append(owner_box)
         totals = {
             "esperado": sum(Decimal(str(r.get("esperado", 0))) for r in rows),
@@ -239,38 +248,37 @@ class AccountStatementService:
             "pagado": sum(Decimal(str(r.get("pagado", 0))) for r in rows),
             "saldo": sum(Decimal(str(r.get("saldo", 0))) for r in rows),
         }
-        story.append(Spacer(1, 0.22 * cm))
+        story.append(Spacer(1, 0.32 * cm))
         summary = Table([[
             self._p(f"Saldo actual<br/><font size='14'><b>{self._money(totals['saldo'])}</b></font>", 8, color="#159447", raw=True),
             self._p(f"Total ingresos<br/><font size='14'><b>{self._money(totals['pagado'])}</b></font>", 8, color="#159447", raw=True),
             self._p(f"Total egresos<br/><font size='14'><b>-{self._money(totals['esperado'] + totals['multas'])}</b></font>", 8, color="#c91f1f", raw=True),
             self._p(f"Total pagos realizados<br/><font size='14'><b>{self._money(totals['pagado'])}</b></font>", 8, color="#1f5bd8", raw=True),
         ]], colWidths=[width / 4] * 4)
-        summary.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#d4dfef")), ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#d4dfef")), ("BACKGROUND", (0, 0), (-1, -1), colors.white), ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
+        summary.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#d4dfef")), ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#d4dfef")), ("BACKGROUND", (0, 0), (-1, -1), colors.white), ("TOPPADDING", (0, 0), (-1, -1), 12), ("BOTTOMPADDING", (0, 0), (-1, -1), 12)]))
         story.append(summary)
-        story.append(Spacer(1, 0.18 * cm))
+        story.append(Spacer(1, 0.3 * cm))
         story.append(self._p("DETALLE DE MOVIMIENTOS", 10, bold=True, color="#0c42a0"))
         data = [["PERIODO", "DEPARTAMENTO", "ESPERADO", "MULTAS", "PAGADO", "SALDO", "ESTADO"]]
         for row in rows:
             data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["multas"]), self._money(row["pagado"]), self._money(row["saldo"]), row["status"]])
         data.append(["TOTALES DEL PERIODO", "", self._money(totals["esperado"]), self._money(totals["multas"]), self._money(totals["pagado"]), self._money(totals["saldo"]), ""])
         story.append(self._blue_table(data, [2.4 * cm, 3 * cm, 2.4 * cm, 2.2 * cm, 2.4 * cm, 2.4 * cm, 3.2 * cm], font_size=7, total_rows=[len(data) - 1]))
-        story.append(Spacer(1, 0.25 * cm))
+        story.append(Spacer(1, 0.35 * cm))
         important = Table([[self._p("INFORMACIÓN IMPORTANTE<br/><br/>El vencimiento de la alícuota es el día 5 de cada mes.<br/>Realiza tus pagos a tiempo para evitar recargos.<br/>Si tienes alguna duda, contáctanos a través del sistema.", 8, raw=True), self._qr_drawing(f"EC-{owner_id}-{date.today()}")]], colWidths=[width * 0.72, width * 0.25])
-        important.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#d4dfef")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10)]))
+        important.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#d4dfef")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 12), ("BOTTOMPADDING", (0, 0), (-1, -1), 12)]))
         story.append(important)
-        story.append(Spacer(1, 0.25 * cm))
+        story.append(Spacer(1, 0.35 * cm))
         story.append(self._p("Gracias por contribuir al bienestar de nuestra comunidad.", 8, color="#667085", align="CENTER"))
-        story.append(Spacer(1, 0.22 * cm))
+        story.append(Spacer(1, 0.3 * cm))
         footer_logo = get_building_logo(building, max_width=2.2 * cm, max_height=1.5 * cm)
         if not footer_logo:
             footer_logo = self._p(f"<b>{escape(get_building_name(building).upper())}</b>", 8, align="CENTER", raw=True)
         footer = Table([[self._p("Franz Guzman G.<br/>Administrador del Edificio", 9, align="CENTER", raw=True), footer_logo]], colWidths=[width * 0.5, width * 0.5])
         footer.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
         story.append(footer)
-        story.append(Spacer(1, 0.15 * cm))
-        story.append(build_pdf_footer_bar(building, width=width, page_text="Página 1 de 1"))
-        doc.build(story)
+        story.append(Spacer(1, 0.35 * cm))
+        doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
         return output.getvalue()
 
     async def expense_certificate_pdf(self, owner_id: UUID) -> bytes:

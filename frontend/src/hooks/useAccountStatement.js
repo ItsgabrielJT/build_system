@@ -6,7 +6,7 @@ export function useAccountStatement() {
   const { token } = useAuth();
   const [statement, setStatement] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState(null);
   const [error, setError] = useState(null);
 
   const fetchStatement = useCallback(
@@ -26,24 +26,28 @@ export function useAccountStatement() {
   );
 
   const exportStatement = useCallback(
-    async (format, params = {}, filename) => {
-      setExporting(true);
+    async (format, params = {}) => {
+      setExportingFormat(format);
+      setError(null);
       try {
-        const blob = await accountStatementService.exportAccountStatement(token, format, params);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename || `estado-cuenta.${format}`;
-        a.click();
-        URL.revokeObjectURL(url);
+        return await accountStatementService.exportAccountStatement(token, format, params);
       } catch (err) {
         setError(err.response?.data?.detail || 'Error al exportar');
+        return null;
       } finally {
-        setExporting(false);
+        setExportingFormat(null);
       }
     },
     [token]
   );
 
-  return { statement, loading, exporting, error, fetchStatement, exportStatement };
+  return {
+    statement,
+    loading,
+    exporting: Boolean(exportingFormat),
+    exportingFormat,
+    error,
+    fetchStatement,
+    exportStatement,
+  };
 }

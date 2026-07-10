@@ -25,6 +25,7 @@ describe('OwnerAccountStatementPage', () => {
       ],
       loading: false,
       exporting: false,
+      exportingFormat: null,
       error: null,
       fetchStatement,
       exportStatement,
@@ -43,8 +44,7 @@ describe('OwnerAccountStatementPage', () => {
       expect.objectContaining({
         start_period: expect.any(String),
         end_period: expect.any(String),
-      }),
-      expect.stringContaining('.pdf')
+      })
     );
   });
 });

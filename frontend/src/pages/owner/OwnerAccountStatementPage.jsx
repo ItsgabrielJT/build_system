@@ -8,6 +8,17 @@ function formatCurrency(value) {
   return `$${Number(value || 0).toLocaleString()}`;
 }
 
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function OwnerAccountStatementPage() {
   const now = new Date();
   const startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
@@ -15,7 +26,7 @@ export default function OwnerAccountStatementPage() {
   const defaultEnd = now.toISOString().slice(0, 7);
 
   const [range, setRange] = useState({ startPeriod: defaultStart, endPeriod: defaultEnd });
-  const { statement, loading, exporting, error, fetchStatement, exportStatement } = useAccountStatement();
+  const { statement, loading, exporting, exportingFormat, error, fetchStatement, exportStatement } = useAccountStatement();
 
   useEffect(() => {
     if (range.startPeriod && range.endPeriod) {
@@ -23,8 +34,14 @@ export default function OwnerAccountStatementPage() {
     }
   }, [range, fetchStatement]);
 
-  const handleExport = (format) => {
-    exportStatement(format, { start_period: range.startPeriod, end_period: range.endPeriod }, `estado-cuenta-${range.startPeriod}-${range.endPeriod}.${format === 'excel' ? 'xlsx' : 'pdf'}`);
+  const handleExport = async (format) => {
+    const blob = await exportStatement(format, {
+      start_period: range.startPeriod,
+      end_period: range.endPeriod,
+    });
+    if (!blob) return;
+    const extension = format === 'excel' ? 'xlsx' : 'pdf';
+    triggerDownload(blob, `estado-cuenta-${range.startPeriod}-${range.endPeriod}.${extension}`);
   };
 
   const totals = statement.reduce(
@@ -47,14 +64,14 @@ export default function OwnerAccountStatementPage() {
             onClick={() => handleExport('pdf')}
             disabled={exporting}
           >
-            📄 Descargar PDF
+            {exportingFormat === 'pdf' ? 'Descargando...' : 'Descargar PDF'}
           </button>
           <button
             className={styles.btnExcel}
             onClick={() => handleExport('excel')}
             disabled={exporting}
           >
-            📊 Descargar Excel
+            {exportingFormat === 'excel' ? 'Descargando...' : 'Descargar Excel'}
           </button>
         </div>
       </div>

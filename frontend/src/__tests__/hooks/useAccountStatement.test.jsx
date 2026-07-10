@@ -55,36 +55,22 @@ describe('useAccountStatement', () => {
 
   it('exporta y dispara descarga', async () => {
     const fakeBlob = new Blob(['file'], { type: 'application/pdf' });
-    const clickSpy = vi.fn();
-    const anchor = { href: '', download: '', click: clickSpy };
 
     accountStatementService.exportAccountStatement.mockResolvedValue(fakeBlob);
 
-    const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:url');
-    const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
-    const originalCreateElement = document.createElement.bind(document);
-    const createElementSpy = vi
-      .spyOn(document, 'createElement')
-      .mockImplementation((tagName) => (tagName === 'a' ? anchor : originalCreateElement(tagName)));
-
     const { result } = renderHook(() => useAccountStatement());
 
+    let exportedBlob = null;
+
     await act(async () => {
-      await result.current.exportStatement('pdf', { start_period: '2026-05' }, 'estado.pdf');
+      exportedBlob = await result.current.exportStatement('pdf', { start_period: '2026-05' });
     });
 
     expect(accountStatementService.exportAccountStatement).toHaveBeenCalledWith('fake-token', 'pdf', {
       start_period: '2026-05',
     });
-    expect(createObjectURLSpy).toHaveBeenCalledWith(fakeBlob);
-    expect(anchor.download).toBe('estado.pdf');
-    expect(clickSpy).toHaveBeenCalled();
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:url');
+    expect(exportedBlob).toBe(fakeBlob);
 
     await waitFor(() => expect(result.current.exporting).toBe(false));
-
-    createObjectURLSpy.mockRestore();
-    revokeObjectURLSpy.mockRestore();
-    createElementSpy.mockRestore();
   });
 });

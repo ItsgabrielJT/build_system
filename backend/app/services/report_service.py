@@ -1580,8 +1580,15 @@ class ReportService:
 
         # 3. Setup PDF document
         output = io.BytesIO()
-        width = A4[0] - 2 * cm
-        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1 * cm, rightMargin=1 * cm, topMargin=0.7 * cm, bottomMargin=0.7 * cm)
+        width = A4[0] - 1.4 * cm
+        doc = SimpleDocTemplate(
+            output,
+            pagesize=A4,
+            leftMargin=0.7 * cm,
+            rightMargin=0.7 * cm,
+            topMargin=0.5 * cm,
+            bottomMargin=1.4 * cm,
+        )
         story = []
         
         # Add QR Code widget to reportlab graphics
@@ -1626,23 +1633,25 @@ class ReportService:
         
         qr_draw = _qr_drawing(f"FICHA-{owner['id']}-{sheet_number}", size=1.8 * cm)
         
-        # Combine Logo, Title center, and QR/Info right
+        # Title block next to logo
+        header_title = Paragraph(
+            "<font size='13' color='#123c7a'><b>FICHA DEL COPROPIETARIO</b></font>",
+            ParagraphStyle("HeaderTitle", fontName="Helvetica-Bold", leading=14, alignment=0)
+        )
+        
         header_table = Table(
-            [[building_logo, Spacer(1,1), qr_draw, info_headers]],
-            colWidths=[5 * cm, width - 11.8 * cm, 2 * cm, 4.8 * cm]
+            [[building_logo, header_title, qr_draw, info_headers]],
+            colWidths=[2.8 * cm, width * 0.45, 2 * cm, width - (2.8 * cm + width * 0.45 + 2 * cm)]
         )
         header_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (1, 0), (1, 0), "LEFT"),
             ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ("LINEBELOW", (0, 0), (-1, -1), 1.2, colors.HexColor("#123c7a")),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.6, colors.HexColor("#123c7a")),
         ]))
         story.append(header_table)
-        story.append(Spacer(1, 0.3 * cm))
-        
-        # Centered document title
-        story.append(Paragraph("<font size='14' color='#123c7a'><b>FICHA DEL COPROPIETARIO</b></font>", ParagraphStyle("DocTitle", fontName="Helvetica-Bold", alignment=1)))
-        story.append(Spacer(1, 0.4 * cm))
+        story.append(Spacer(1, 0.08 * cm))
         
         # Helper for sections titles
         def make_section_title(title_text: str):
@@ -1651,10 +1660,10 @@ class ReportService:
                 colWidths=[width]
             )
             t.setStyle(TableStyle([
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor("#123c7a")),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.5, colors.HexColor("#123c7a")),
             ]))
             return t
 
@@ -1713,15 +1722,15 @@ class ReportService:
         )
         sec1_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 2),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#f8fafc")),
-            ("BOX", (2, 0), (2, 0), 0.6, colors.HexColor("#e5e7eb")),
+            ("BOX", (2, 0), (2, 0), 0.5, colors.HexColor("#e5e7eb")),
         ]))
         story.append(sec1_table)
-        story.append(Spacer(1, 0.3 * cm))
+        story.append(Spacer(1, 0.12 * cm))
         
         # SECTION 2: INFORMACIÓN DEL DEPARTAMENTO
         story.append(make_section_title("2. INFORMACIÓN DEL DEPARTAMENTO"))
@@ -1769,14 +1778,14 @@ class ReportService:
         sec2_table = Table(sec2_data, colWidths=[width * 0.28, width * 0.22, width * 0.28, width * 0.22])
         sec2_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#e5e7eb")),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("LEFTPADDING", (0, 0), (-1, -1), 1),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 1),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.2, colors.HexColor("#e5e7eb")),
         ]))
         story.append(sec2_table)
-        story.append(Spacer(1, 0.3 * cm))
+        story.append(Spacer(1, 0.12 * cm))
         
         # SECTION 3: INFORMACIÓN FINANCIERA
         story.append(make_section_title("3. INFORMACIÓN FINANCIERA"))
@@ -1797,15 +1806,15 @@ class ReportService:
         ]
         resumen_table = Table(resumen_data, colWidths=[width * 0.32])
         resumen_table.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-            ("LINEBELOW", (0, 0), (0, 0), 0.8, colors.HexColor("#123c7a")),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+            ("LINEBELOW", (0, 0), (0, 0), 0.6, colors.HexColor("#123c7a")),
             ("BACKGROUND", (0, -1), (0, -1), colors.HexColor("#edf9f0") if saldo_actual <= 0 else colors.HexColor("#fdf2f2")),
-            ("BOX", (0, -1), (0, -1), 0.4, colors.HexColor("#1f8f4d") if saldo_actual <= 0 else colors.HexColor("#f87171")),
+            ("BOX", (0, -1), (0, -1), 0.3, colors.HexColor("#1f8f4d") if saldo_actual <= 0 else colors.HexColor("#f87171")),
         ]))
         
         # Column 2: Últimos 3 pagos registrados
@@ -1844,20 +1853,20 @@ class ReportService:
             Paragraph(f"<b>{self._usd(sum_last_3)}</b>", ParagraphStyle("PTA", fontName="Helvetica-Bold", size=7, color="#123c7a", align="RIGHT")),
         ])
         
-        pagos_table = Table(pagos_rows, colWidths=[width * 0.10, width * 0.13, width * 0.10])
+        pagos_table = Table(pagos_rows, colWidths=[width * 0.095, width * 0.135, width * 0.10])
         pagos_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123c7a")),
             ("ALIGN", (0, 0), (-1, -1), "LEFT"),
             ("ALIGN", (2, 0), (2, -1), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("GRID", (0, 0), (-1, -2), 0.4, colors.HexColor("#e5e7eb")),
+            ("GRID", (0, 0), (-1, -2), 0.3, colors.HexColor("#e5e7eb")),
             ("SPAN", (0, -1), (1, -1)),
             ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#dbe7f7")),
-            ("BOX", (0, -1), (-1, -1), 0.6, colors.HexColor("#123c7a")),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("BOX", (0, -1), (-1, -1), 0.5, colors.HexColor("#123c7a")),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
         ]))
         
         # Column 3: Estado de cuenta actual
@@ -1874,13 +1883,13 @@ class ReportService:
             ("ALIGN", (0, 0), (-1, -1), "LEFT"),
             ("ALIGN", (1, 0), (1, -1), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("GRID", (0, 0), (-1, -2), 0.4, colors.HexColor("#e5e7eb")),
+            ("GRID", (0, 0), (-1, -2), 0.3, colors.HexColor("#e5e7eb")),
             ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#edf9f0") if saldo_actual <= 0 else colors.HexColor("#fdf2f2")),
-            ("BOX", (0, -1), (-1, -1), 0.6, colors.HexColor("#1f8f4d") if saldo_actual <= 0 else colors.HexColor("#f87171")),
-            ("TOPPADDING", (0, 0), (-1, -1), 4.8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4.8),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("BOX", (0, -1), (-1, -1), 0.5, colors.HexColor("#1f8f4d") if saldo_actual <= 0 else colors.HexColor("#f87171")),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
         ]))
         
         # Combine the 3 columns into Section 3 table
@@ -1888,12 +1897,12 @@ class ReportService:
         sec3_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ("TOPPADDING", (0, 0), (-1, -1), 0),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
         ]))
         story.append(sec3_table)
-        story.append(Spacer(1, 0.3 * cm))
+        story.append(Spacer(1, 0.10 * cm))
         
         # SECTION 4: CONTACTOS DE EMERGENCIA
         story.append(make_section_title("4. CONTACTOS DE EMERGENCIA"))
@@ -1921,41 +1930,41 @@ class ReportService:
         
         c1_table = Table([[Paragraph(contact1_text, ParagraphStyle("C1T", leading=10))]], colWidths=[width * 0.32])
         c1_table.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#e5e7eb")),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
         ]))
         
         c2_table = Table([[Paragraph(contact2_text, ParagraphStyle("C2T", leading=10))]], colWidths=[width * 0.32])
         c2_table.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#e5e7eb")),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
         ]))
         
         c3_table = Table([[Paragraph(contact3_text, ParagraphStyle("C3T", leading=10))]], colWidths=[width * 0.32])
         c3_table.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#e5e7eb")),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
         ]))
         
         sec4_table = Table([[c1_table, c2_table, c3_table]], colWidths=[width * 0.34, width * 0.33, width * 0.33])
         sec4_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ("TOPPADDING", (0, 0), (-1, -1), 0),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
         ]))
         story.append(sec4_table)
-        story.append(Spacer(1, 0.3 * cm))
+        story.append(Spacer(1, 0.08 * cm))
         
         # SECTION 5: OBSERVACIONES
         story.append(make_section_title("5. OBSERVACIONES"))
@@ -1966,14 +1975,14 @@ class ReportService:
             colWidths=[width]
         )
         obs_box.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e5e7eb")),
+            ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#e5e7eb")),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-            ("TOPPADDING", (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
         ]))
         story.append(obs_box)
-        story.append(Spacer(1, 0.5 * cm))
+        story.append(Spacer(1, 0.14 * cm))
         
         # Signatures
         sig_admin = Table(
@@ -2015,9 +2024,12 @@ class ReportService:
             ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
         ]))
         story.append(signatures_table)
-        story.append(Spacer(1, 0.4 * cm))
+        story.append(Spacer(1, 0.18 * cm))
         
-        story.append(build_pdf_footer_bar(building, width=width, page_text="Página 1 de 1"))
-        
-        doc.build(story)
+        def draw_footer(canvas, doc):
+            footer = build_pdf_footer_bar(building, width=width, page_text="Página %d de 1" % doc.page)
+            footer.wrapOn(canvas, doc.width, doc.bottomMargin)
+            footer.drawOn(canvas, doc.leftMargin, doc.bottomMargin - 1.3 * cm)
+
+        doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
         return output.getvalue()

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { getEvents, createEvent } from '../../services/eventService';
+import { createEvent, deleteEvent, getEvents, updateEvent } from '../../services/eventService';
 import { getOwners } from '../../services/ownerService';
 import FormModal from '../../components/FormModal/FormModal';
 import { useNotification } from '../../context/NotificationContext';
@@ -27,6 +27,7 @@ export default function AdminEventsPage() {
   const [error, setError] = useState(null);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [query, setQuery] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -129,14 +130,50 @@ export default function AdminEventsPage() {
     },
   ];
 
-  const handleCreate = async (formData) => {
+  const openCreateModal = () => {
+    setEditingEvent(null);
+    setIsFormOpen(true);
+  };
+
+  const openEditModal = (event) => {
+    setEditingEvent({
+      ...event,
+      owner_ids: (event.assigned_owners || []).map((owner) => owner.id),
+    });
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingEvent(null);
+  };
+
+  const handleSubmit = async (formData) => {
     try {
-      await createEvent(formData, token);
-      success('Evento creado con éxito');
-      setIsFormOpen(false);
+      if (editingEvent) {
+        await updateEvent(editingEvent.id, formData, token);
+        success('Evento actualizado con éxito');
+      } else {
+        await createEvent(formData, token);
+        success('Evento creado con éxito');
+      }
+      closeForm();
       await loadEventsOnly();
     } catch (err) {
-      toastError(err.response?.data?.detail || 'Error al crear el evento');
+      toastError(err.response?.data?.detail || 'Error al guardar el evento');
+      throw err;
+    }
+  };
+
+  const handleDelete = async (event) => {
+    const confirmed = window.confirm(`¿Eliminar el evento "${event.title}"?`);
+    if (!confirmed) return;
+    try {
+      await deleteEvent(event.id, token);
+      success('Evento eliminado con éxito');
+      await loadEventsOnly();
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al eliminar el evento');
     }
   };
 
@@ -184,7 +221,7 @@ export default function AdminEventsPage() {
             <span>Fin</span>
             <input type="date" value={filterEndDate} onChange={(event) => setFilterEndDate(event.target.value)} />
           </label>
-          <button type="button" className={styles.btnPrimary} onClick={() => setIsFormOpen(true)}>
+          <button type="button" className={styles.btnPrimary} onClick={openCreateModal}>
             + Crear evento
           </button>
         </div>
@@ -252,6 +289,7 @@ export default function AdminEventsPage() {
                         <th>Fecha</th>
                         <th>Horario</th>
                         <th>Propietarios Asignados</th>
+                        <th>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -280,6 +318,24 @@ export default function AdminEventsPage() {
                                   Sin propietarios asignados
                                 </span>
                               )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className={styles.rowActions}>
+                              <button
+                                type="button"
+                                className={styles.btnEdit}
+                                onClick={() => openEditModal(event)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.btnTable}
+                                onClick={() => handleDelete(event)}
+                              >
+                                Eliminar
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -322,10 +378,11 @@ export default function AdminEventsPage() {
 
       <FormModal
         isOpen={isFormOpen}
-        title="Crear nuevo evento"
+        title={editingEvent ? 'Editar evento' : 'Crear nuevo evento'}
         fields={formFields}
-        onSubmit={handleCreate}
-        onClose={() => setIsFormOpen(false)}
+        initialData={editingEvent || undefined}
+        onSubmit={handleSubmit}
+        onClose={closeForm}
       />
     </div>
   );

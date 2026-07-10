@@ -1,12 +1,14 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AdminEventsPage from '../../pages/admin/AdminEventsPage';
-import { getEvents, createEvent } from '../../services/eventService';
+import { getEvents, createEvent, updateEvent, deleteEvent } from '../../services/eventService';
 import { getOwners } from '../../services/ownerService';
 
 vi.mock('../../services/eventService', () => ({
   getEvents: vi.fn(),
   createEvent: vi.fn(),
+  updateEvent: vi.fn(),
+  deleteEvent: vi.fn(),
 }));
 
 vi.mock('../../services/ownerService', () => ({
@@ -117,6 +119,7 @@ describe('AdminEventsPage', () => {
   it('opens FormModal and allows creation of a new event', async () => {
     const mockOwners = [
       { id: 'owner-1', full_name: 'Gabriel Tates', email: 'gabriel@test.com' },
+      { id: 'owner-2', full_name: 'Ana Pérez', email: 'ana@test.com' },
     ];
     getEvents.mockResolvedValue([]);
     getOwners.mockResolvedValue(mockOwners);
@@ -142,10 +145,8 @@ describe('AdminEventsPage', () => {
     fireEvent.change(screen.getByLabelText(/Hora de inicio/i), { target: { value: '10:00' } });
     fireEvent.change(screen.getByLabelText(/Hora de fin/i), { target: { value: '11:30' } });
 
-    // Multi-select owner_ids
-    const multiselect = screen.getByLabelText(/Propietarios asignados/i);
-    // select owner-1
-    fireEvent.change(multiselect, { target: { value: 'owner-1' } });
+    fireEvent.click(screen.getByLabelText('Gabriel Tates'));
+    fireEvent.click(screen.getByLabelText('Ana Pérez'));
 
     // Submit form
     const submitBtn = screen.getByRole('button', { name: /Guardar/i });
@@ -159,10 +160,63 @@ describe('AdminEventsPage', () => {
           event_date: '2026-07-20',
           start_time: '10:00',
           end_time: '11:30',
-          owner_ids: ['owner-1'],
+          owner_ids: ['owner-1', 'owner-2'],
         },
         'test-token'
       );
+    });
+  });
+
+  it('allows editing and deleting events', async () => {
+    const mockEvents = [
+      {
+        id: 'event-1',
+        title: 'Reunión de Consorcio',
+        description: 'Reunión mensual',
+        event_date: '2026-08-15',
+        start_time: '18:00',
+        end_time: '20:00',
+        assigned_owners: [
+          { id: 'owner-1', full_name: 'Gabriel Tates', email: 'gabriel@test.com' },
+        ],
+      },
+    ];
+    const mockOwners = [
+      { id: 'owner-1', full_name: 'Gabriel Tates', email: 'gabriel@test.com' },
+      { id: 'owner-2', full_name: 'Ana Pérez', email: 'ana@test.com' },
+    ];
+    getEvents.mockResolvedValue(mockEvents);
+    getOwners.mockResolvedValue(mockOwners);
+    updateEvent.mockResolvedValue({ id: 'event-1' });
+    deleteEvent.mockResolvedValue();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<AdminEventsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunión de Consorcio')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Editar/i }));
+    expect(screen.getByRole('heading', { name: /Editar evento/i })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Título/i), { target: { value: 'Reunión actualizada' } });
+    fireEvent.click(screen.getByLabelText('Ana Pérez'));
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/i }));
+
+    await waitFor(() => {
+      expect(updateEvent).toHaveBeenCalledWith(
+        'event-1',
+        expect.objectContaining({
+          title: 'Reunión actualizada',
+          owner_ids: ['owner-1', 'owner-2'],
+        }),
+        'test-token'
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar/i }));
+    await waitFor(() => {
+      expect(deleteEvent).toHaveBeenCalledWith('event-1', 'test-token');
     });
   });
 });

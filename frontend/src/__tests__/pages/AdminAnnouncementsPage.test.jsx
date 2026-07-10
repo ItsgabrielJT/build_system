@@ -1,11 +1,18 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AdminAnnouncementsPage from '../../pages/admin/AdminAnnouncementsPage';
-import { getAnnouncements, createAnnouncement } from '../../services/announcementService';
+import {
+  createAnnouncement,
+  deleteAnnouncement,
+  getAnnouncements,
+  updateAnnouncement,
+} from '../../services/announcementService';
 
 vi.mock('../../services/announcementService', () => ({
   getAnnouncements: vi.fn(),
   createAnnouncement: vi.fn(),
+  updateAnnouncement: vi.fn(),
+  deleteAnnouncement: vi.fn(),
 }));
 
 vi.mock('../../hooks/useAuth', () => ({
@@ -51,8 +58,8 @@ describe('AdminAnnouncementsPage', () => {
     expect(screen.getByText('Gestión de Avisos')).toBeInTheDocument();
 
     expect(screen.getByText('Total avisos')).toBeInTheDocument();
-    expect(screen.getByText('Últimos 7 días')).toBeInTheDocument();
-    expect(screen.getByText('Este mes')).toBeInTheDocument();
+    expect(screen.getAllByText('Últimos 7 días').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Este mes').length).toBeGreaterThan(0);
   });
 
   it('filters list based on search query', async () => {
@@ -80,7 +87,7 @@ describe('AdminAnnouncementsPage', () => {
       expect(screen.getByText('Asamblea Anual')).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByPlaceholderText(/Buscar por título u descripción.../i);
+    const searchInput = screen.getByPlaceholderText(/Buscar por título o descripción.../i);
     fireEvent.change(searchInput, { target: { value: 'Asamblea' } });
 
     expect(screen.queryByText('Mantenimiento Ascensor')).not.toBeInTheDocument();
@@ -94,13 +101,13 @@ describe('AdminAnnouncementsPage', () => {
     render(<AdminAnnouncementsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /\+ Crear aviso/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /\+ Publicar aviso/i })).toBeInTheDocument();
     });
 
-    const createBtn = screen.getByRole('button', { name: /\+ Crear aviso/i });
+    const createBtn = screen.getByRole('button', { name: /\+ Publicar aviso/i });
     fireEvent.click(createBtn);
 
-    expect(screen.getByRole('heading', { name: /Crear nuevo aviso/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Publicar nuevo aviso/i })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Título del aviso/i), { target: { value: 'Nuevo Comunicado' } });
     fireEvent.change(screen.getByLabelText(/Descripción \/ Cuerpo del aviso/i), { target: { value: 'Descripción importante' } });
@@ -116,6 +123,51 @@ describe('AdminAnnouncementsPage', () => {
         },
         'test-token'
       );
+    });
+  });
+
+  it('allows editing and deleting announcements', async () => {
+    const mockAnnouncements = [
+      {
+        id: 'ann-1',
+        title: 'Mantenimiento de Agua',
+        description: 'Habrá corte de agua',
+        created_at: '2026-07-10T12:00:00Z',
+      },
+    ];
+
+    getAnnouncements.mockResolvedValue(mockAnnouncements);
+    updateAnnouncement.mockResolvedValue({ id: 'ann-1' });
+    deleteAnnouncement.mockResolvedValue();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<AdminAnnouncementsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Mantenimiento de Agua')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Editar/i }));
+    expect(screen.getByRole('heading', { name: /Editar aviso/i })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Título del aviso/i), { target: { value: 'Aviso actualizado' } });
+    fireEvent.change(screen.getByLabelText(/Descripción \/ Cuerpo del aviso/i), { target: { value: 'Nuevo detalle' } });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/i }));
+
+    await waitFor(() => {
+      expect(updateAnnouncement).toHaveBeenCalledWith(
+        'ann-1',
+        {
+          title: 'Aviso actualizado',
+          description: 'Nuevo detalle',
+        },
+        'test-token'
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar/i }));
+    await waitFor(() => {
+      expect(deleteAnnouncement).toHaveBeenCalledWith('ann-1', 'test-token');
     });
   });
 });

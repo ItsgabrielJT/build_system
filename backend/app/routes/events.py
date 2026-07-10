@@ -25,6 +25,26 @@ class EventCreate(BaseModel):
     owner_ids: List[UUID]
 
 
+class EventUpdate(EventCreate):
+    pass
+
+
+def _parse_event_time(value: str) -> time:
+    from datetime import datetime
+
+    try:
+        return (
+            datetime.strptime(value, "%H:%M").time()
+            if len(value) <= 5
+            else datetime.strptime(value, "%H:%M:%S").time()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato de hora inválido. Use HH:MM o HH:MM:SS: {str(exc)}",
+        )
+
+
 @router.post(
     "/events",
     status_code=status.HTTP_201_CREATED,
@@ -39,16 +59,8 @@ async def create_event(
     owner_repo = OwnerRepository(db)
     notification_repo = NotificationRepository(db)
 
-    # Parse times
-    try:
-        from datetime import datetime
-        start_t = datetime.strptime(data.start_time, "%H:%M").time() if len(data.start_time) <= 5 else datetime.strptime(data.start_time, "%H:%M:%S").time()
-        end_t = datetime.strptime(data.end_time, "%H:%M").time() if len(data.end_time) <= 5 else datetime.strptime(data.end_time, "%H:%M:%S").time()
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Formato de hora inválido. Use HH:MM o HH:MM:SS: {str(exc)}",
-        )
+    start_t = _parse_event_time(data.start_time)
+    end_t = _parse_event_time(data.end_time)
 
     # Create event
     event = await event_repo.create(
@@ -89,6 +101,58 @@ async def create_event(
             )
 
     return event
+
+
+@router.put(
+    "/events/{event_id}",
+    dependencies=[Depends(require_admin)],
+)
+async def update_event(
+    event_id: UUID,
+    data: EventUpdate,
+    db=Depends(get_db),
+):
+    """Actualiza un evento y sus propietarios asignados (ADMIN)."""
+    event_repo = EventRepository(db)
+
+    start_t = _parse_event_time(data.start_time)
+    end_t = _parse_event_time(data.end_time)
+
+    event = await event_repo.update(
+        event_id=event_id,
+        title=data.title,
+        description=data.description,
+        event_date=data.event_date,
+        start_time=start_t,
+        end_time=end_t,
+    )
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Evento no encontrado",
+        )
+
+    await event_repo.assign_to_owners(event_id, data.owner_ids)
+    return event
+
+
+@router.delete(
+    "/events/{event_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+async def delete_event(
+    event_id: UUID,
+    db=Depends(get_db),
+):
+    """Elimina un evento existente (ADMIN)."""
+    event_repo = EventRepository(db)
+    deleted = await event_repo.delete(event_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Evento no encontrado",
+        )
 
 
 @router.get(

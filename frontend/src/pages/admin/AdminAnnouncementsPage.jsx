@@ -1,7 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../context/NotificationContext';
-import { getAnnouncements, createAnnouncement } from '../../services/announcementService';
+import {
+  createAnnouncement,
+  deleteAnnouncement,
+  getAnnouncements,
+  updateAnnouncement,
+} from '../../services/announcementService';
 import FormModal from '../../components/FormModal/FormModal';
 import styles from './AdminAnnouncementsPage.module.css';
 
@@ -43,6 +48,7 @@ export default function AdminAnnouncementsPage() {
   
   const [page, setPage] = useState(1);
   const [actionError, setActionError] = useState(null);
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
 
   const fetchAllAnnouncements = async () => {
     setLoading(true);
@@ -111,16 +117,50 @@ export default function AdminAnnouncementsPage() {
     return announcements.filter((ann) => ann.created_at && new Date(ann.created_at) >= sevenDaysAgo).length;
   }, [announcements]);
 
-  const handleCreate = async (formData) => {
+  const openCreateModal = () => {
+    setEditingAnnouncement(null);
+    setIsFormOpen(true);
+  };
+
+  const openEditModal = (announcement) => {
+    setEditingAnnouncement(announcement);
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingAnnouncement(null);
+  };
+
+  const handleSubmit = async (formData) => {
     try {
-      await createAnnouncement(formData, token);
-      success('Aviso creado y difundido con éxito');
-      setIsFormOpen(false);
+      if (editingAnnouncement) {
+        await updateAnnouncement(editingAnnouncement.id, formData, token);
+        success('Aviso actualizado con éxito');
+      } else {
+        await createAnnouncement(formData, token);
+        success('Aviso creado y difundido con éxito');
+      }
+      closeForm();
       await fetchAllAnnouncements();
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Error al crear el aviso';
+      const msg = err.response?.data?.detail || 'Error al guardar el aviso';
       toastError(msg);
       throw err; // FormModal handles the error and stops submitting
+    }
+  };
+
+  const handleDelete = async (announcement) => {
+    const confirmed = window.confirm(`¿Eliminar el aviso "${announcement.title}"?`);
+    if (!confirmed) return;
+    try {
+      await deleteAnnouncement(announcement.id, token);
+      success('Aviso eliminado con éxito');
+      await fetchAllAnnouncements();
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Error al eliminar el aviso';
+      setActionError(msg);
+      toastError(msg);
     }
   };
 
@@ -201,7 +241,7 @@ export default function AdminAnnouncementsPage() {
           <button 
             type="button" 
             className={styles.btnPrimary} 
-            onClick={() => setIsFormOpen(true)}
+            onClick={openCreateModal}
           >
             + Publicar aviso
           </button>
@@ -274,6 +314,7 @@ export default function AdminAnnouncementsPage() {
                         <th>Título</th>
                         <th>Descripción</th>
                         <th>Fecha de publicación</th>
+                        <th>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -290,6 +331,24 @@ export default function AdminAnnouncementsPage() {
                           <td style={{ verticalAlign: 'top', width: '20%' }}>
                             <strong>{formatDate(ann.created_at)}</strong>
                             <span>{formatTime(ann.created_at)}</span>
+                          </td>
+                          <td style={{ verticalAlign: 'top', width: '18%' }}>
+                            <div className={styles.rowActions}>
+                              <button
+                                type="button"
+                                className={styles.btnEdit}
+                                onClick={() => openEditModal(ann)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.btnTable}
+                                onClick={() => handleDelete(ann)}
+                              >
+                                Eliminar
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -327,10 +386,11 @@ export default function AdminAnnouncementsPage() {
 
       <FormModal
         isOpen={isFormOpen}
-        title="Publicar nuevo aviso"
+        title={editingAnnouncement ? 'Editar aviso' : 'Publicar nuevo aviso'}
         fields={getAnnouncementFields()}
-        onSubmit={handleCreate}
-        onClose={() => setIsFormOpen(false)}
+        initialData={editingAnnouncement || undefined}
+        onSubmit={handleSubmit}
+        onClose={closeForm}
       />
     </div>
   );

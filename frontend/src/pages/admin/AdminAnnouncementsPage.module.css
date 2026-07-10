@@ -181,6 +181,26 @@
   border-color: #fecaca;
 }
 
+.btnEdit {
+  padding: 7px 12px;
+  color: #0b5bd3;
+  background: #eef4ff;
+  border: 1px solid #c7d7fe;
+  border-radius: var(--border-radius);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnEdit:hover {
+  background: #dbeafe;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .btnTable:disabled {
   cursor: not-allowed;
   color: var(--color-gray-400);

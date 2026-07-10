@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
@@ -13,6 +13,11 @@ router = APIRouter(tags=["announcements"])
 
 
 class AnnouncementCreate(BaseModel):
+    title: str
+    description: str
+
+
+class AnnouncementUpdate(BaseModel):
     title: str
     description: str
 
@@ -57,6 +62,49 @@ async def list_announcements(
     """Lista todos los avisos (ADMIN)."""
     repo = AnnouncementRepository(db)
     return await repo.get_all()
+
+
+@router.put(
+    "/announcements/{announcement_id}",
+    dependencies=[Depends(require_admin)],
+)
+async def update_announcement(
+    announcement_id: UUID,
+    data: AnnouncementUpdate,
+    db=Depends(get_db),
+):
+    """Actualiza un aviso existente (ADMIN)."""
+    repo = AnnouncementRepository(db)
+    announcement = await repo.update(
+        announcement_id=announcement_id,
+        title=data.title,
+        description=data.description,
+    )
+    if not announcement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aviso no encontrado",
+        )
+    return announcement
+
+
+@router.delete(
+    "/announcements/{announcement_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+async def delete_announcement(
+    announcement_id: UUID,
+    db=Depends(get_db),
+):
+    """Elimina un aviso existente (ADMIN)."""
+    repo = AnnouncementRepository(db)
+    deleted = await repo.delete(announcement_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aviso no encontrado",
+        )
 
 
 @router.get(

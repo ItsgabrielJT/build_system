@@ -31,6 +31,54 @@ class EventRepository:
         )
         return dict(row)
 
+    async def get_by_id(self, event_id: UUID) -> dict | None:
+        row = await self._conn.fetchrow(
+            "SELECT * FROM events WHERE id = $1",
+            event_id,
+        )
+        return dict(row) if row else None
+
+    async def update(
+        self,
+        event_id: UUID,
+        title: str,
+        description: str,
+        event_date: date,
+        start_time: time,
+        end_time: time,
+    ) -> dict | None:
+        row = await self._conn.fetchrow(
+            """
+            UPDATE events
+            SET title = $2,
+                description = $3,
+                event_date = $4,
+                start_time = $5,
+                end_time = $6
+            WHERE id = $1
+            RETURNING *
+            """,
+            event_id,
+            title,
+            description,
+            event_date,
+            start_time,
+            end_time,
+        )
+        return dict(row) if row else None
+
+    async def delete(self, event_id: UUID) -> bool:
+        async with self._conn.transaction():
+            await self._conn.execute(
+                "DELETE FROM event_owners WHERE event_id = $1",
+                event_id,
+            )
+            result = await self._conn.execute(
+                "DELETE FROM events WHERE id = $1",
+                event_id,
+            )
+        return result == "DELETE 1"
+
     async def assign_to_owners(self, event_id: UUID, owner_ids: list[UUID]) -> None:
         async with self._conn.transaction():
             # Clear existing if any

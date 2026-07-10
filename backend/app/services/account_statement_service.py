@@ -12,6 +12,7 @@ from app.repositories.delinquency_repository import DelinquencyRepository
 from app.repositories.owner_repository import OwnerRepository
 from app.services.delinquency_service import _period_status, _saldo
 from app.services.pdf_branding import (
+    build_pdf_footer_bar,
     get_building_contact_lines,
     get_building_logo,
     get_building_name,
@@ -267,12 +268,8 @@ class AccountStatementService:
         footer = Table([[self._p("Franz Guzman G.<br/>Administrador del Edificio", 9, align="CENTER", raw=True), footer_logo]], colWidths=[width * 0.5, width * 0.5])
         footer.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
         story.append(footer)
-        contact_lines = get_building_contact_lines(building)
-        if contact_lines:
-            bottom = Table([[self._p(line, 7, color="#ffffff", align="CENTER") for line in contact_lines[:3]]], colWidths=[width / max(len(contact_lines[:3]), 1)] * len(contact_lines[:3]))
-            bottom.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#002e6d")), ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
-            story.append(Spacer(1, 0.15 * cm))
-            story.append(bottom)
+        story.append(Spacer(1, 0.15 * cm))
+        story.append(build_pdf_footer_bar(building, width=width, page_text="Página 1 de 1"))
         doc.build(story)
         return output.getvalue()
 
@@ -328,13 +325,6 @@ class AccountStatementService:
         verify.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
         story.append(verify)
         story.append(Spacer(1, 0.25 * cm))
-        contact_lines = get_building_contact_lines(building) or [
-            "Av. República del Salvador N35-146 y Suecia",
-            "02 333 4567",
-            "administracion@torresnetanya.com",
-        ]
-        bottom = Table([[self._p(line, 8, color="#ffffff", align="CENTER") for line in contact_lines[:3]]], colWidths=[width / len(contact_lines[:3])] * len(contact_lines[:3]))
-        bottom.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#002e6d")), ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
-        story.append(bottom)
+        story.append(build_pdf_footer_bar(building, width=width, page_text="Página 1 de 1"))
         doc.build(story)
         return output.getvalue()

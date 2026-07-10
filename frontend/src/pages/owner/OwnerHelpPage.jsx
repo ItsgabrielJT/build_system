@@ -1,15 +1,16 @@
-import React from 'react';
 import styles from './OwnerHelpPage.module.css';
 
 export default function OwnerHelpPage() {
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Centro de Ayuda y Soporte</h1>
-      <p className={styles.subtitle}>¿Necesita ayuda? Póngase en contacto con la administración del edificio.</p>
+      <header>
+        <h1 className={styles.title}>Centro de ayuda</h1>
+        <p className={styles.subtitle}>Consulte canales de soporte, preguntas frecuentes y asistencia administrativa.</p>
+      </header>
       
       <div className={styles.grid}>
-        <div className={styles.card}>
-          <h2>Contacto Directo</h2>
+        <section className={styles.card}>
+          <h2>Soporte / contacto</h2>
           <div className={styles.infoRow}>
             <span className={styles.icon}>✉</span>
             <div>
@@ -26,10 +27,10 @@ export default function OwnerHelpPage() {
               <span className={styles.tag}>Lunes a viernes: 08:00 - 17:00</span>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className={styles.card}>
-          <h2>Preguntas Frecuentes</h2>
+        <section className={styles.card}>
+          <h2>Preguntas frecuentes</h2>
           <div className={styles.faqList}>
             <div className={styles.faqItem}>
               <strong>¿Cómo registro un pago?</strong>
@@ -40,7 +41,21 @@ export default function OwnerHelpPage() {
               <p>Las expensas vencen usualmente los primeros 5 o 10 días de cada mes. Verifique las novedades en Avisos Importantes.</p>
             </div>
           </div>
-        </div>
+        </section>
+
+        <section className={styles.card}>
+          <h2>Solicitudes</h2>
+          <div className={styles.faqList}>
+            <div className={styles.faqItem}>
+              <strong>Actualización de datos</strong>
+              <p>Solicite cambios de teléfono, correo o datos del ocupante desde el módulo Mi perfil.</p>
+            </div>
+            <div className={styles.faqItem}>
+              <strong>Emergencias administrativas</strong>
+              <p>Comuníquese directamente con administración para incidentes de seguridad, mantenimiento o accesos.</p>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -23,6 +23,7 @@ from app.repositories.notification_repository import NotificationRepository
 from app.repositories.owner_repository import OwnerRepository
 from app.repositories.payment_proof_repository import PaymentProofRepository
 from app.repositories.payment_repository import PaymentRepository
+from app.services.pdf_branding import build_pdf_footer_bar
 
 _STATUS_APROBADO = "REGISTRADO"
 _PRIMARY_BLUE = colors.HexColor("#123c7a")
@@ -331,11 +332,10 @@ class OwnerPaymentService:
         document_number: str,
         building: dict,
     ) -> Table:
-        building_name = building.get("name") or "Administracion del edificio"
         title_block = Table(
             [[
                 Paragraph(
-                    f'<font size="22"><b>{title}</b></font><br/><font size="11">{building_name}</font><br/><font size="9">{subtitle}</font>',
+                    f'<font size="22"><b>{title}</b></font><br/><font size="9">{subtitle}</font>',
                     ParagraphStyle(
                         "HeaderTitle",
                         fontName="Helvetica",
@@ -584,6 +584,8 @@ class OwnerPaymentService:
             ),
             Spacer(1, 0.48 * inch),
             signature,
+            Spacer(1, 0.16 * inch),
+            build_pdf_footer_bar(building, width=_PAYMENT_CONTENT_WIDTH),
         ]
 
     def _build_payment_story(

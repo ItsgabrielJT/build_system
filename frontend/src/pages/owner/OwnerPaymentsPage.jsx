@@ -19,7 +19,7 @@ const getCurrentMonth = () => {
 };
 
 const formatCurrency = (value) =>
-  `$${Number(value || 0).toLocaleString(undefined, {
+  `USD ${Number(value || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -214,184 +214,141 @@ export default function OwnerPaymentsPage() {
     setCurrentPage(newPage);
   };
 
+  const firstApartment = apartments[0];
+  const pendingTotal = pendingDebts.cuotas.reduce((sum, debt) => sum + Number(debt.amount || 0), 0)
+    + pendingDebts.multas.reduce((sum, debt) => sum + Number(debt.amount || 0), 0);
+  const reviewTotal = payments
+    .filter((payment) => payment.status === 'PENDIENTE' || payment.status === 'EN_REVISION')
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  const latestRegisteredPayment = payments.find((payment) => payment.status === 'REGISTRADO') || payments[0];
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <div className={styles.breadcrumb}>Propietario / Mis Pagos</div>
-        <h1 className={styles.title}>Mis Pagos</h1>
+        <h1 className={styles.title}>Pagos</h1>
         <p className={styles.subtitle}>
-          Registra tus pagos adjuntando el comprobante. El administrador los revisará y aprobará.
+          Registre y consulte sus pagos de alícuotas y demás obligaciones del condominio.
         </p>
       </div>
 
-      <section className={styles.formSection}>
-        <h2 className={styles.sectionTitle}>Nueva solicitud de pago</h2>
-        <form className={styles.form} onSubmit={handleSubmit}>
-          <div className={styles.formRow}>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="apartment_id">
-                Departamento <span aria-hidden="true">*</span>
-              </label>
-              <select
-                id="apartment_id"
-                name="apartment_id"
-                className={`${styles.input} ${styles.select}`}
-                value={form.apartment_id}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Seleccionar departamento</option>
-                {apartments.map((apt) => (
-                  <option key={apt.id} value={apt.id}>
-                    Depto {apt.code}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="selected_debt">
-                Concepto / Deuda Pendiente
-              </label>
-              <select
-                id="selected_debt"
-                className={`${styles.input} ${styles.select}`}
-                value={selectedDebt}
-                onChange={handleDebtChange}
-                disabled={!form.apartment_id}
-              >
-                <option value="">Otro / Pago personalizado</option>
-                
-                {pendingDebts.cuotas.length > 0 && (
-                  <optgroup label="Cuotas pendientes">
-                    {pendingDebts.cuotas.map((c) => (
-                      <option key={`cuota:${c.id}`} value={`cuota:${c.id}`}>
-                        {c.description} ({formatCurrency(c.amount)})
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                
-                {pendingDebts.multas.length > 0 && (
-                  <optgroup label="Multas activas">
-                    {pendingDebts.multas.map((m) => (
-                      <option key={`multas:${m.id}`} value={`multas:${m.id}`}>
-                        {m.description} ({formatCurrency(m.amount)})
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </div>
+      <section className={styles.metricsGrid}>
+        <article className={styles.metricCard}>
+          <span className={`${styles.metricIcon} ${styles.metricDanger}`}>$</span>
+          <div>
+            <span>Deuda pendiente</span>
+            <strong className={styles.textDanger}>{formatCurrency(pendingTotal)}</strong>
+            <small>{pendingTotal > 0 ? 'Tiene valores pendientes' : 'Usted se encuentra al día'}</small>
           </div>
-
-          <div className={styles.formRow3}>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="period">
-                Período <span aria-hidden="true">*</span>
-              </label>
-              <input
-                id="period"
-                name="period"
-                type="month"
-                className={styles.input}
-                value={form.period}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="paid_at">
-                Fecha de pago <span aria-hidden="true">*</span>
-              </label>
-              <input
-                id="paid_at"
-                name="paid_at"
-                type="date"
-                className={styles.input}
-                value={form.paid_at}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="amount">
-                Monto <span aria-hidden="true">*</span>
-              </label>
-              <input
-                id="amount"
-                name="amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                className={styles.input}
-                value={form.amount}
-                onChange={handleChange}
-                required
-              />
-            </div>
+        </article>
+        <article className={styles.metricCard}>
+          <span className={`${styles.metricIcon} ${styles.metricWarning}`}>◷</span>
+          <div>
+            <span>Pagos en revisión</span>
+            <strong className={styles.textWarning}>{formatCurrency(reviewTotal)}</strong>
+            <small>{payments.filter((payment) => payment.status === 'PENDIENTE' || payment.status === 'EN_REVISION').length} pagos en revisión</small>
           </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="method">
-                Método de pago
-              </label>
-              <select
-                id="method"
-                name="method"
-                className={`${styles.input} ${styles.select}`}
-                value={form.method}
-                onChange={handleChange}
-              >
-                {METHOD_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.label} htmlFor="reference">
-                Referencia
-              </label>
-              <input
-                id="reference"
-                name="reference"
-                type="text"
-                maxLength={120}
-                className={styles.input}
-                value={form.reference}
-                onChange={handleChange}
-                placeholder="Número de transacción (opcional)"
-              />
-            </div>
+        </article>
+        <article className={styles.metricCard}>
+          <span className={`${styles.metricIcon} ${styles.metricSuccess}`}>▣</span>
+          <div>
+            <span>Último pago</span>
+            <strong className={styles.textSuccess}>{formatCurrency(latestRegisteredPayment?.amount || 0)}</strong>
+            <small>{latestRegisteredPayment ? formatDate(latestRegisteredPayment.paid_at) : 'Sin registro'}</small>
           </div>
-
-          <div className={styles.fieldGroup}>
-            <label className={styles.label}>
-              Comprobante <span aria-hidden="true">*</span>
-            </label>
-            <PaymentProofUpload
-              value={proofFile}
-              onChange={handleProofChange}
-              error={proofError}
-            />
-          </div>
-
-          {submitError && <p className={styles.errorMsg}>{submitError}</p>}
-          {successMsg && <p className={styles.successMsg}>{successMsg}</p>}
-
-          <div className={styles.formActions}>
-            <button type="submit" className={styles.btnPrimary} disabled={submitting}>
-              {submitting ? 'Enviando...' : 'Enviar solicitud de pago'}
-            </button>
-          </div>
-        </form>
+        </article>
       </section>
+
+      <div className={styles.paymentGrid}>
+        <aside className={styles.ownerCard}>
+          <div className={styles.ownerAvatar}>U</div>
+          <h2>Juan Francisco Cuaical</h2>
+          <p>Copropietario</p>
+          <div className={styles.ownerRows}>
+            <div><span>Departamento:</span><strong>{firstApartment?.code || 'S/N'}</strong></div>
+            <div><span>Torre:</span><strong>{firstApartment?.tower || 'S/N'}</strong></div>
+            <div><span>Teléfono:</span><strong>+593 99 295 3596</strong></div>
+            <div><span>Estado:</span><strong className={styles.textSuccess}>Al día</strong></div>
+          </div>
+        </aside>
+
+        <section className={styles.formSection}>
+          <h2 className={styles.sectionTitle}>Registrar nuevo pago</h2>
+          <form className={styles.form} onSubmit={handleSubmit}>
+            <div className={styles.formRow3}>
+              <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="apartment_id">Departamento</label>
+                <select id="apartment_id" name="apartment_id" className={`${styles.input} ${styles.select}`} value={form.apartment_id} onChange={handleChange} required>
+                  <option value="">Seleccione departamento</option>
+                  {apartments.map((apt) => <option key={apt.id} value={apt.id}>DEP {apt.code}</option>)}
+                </select>
+              </div>
+              <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="selected_debt">Concepto / deuda pendiente</label>
+                <select id="selected_debt" className={`${styles.input} ${styles.select}`} value={selectedDebt} onChange={handleDebtChange} disabled={!form.apartment_id}>
+                  <option value="">Seleccione un concepto</option>
+                  {pendingDebts.cuotas.length > 0 && (
+                    <optgroup label="Cuotas pendientes">
+                      {pendingDebts.cuotas.map((c) => <option key={`cuota:${c.id}`} value={`cuota:${c.id}`}>{c.description} ({formatCurrency(c.amount)})</option>)}
+                    </optgroup>
+                  )}
+                  {pendingDebts.multas.length > 0 && (
+                    <optgroup label="Multas activas">
+                      {pendingDebts.multas.map((m) => <option key={`multas:${m.id}`} value={`multas:${m.id}`}>{m.description} ({formatCurrency(m.amount)})</option>)}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+              <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="period">Período</label>
+                <input id="period" name="period" type="month" className={styles.input} value={form.period} onChange={handleChange} required />
+              </div>
+            </div>
+
+            <div className={styles.formRow3}>
+              <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="paid_at">Fecha de pago</label>
+                <input id="paid_at" name="paid_at" type="date" className={styles.input} value={form.paid_at} onChange={handleChange} required />
+              </div>
+              <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="amount">Monto (USD)</label>
+                <input id="amount" name="amount" type="number" min="0.01" step="0.01" className={styles.input} value={form.amount} onChange={handleChange} placeholder="0.00" required />
+              </div>
+              <div className={styles.fieldGroup}>
+                <label className={styles.label} htmlFor="method">Método de pago</label>
+                <select id="method" name="method" className={`${styles.input} ${styles.select}`} value={form.method} onChange={handleChange}>
+                  {METHOD_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.fieldGroup}>
+              <label className={styles.label} htmlFor="reference">Referencia / número de transacción</label>
+              <input id="reference" name="reference" type="text" maxLength={120} className={styles.input} value={form.reference} onChange={handleChange} placeholder="Ej: 123456789, ref. bancaria, etc." />
+            </div>
+
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>Adjuntar comprobante (obligatorio)</label>
+              <PaymentProofUpload value={proofFile} onChange={handleProofChange} error={proofError} />
+            </div>
+
+            {submitError && <p className={styles.errorMsg}>{submitError}</p>}
+            {successMsg && <p className={styles.successMsg}>{successMsg}</p>}
+
+            <div className={styles.formActions}>
+              <button type="submit" className={styles.btnPrimary} disabled={submitting}>
+                {submitting ? 'Enviando...' : 'Enviar solicitud de pago'}
+              </button>
+            </div>
+            <p className={styles.secureNote}>Su información está protegida y será utilizada únicamente para fines administrativos.</p>
+          </form>
+        </section>
+
+        <aside className={styles.infoStack}>
+          <article><strong>Formatos aceptados</strong><span>PDF, JPG, PNG (máx. 10 MB). Asegúrese de que el comprobante sea legible y completo.</span></article>
+          <article><strong>Verificación del administrador</strong><span>Su pago será revisado por la administración del edificio. Recibirá una notificación con el resultado.</span></article>
+          <article><strong>Recibo oficial</strong><span>Una vez aprobado el pago, podrá descargar su recibo oficial desde el historial de pagos.</span></article>
+        </aside>
+      </div>
 
       <section className={styles.historySection}>
         <div className={styles.historyHeader}>

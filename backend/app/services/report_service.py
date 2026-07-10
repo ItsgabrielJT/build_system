@@ -20,6 +20,7 @@ from app.repositories.expense_repository import ExpenseRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.services.pdf_branding import (
     build_pdf_brand_header,
+    build_pdf_footer_bar,
     get_building_contact_lines,
     get_building_logo,
     get_building_name,
@@ -143,7 +144,6 @@ class ReportService:
 
     async def _modern_report_header(self, title: str, subtitle: str, width: float, *, building: Optional[dict] = None) -> list:
         building = building if building is not None else await get_default_building_config(getattr(self._payment_repo, "_conn", None))
-        building_name = get_building_name(building)
         generated = datetime.now()
         logo = get_building_logo(building, max_width=2.8 * cm, max_height=2.4 * cm)
         if not logo:
@@ -172,7 +172,7 @@ class ReportService:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
         title_block = self._p(
-            f"<font size='22'><b>{escape(title)}</b></font><br/><font size='14'>{escape(building_name)}</font><br/><font size='8'>{escape(subtitle)}</font>",
+            f"<font size='22'><b>{escape(title)}</b></font><br/><font size='8'>{escape(subtitle)}</font>",
             12,
             color="#082f6f",
             align="LEFT",
@@ -217,9 +217,16 @@ class ReportService:
         ]))
         return table
 
-    def _report_footer(self, width: float) -> list:
+    def _report_footer(self, width: float, building: Optional[dict] = None) -> list:
         line = HRFlowable(width=width * 0.52, thickness=1, color=_PDF_BLUE, hAlign="CENTER")
-        return [Spacer(1, 0.22 * cm), line, self._p("La Administración", 12, bold=True), self._p("Período 2026-2027", 10)]
+        return [
+            Spacer(1, 0.22 * cm),
+            line,
+            self._p("La Administración", 12, bold=True),
+            self._p("Período 2026-2027", 10),
+            Spacer(1, 0.18 * cm),
+            build_pdf_footer_bar(building or {}, width=width),
+        ]
 
     def _styled_table(self, data: list[list], col_widths: list[float], *, font_size: int = 7, total_rows: Optional[list[int]] = None) -> Table:
         table = Table(data, colWidths=col_widths, repeatRows=1)
@@ -862,6 +869,7 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 1.1*inch, 0.55*inch, 0.7*inch, 0.75*inch, 0.75*inch, 0.85*inch, 1.05*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
         doc.build(story)
         return output.getvalue()
 
@@ -965,6 +973,7 @@ class ReportService:
         story.append(table)
         story.append(Spacer(1, 0.3*inch))
         story.append(Paragraph("Reporte generado automáticamente", styles['Normal']))
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
         
         doc.build(story)
         return output.getvalue()
@@ -1305,6 +1314,7 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 0.65*inch, 1.55*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
         doc.build(story)
         return output.getvalue()
 
@@ -1341,6 +1351,7 @@ class ReportService:
         table = Table(data, colWidths=[0.8*inch, 0.55*inch, 1.1*inch, 0.65*inch, 1.8*inch, 0.75*inch, 0.75*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
         doc.build(story)
         return output.getvalue()
 
@@ -1374,6 +1385,7 @@ class ReportService:
         table = Table(data, colWidths=[0.7*inch, 1.25*inch, 0.85*inch, 1.35*inch, 0.8*inch, 0.9*inch, 0.65*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
         doc.build(story)
         return output.getvalue()
 
@@ -1407,6 +1419,7 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 1.35*inch, 1.5*inch, 0.85*inch, 1.4*inch, 0.75*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
+        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=letter[0] - 2 * inch)])
         doc.build(story)
         return output.getvalue()
 
@@ -2004,25 +2017,7 @@ class ReportService:
         story.append(signatures_table)
         story.append(Spacer(1, 0.4 * cm))
         
-        # Footer
-        footer_table = Table(
-            [[
-                Paragraph("<b>EDIFICIO TORRES NETANYA</b>", ParagraphStyle("FL11", size=7, fontName="Helvetica-Bold", color="#ffffff")),
-                Paragraph("Este documento es válido únicamente con el código QR y sello de verificación.", ParagraphStyle("FL22", size=6, fontName="Helvetica", color="#ffffff", alignment=1)),
-                Paragraph("Página 1 de 1", ParagraphStyle("FL33", size=6.5, fontName="Helvetica", color="#ffffff", alignment=2))
-            ]],
-            colWidths=[width * 0.3, width * 0.5, width * 0.2]
-        )
-        footer_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#092b62")),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ]))
-        story.append(footer_table)
+        story.append(build_pdf_footer_bar(building, width=width, page_text="Página 1 de 1"))
         
         doc.build(story)
         return output.getvalue()
-

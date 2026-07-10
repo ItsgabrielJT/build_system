@@ -40,8 +40,8 @@ describe('OwnerPaymentsPage', () => {
 
     render(<OwnerPaymentsPage />);
 
-    expect(screen.getByRole('heading', { name: /Mis Pagos/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Nueva solicitud/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Pagos$/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Registrar nuevo pago/i })).toBeInTheDocument();
     expect(screen.getByText(/No tienes pagos registrados/i)).toBeInTheDocument();
   });
 

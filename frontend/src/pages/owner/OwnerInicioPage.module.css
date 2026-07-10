@@ -1,6 +1,6 @@
 .container {
-  padding: 1.5rem 2rem;
-  background-color: #f8fafc;
+  padding: 0;
+  background-color: transparent;
   min-height: 100vh;
   font-family: inherit;
 }
@@ -19,15 +19,17 @@
 }
 
 .title {
-  font-size: 2.25rem;
-  font-weight: 800;
-  color: #0f172a;
+  font-size: 38px;
+  font-weight: 900;
+  color: #073276;
   margin: 0 0 0.5rem 0;
+  letter-spacing: 0;
 }
 
 .subtitle {
-  color: #64748b;
-  font-size: 1rem;
+  color: #657696;
+  font-size: 17px;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -42,12 +44,12 @@
 .metricCard {
   background: white;
   border-radius: 12px;
-  padding: 1.25rem;
+  padding: 1.35rem 1.5rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
-  border: 1px solid #f1f5f9;
+  box-shadow: 0 10px 24px rgba(13, 39, 88, 0.07);
+  border: 1px solid #dfe6f1;
 }
 
 .iconCircle {
@@ -98,7 +100,7 @@
 /* Main Grid Layout */
 .mainGrid {
   display: grid;
-  grid-template-columns: 260px 1fr 340px;
+  grid-template-columns: 330px minmax(580px, 1fr) 360px;
   gap: 1.5rem;
   margin-bottom: 2rem;
 }

@@ -20,8 +20,6 @@ from app.services.pdf_branding import (
     get_default_building_config,
 )
 
-from reportlab.graphics.barcode import qr
-from reportlab.graphics.shapes import Drawing
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
@@ -260,16 +258,23 @@ class AccountStatementService:
         table.setStyle(TableStyle(style))
         return table
 
-    def _qr_drawing(self, value: str, size: float = 2.2 * cm) -> Drawing:
-        code = qr.QrCodeWidget(value)
-        bounds = code.getBounds()
-        drawing = Drawing(size, size, transform=[size / (bounds[2] - bounds[0]), 0, 0, size / (bounds[3] - bounds[1]), 0, 0])
-        drawing.add(code)
-        return drawing
-
-    def _signature_grid(self, *, width: float, building: dict | None, document_tag: str) -> Table:
+    def _signature_grid(
+        self,
+        *,
+        width: float,
+        building: dict | None,
+        document_tag: str,
+        signer_name: str,
+        signer_role: str,
+    ) -> Table:
         qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
-        return build_pdf_signature_seal_qr_grid(building, width=width, qr_value=qr_value)
+        return build_pdf_signature_seal_qr_grid(
+            building,
+            width=width,
+            qr_value=qr_value,
+            signer_name=signer_name,
+            signer_role=signer_role,
+        )
 
     async def statement_pdf(self, owner_id: UUID, start_period: Optional[str], end_period: Optional[str]) -> bytes:
         rows = await self.get_statement(owner_id, start_period, end_period)
@@ -323,13 +328,21 @@ class AccountStatementService:
         data.append(["TOTALES DEL PERIODO", "", self._money(totals["esperado"]), self._money(totals["multas"]), self._money(totals["pagado"]), self._money(totals["saldo"]), ""])
         story.append(self._blue_table(data, [2.4 * cm, 3 * cm, 2.4 * cm, 2.2 * cm, 2.4 * cm, 2.4 * cm, 3.2 * cm], font_size=7, total_rows=[len(data) - 1]))
         story.append(Spacer(1, 0.35 * cm))
-        important = Table([[self._p("INFORMACIÓN IMPORTANTE<br/><br/>El vencimiento de la alícuota es el día 5 de cada mes.<br/>Realiza tus pagos a tiempo para evitar recargos.<br/>Si tienes alguna duda, contáctanos a través del sistema.", 8, raw=True), self._qr_drawing(f"EC-{owner_id}-{date.today()}")]], colWidths=[width * 0.72, width * 0.25])
+        important = Table([[self._p("INFORMACIÓN IMPORTANTE<br/><br/>El vencimiento de la alícuota es el día 5 de cada mes.<br/>Realiza tus pagos a tiempo para evitar recargos.<br/>Si tienes alguna duda, contáctanos a través del sistema.", 8, raw=True)]], colWidths=[width])
         important.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#d4dfef")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 12), ("BOTTOMPADDING", (0, 0), (-1, -1), 12)]))
         story.append(important)
         story.append(Spacer(1, 0.35 * cm))
         story.append(self._p("Gracias por contribuir al bienestar de nuestra comunidad.", 8, color="#667085", align="CENTER"))
         story.append(Spacer(1, 0.25 * cm))
-        story.append(self._signature_grid(width=width, building=building, document_tag=f"ESTADO-CUENTA-{owner_id}"))
+        story.append(
+            self._signature_grid(
+                width=width,
+                building=building,
+                document_tag=f"ESTADO-CUENTA-{owner_id}",
+                signer_name=owner.get("full_name") or "Copropietario",
+                signer_role="Copropietario",
+            )
+        )
         story.append(Spacer(1, 0.28 * cm))
         doc.build(story, onFirstPage=draw_footer, onLaterPages=draw_footer)
         return output.getvalue()
@@ -382,11 +395,19 @@ class AccountStatementService:
         story.append(Spacer(1, 0.2 * cm))
         story.append(self._p("<b>CONDICIÓN DE EMISIÓN AUTOMÁTICA</b><br/>Este certificado se genera automáticamente únicamente cuando la cuenta del copropietario mantiene saldo pendiente igual a USD 0,00 y no registra obligaciones vencidas en el sistema.", 8, raw=True))
         story.append(Spacer(1, 0.25 * cm))
-        verify = Table([[self._qr_drawing(verification, 2.6 * cm), self._p(f"VERIFICACIÓN DEL DOCUMENTO<br/>Escanee el código QR para validar la autenticidad de este certificado.<br/><br/>Código de verificación:<br/><b>{verification}</b>", 8, raw=True), self._p("Franz Guzman Galarza<br/>Administrador del Edificio", 10, align="CENTER", raw=True)]], colWidths=[3 * cm, width * 0.42, width * 0.35])
+        verify = Table([[self._p(f"VERIFICACIÓN DEL DOCUMENTO<br/>Código de verificación:<br/><b>{verification}</b>", 8, raw=True), self._p("Administrador del Edificio", 10, align="CENTER", raw=True)]], colWidths=[width * 0.62, width * 0.35])
         verify.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
         story.append(verify)
         story.append(Spacer(1, 0.25 * cm))
-        story.append(self._signature_grid(width=width, building=building, document_tag=verification))
+        story.append(
+            self._signature_grid(
+                width=width,
+                building=building,
+                document_tag=verification,
+                signer_name=profile.get("full_name") or "Copropietario",
+                signer_role="Copropietario",
+            )
+        )
         story.append(Spacer(1, 0.2 * cm))
         story.append(build_pdf_footer_bar(building, width=width, page_text="Página 1 de 1"))
         doc.build(story)

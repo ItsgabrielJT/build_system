@@ -14,7 +14,6 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm, inch
-from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import HRFlowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
@@ -299,12 +298,46 @@ class ReportService:
             build_pdf_footer_bar(building or {}, width=width),
         ]
 
-    def _signature_grid(self, width: float, building: Optional[dict], document_tag: str) -> Table:
+    def _signature_grid(
+        self,
+        width: float,
+        building: Optional[dict],
+        document_tag: str,
+        *,
+        signer_name: str,
+        signer_role: str,
+    ) -> Table:
         qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
-        return build_pdf_signature_seal_qr_grid(building or {}, width=width, qr_value=qr_value)
+        return build_pdf_signature_seal_qr_grid(
+            building or {},
+            width=width,
+            qr_value=qr_value,
+            signer_name=signer_name,
+            signer_role=signer_role,
+        )
 
-    def _append_signature_grid(self, story: list, *, width: float, building: Optional[dict], document_tag: str) -> None:
-        story.extend([Spacer(1, 0.24 * cm), self._signature_grid(width, building, document_tag)])
+    def _append_signature_grid(
+        self,
+        story: list,
+        *,
+        width: float,
+        building: Optional[dict],
+        document_tag: str,
+        signer_name: str = "Usuario del sistema",
+        signer_role: str = "Rol no definido",
+    ) -> None:
+        story.extend(
+            [
+                Spacer(1, 0.24 * cm),
+                self._signature_grid(
+                    width,
+                    building,
+                    document_tag,
+                    signer_name=signer_name,
+                    signer_role=signer_role,
+                ),
+            ]
+        )
 
     def _footer_callback(self, building: Optional[dict], width: float):
         def draw_footer(canvas, doc):
@@ -846,7 +879,7 @@ class ReportService:
         final = Table([[self._p("Ingresos totales registrados en el período", 11, bold=True, color="#ffffff", align="LEFT"), self._p(self._usd(total), 14, bold=True, color="#ffffff")]], colWidths=[width * 0.72, width * 0.28])
         final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("LEFTPADDING", (0, 0), (-1, -1), 10)]))
         story.append(final)
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-INGRESOS")
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-INGRESOS", signer_name="Administración", signer_role="Administrador del edificio")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -918,7 +951,7 @@ class ReportService:
             {"label": "Total egresos", "current": total_expenses, "previous": 0},
             {"label": "Balance neto", "current": abs(balance), "previous": 0},
         ], width))
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-BALANCE")
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-BALANCE", signer_name="Administración", signer_role="Administrador del edificio")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -969,7 +1002,7 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 1.1*inch, 0.55*inch, 0.7*inch, 0.75*inch, 0.75*inch, 0.85*inch, 1.05*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PAGOS")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PAGOS", signer_name="Administración", signer_role="Administrador del edificio")
         footer = self._footer_callback(building, doc.width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -1032,7 +1065,7 @@ class ReportService:
                     for row in by_category[:4]
                 ],
             ], width))
-            self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-GASTOS")
+            self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-GASTOS", signer_name="Administración", signer_role="Administrador del edificio")
             footer = self._footer_callback(building, width)
             doc.build(story, onFirstPage=footer, onLaterPages=footer)
             return output.getvalue()
@@ -1041,6 +1074,7 @@ class ReportService:
             output = io.BytesIO()
             doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.6 * inch, bottomMargin=0.6 * inch)
             styles = getSampleStyleSheet()
+            building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
             story = [
                 Paragraph("Reporte de Gastos", styles["Title"]),
                 Spacer(1, 0.14 * inch),
@@ -1065,8 +1099,8 @@ class ReportService:
             table = Table(table_data, colWidths=[1.1 * inch, 1.4 * inch, 1.2 * inch, 2.5 * inch, 1.0 * inch], repeatRows=1)
             table.setStyle(self._table_style(7))
             story.append(table)
-            self._append_signature_grid(story, width=doc.width, building={}, document_tag="REPORTE-GASTOS")
-            story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar({}, width=doc.width)])
+            self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-GASTOS", signer_name="Administración", signer_role="Administrador del edificio")
+            story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
             doc.build(story)
             return output.getvalue()
 
@@ -1114,7 +1148,7 @@ class ReportService:
         story.append(Spacer(1, 0.3*inch))
         story.append(Paragraph("Reporte generado automáticamente", styles['Normal']))
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MOROSIDAD")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MOROSIDAD", signer_name="Administración", signer_role="Administrador del edificio")
         footer = self._footer_callback(building, doc.width)
         
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
@@ -1457,7 +1491,7 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 0.65*inch, 1.55*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-CUOTAS")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-CUOTAS", signer_name="Administración", signer_role="Administrador del edificio")
         story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
@@ -1496,7 +1530,7 @@ class ReportService:
         table = Table(data, colWidths=[0.8*inch, 0.55*inch, 1.1*inch, 0.65*inch, 1.8*inch, 0.75*inch, 0.75*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MULTAS")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MULTAS", signer_name="Administración", signer_role="Administrador del edificio")
         story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
@@ -1532,7 +1566,7 @@ class ReportService:
         table = Table(data, colWidths=[0.7*inch, 1.25*inch, 0.85*inch, 1.35*inch, 0.8*inch, 0.9*inch, 0.65*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PROPIETARIOS")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PROPIETARIOS", signer_name="Administración", signer_role="Administrador del edificio")
         story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
@@ -1568,7 +1602,7 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 1.35*inch, 1.5*inch, 0.85*inch, 1.4*inch, 0.75*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-EDIFICIOS")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-EDIFICIOS", signer_name="Administración", signer_role="Administrador del edificio")
         story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
@@ -1741,21 +1775,9 @@ class ReportService:
         )
         story = []
         
-        # Add QR Code widget to reportlab graphics
-        def _qr_drawing(value: str, size: float = 2.0 * cm) -> Drawing:
-            from reportlab.graphics.barcode import qr
-            from reportlab.graphics.shapes import Drawing
-            code = qr.QrCodeWidget(value)
-            bounds = code.getBounds()
-            drawing = Drawing(size, size, transform=[size / (bounds[2] - bounds[0]), 0, 0, size / (bounds[3] - bounds[1]), 0, 0])
-            drawing.add(code)
-            return drawing
-            
         # Emission date and sheet number block
         emission_date = datetime.now().strftime("%d/%m/%Y")
         sheet_number = f"FTN-{datetime.now().year}-{str(owner['document_id'])[-6:].zfill(6)}"
-
-        qr_draw = _qr_drawing(f"FICHA-{owner['id']}-{sheet_number}", size=1.8 * cm)
         story.extend(
             build_pdf_brand_header(
                 "FICHA DEL COPROPIETARIO",
@@ -1768,7 +1790,6 @@ class ReportService:
         header_info = Table(
             [
                 [
-                    qr_draw,
                     Paragraph(
                         "<font size='8' color='#123c7a'><b>DATOS DE EMISION</b></font><br/>"
                         f"<font size='8' color='#4b5563'>Fecha de emisión: {emission_date}</font><br/>"
@@ -1777,7 +1798,7 @@ class ReportService:
                     ),
                 ]
             ],
-            colWidths=[2.1 * cm, width - 2.1 * cm],
+            colWidths=[width],
         )
         header_info.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#123c7a")),
@@ -2123,7 +2144,14 @@ class ReportService:
         story.append(obs_box)
         story.append(Spacer(1, 0.14 * cm))
         
-        self._append_signature_grid(story, width=width, building=building, document_tag=f"FICHA-{sheet_number}")
+        self._append_signature_grid(
+            story,
+            width=width,
+            building=building,
+            document_tag=f"FICHA-{sheet_number}",
+            signer_name=owner.get("full_name") or "Copropietario",
+            signer_role="Copropietario",
+        )
         story.append(Spacer(1, 0.18 * cm))
         
         def draw_footer(canvas, doc):

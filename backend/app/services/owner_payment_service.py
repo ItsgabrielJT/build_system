@@ -617,54 +617,30 @@ class OwnerPaymentService:
         return banner
 
     def _build_footer(self, styles: dict, signer_label: str, building: dict) -> list:
-        building_name = building.get("name") or "edificio"
-        contact_parts = [
-            building.get("address"),
-            building.get("email"),
-            building.get("phone"),
-        ]
-        contact_line = " | ".join(str(part) for part in contact_parts if part)
-        signature = Table(
-            [
-                [
-                    Paragraph(
-                        (
-                            f"<b>Administracion de {escape(building_name)}</b>"
-                            + (f"<br/><font size=\"7.5\">{escape(contact_line)}</font>" if contact_line else "")
-                        ),
-                        styles["footer"],
-                    )
-                ],
-            ],
-            colWidths=[3.7 * inch],
-        )
-        signature.setStyle(
-            TableStyle(
-                [
-                    ("LINEABOVE", (0, 0), (-1, 0), 1, _PRIMARY_BLUE),
-                    ("TOPPADDING", (0, 0), (-1, 0), 6),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 0),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ]
-            )
-        )
         return [
             Table(
                 [[Paragraph("Documento emitido electronicamente con fines de control administrativo.", styles["muted"]) ]],
                 colWidths=[_PAYMENT_CONTENT_WIDTH],
             ),
-            Spacer(1, 0.24 * inch),
-            signature,
             Spacer(1, 0.16 * inch),
             build_pdf_footer_bar(building, width=_PAYMENT_CONTENT_WIDTH),
         ]
 
-    def _build_signature_grid(self, *, building: dict, document_tag: str) -> Table:
+    def _build_signature_grid(
+        self,
+        *,
+        building: dict,
+        document_tag: str,
+        signer_name: str,
+        signer_role: str,
+    ) -> Table:
         qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
         return build_pdf_signature_seal_qr_grid(
             building,
             width=_PAYMENT_CONTENT_WIDTH,
             qr_value=qr_value,
+            signer_name=signer_name,
+            signer_role=signer_role,
         )
 
     def _build_payment_story(
@@ -700,7 +676,12 @@ class OwnerPaymentService:
             Spacer(1, 0.16 * inch),
             self._build_status_banner(status_text, ok=ok),
             Spacer(1, 0.16 * inch),
-            self._build_signature_grid(building=building, document_tag=document_number),
+            self._build_signature_grid(
+                building=building,
+                document_tag=document_number,
+                signer_name=owner.get("full_name") or "Copropietario",
+                signer_role="Copropietario",
+            ),
             Spacer(1, 0.16 * inch),
         ]
         story.extend(self._build_footer(styles, signer_label, building))

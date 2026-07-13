@@ -19,6 +19,7 @@ import FormModal from '../../components/FormModal/FormModal';
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog';
 import PaymentReviewModal from '../../components/PaymentReviewModal/PaymentReviewModal';
 import DownloadIcon from '../../components/icons/DownloadIcon';
+import { formatApiError } from '../../utils/apiError';
 import styles from './AdminPaymentsPage.module.css';
 
 const STATUS_FILTERS = [
@@ -252,6 +253,7 @@ export default function AdminPaymentsPage() {
   const completionRate = visiblePayments.length
     ? Math.round((registeredPayments.length / visiblePayments.length) * 100)
     : 0;
+  const visibleError = error || actionError || errorPending;
 
   const handleApartmentChange = (apartmentId) => {
     const selectedApartment = apartments.find((a) => String(a.id) === String(apartmentId));
@@ -389,7 +391,16 @@ export default function AdminPaymentsPage() {
 
   const handleCreate = async (data) => {
     try {
-      await createPayment({ ...data, amount: parseFloat(data.amount) });
+      const { selected_debt: _selectedDebt, fine_id, method, reference, ...paymentData } = data;
+      const payload = {
+        ...paymentData,
+        amount: parseFloat(data.amount),
+        ...(method ? { method } : {}),
+        ...(reference ? { reference } : {}),
+        ...(fine_id ? { fine_id } : {}),
+      };
+
+      await createPayment(payload);
       success('Pago registrado con éxito');
       setIsFormOpen(false);
       setFilteredApartments([]);
@@ -398,7 +409,7 @@ export default function AdminPaymentsPage() {
       setPaymentsPage(1);
       await fetchPayments(getPaymentFetchParams());
     } catch (err) {
-      toastError(err.response?.data?.detail || 'Error al registrar pago');
+      toastError(formatApiError(err, 'Error al registrar pago'));
     }
   };
 
@@ -416,7 +427,7 @@ export default function AdminPaymentsPage() {
       success('Pago anulado con éxito');
       await fetchPayments(getPaymentFetchParams());
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Error al anular pago';
+      const msg = formatApiError(err, 'Error al anular pago');
       setActionError(msg);
       toastError(msg);
     } finally {
@@ -439,7 +450,7 @@ export default function AdminPaymentsPage() {
       triggerDownload(blob, `reporte-pagos-${filterStartDate || 'todos'}-${filterEndDate || 'actual'}.${ext}`);
       success(`Reporte de pagos descargado en ${format === 'excel' ? 'Excel' : 'PDF'}`);
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Error al descargar el reporte de pagos';
+      const msg = formatApiError(err, 'Error al descargar el reporte de pagos');
       setActionError(msg);
       toastError(msg);
     } finally {
@@ -528,8 +539,8 @@ export default function AdminPaymentsPage() {
         </div>
       </section>
 
-      {(error || actionError || errorPending) && (
-        <div className={styles.errorBanner}>{error || actionError || errorPending}</div>
+      {visibleError && (
+        <div className={styles.errorBanner}>{formatApiError(visibleError)}</div>
       )}
 
       <section className={styles.tabsSection}>
@@ -854,7 +865,7 @@ export default function AdminPaymentsPage() {
               fetchPayments(getPaymentFetchParams()),
             ]);
           } catch (err) {
-            toastError(err.response?.data?.detail || 'Error al aprobar pago');
+            toastError(formatApiError(err, 'Error al aprobar pago'));
           }
         }}
         onReject={async (id, reason) => {
@@ -867,7 +878,7 @@ export default function AdminPaymentsPage() {
               fetchPayments(getPaymentFetchParams()),
             ]);
           } catch (err) {
-            toastError(err.response?.data?.detail || 'Error al rechazar pago');
+            toastError(formatApiError(err, 'Error al rechazar pago'));
           }
         }}
         onClose={() => setReviewTarget(null)}

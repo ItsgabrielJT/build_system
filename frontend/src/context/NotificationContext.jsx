@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
+import { formatApiError } from '../utils/apiError';
 import styles from './NotificationContext.module.css';
 
 const NotificationContext = createContext(null);
@@ -8,7 +9,7 @@ export function NotificationProvider({ children }) {
 
   const addNotification = useCallback((message, type = 'success', duration = 4000) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setNotifications((prev) => [...prev, { id, message, type }]);
+    setNotifications((prev) => [...prev, { id, message: formatApiError(message), type }]);
 
     setTimeout(() => {
       setNotifications((prev) => prev.filter((n) => n.id !== id));

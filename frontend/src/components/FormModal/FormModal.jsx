@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useId } from 'react';
+import { formatApiError } from '../../utils/apiError';
 import styles from './FormModal.module.css';
 
 export default function FormModal({ isOpen, title, fields = [], initialData, defaultValues, onSubmit, onClose }) {
@@ -56,7 +57,7 @@ export default function FormModal({ isOpen, title, fields = [], initialData, def
     try {
       await onSubmit(formData);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al guardar');
+      setError(formatApiError(err, 'Error al guardar'));
     } finally {
       setSubmitting(false);
     }

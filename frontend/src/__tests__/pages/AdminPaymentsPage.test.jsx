@@ -6,11 +6,15 @@ import { usePayments } from '../../hooks/usePayments';
 import { useAdminPaymentReview } from '../../hooks/useAdminPaymentReview';
 import { useApartments } from '../../hooks/useApartments';
 import { useOwners } from '../../hooks/useOwners';
+import { getApartmentPendingDebts } from '../../services/apartmentService';
 
 vi.mock('../../hooks/usePayments', () => ({ usePayments: vi.fn() }));
 vi.mock('../../hooks/useAdminPaymentReview', () => ({ useAdminPaymentReview: vi.fn() }));
 vi.mock('../../hooks/useApartments', () => ({ useApartments: vi.fn() }));
 vi.mock('../../hooks/useOwners', () => ({ useOwners: vi.fn() }));
+vi.mock('../../services/apartmentService', () => ({
+  getApartmentPendingDebts: vi.fn(),
+}));
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
     token: 'test-token',
@@ -36,6 +40,7 @@ function currentMonthDate(day) {
 describe('AdminPaymentsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getApartmentPendingDebts.mockResolvedValue({ cuotas: [], multas: [] });
   });
 
   it('filtra pagos por rango de fechas', async () => {
@@ -246,6 +251,72 @@ describe('AdminPaymentsPage', () => {
       const ownerSelect = screen.getByLabelText(/Propietario/i);
       expect(ownerSelect).toHaveValue('owner1');
     });
+  });
+
+  it('registra una cuota sin enviar fine_id vacío', async () => {
+    const user = userEvent.setup();
+    const fetchPayments = vi.fn();
+    const fetchPending = vi.fn();
+    const fetchApartments = vi.fn();
+    const fetchOwners = vi.fn();
+    const createPayment = vi.fn().mockResolvedValue({ id: 'pay-created' });
+
+    usePayments.mockReturnValue({
+      payments: [],
+      loading: false,
+      error: null,
+      fetchPayments,
+      createPayment,
+      annulPayment: vi.fn(),
+    });
+
+    useAdminPaymentReview.mockReturnValue({
+      pendingPayments: [],
+      loading: false,
+      error: null,
+      fetchPending,
+      approvePayment: vi.fn(),
+      rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
+    });
+
+    useApartments.mockReturnValue({
+      apartments: [
+        { id: 'apt1', code: '101', owner_id: 'owner1', owner_name: 'Juan', owner_email: 'juan@test.com' },
+      ],
+      loading: false,
+      error: null,
+      fetchApartments,
+    });
+
+    useOwners.mockReturnValue({
+      owners: [
+        { id: 'owner1', full_name: 'Juan', document_id: '123' },
+      ],
+      loading: false,
+      error: null,
+      fetchOwners,
+    });
+
+    render(<AdminPaymentsPage />);
+
+    await user.click(screen.getByRole('button', { name: /Registrar pago/i }));
+    await user.selectOptions(screen.getByLabelText(/Departamento/i), 'apt1');
+    await user.clear(screen.getByLabelText(/Monto/i));
+    await user.type(screen.getByLabelText(/Monto/i), '125.50');
+    await user.type(screen.getByLabelText(/Fecha de pago/i), `${currentPeriod()}-15`);
+    await user.click(screen.getByRole('button', { name: /^Guardar$/i }));
+
+    await waitFor(() => {
+      expect(createPayment).toHaveBeenCalledTimes(1);
+    });
+
+    expect(createPayment).toHaveBeenCalledWith(expect.not.objectContaining({ fine_id: '' }));
+    expect(createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      apartment_id: 'apt1',
+      owner_id: 'owner1',
+      amount: 125.5,
+    }));
   });
 
   it('carga y renderiza pagos pendientes en la sección administrativa', async () => {

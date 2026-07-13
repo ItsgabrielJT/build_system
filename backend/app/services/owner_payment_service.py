@@ -637,6 +637,7 @@ class OwnerPaymentService:
         document_tag: str,
         signer_name: str,
         signer_role: str,
+        file_name: str | None = None,
     ) -> Table:
         qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
         return build_pdf_signature_seal_qr_grid(
@@ -645,6 +646,7 @@ class OwnerPaymentService:
             qr_value=qr_value,
             signer_name=signer_name,
             signer_role=signer_role,
+            file_name=file_name,
         )
 
     def _build_payment_story(
@@ -685,6 +687,7 @@ class OwnerPaymentService:
                 document_tag=document_number,
                 signer_name=owner.get("full_name") or "Copropietario",
                 signer_role="Copropietario",
+                file_name=f"{title.lower().replace(' ', '-')}-{payment.get('id') or document_number}.pdf",
             ),
             Spacer(1, 0.16 * inch),
         ]

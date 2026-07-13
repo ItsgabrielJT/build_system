@@ -23,6 +23,7 @@ from app.routes import (
     owner_payments,
     owners,
     payments,
+    public_pdf_validation,
     reports,
     users,
 )
@@ -74,6 +75,7 @@ app.include_router(owner_notifications.router, prefix=PREFIX)
 app.include_router(admin_payment_review.router, prefix=PREFIX)
 app.include_router(announcements.router, prefix=PREFIX)
 app.include_router(events.router, prefix=PREFIX)
+app.include_router(public_pdf_validation.router, prefix=PREFIX)
 
 
 @app.get("/health", tags=["health"])

@@ -315,6 +315,7 @@ class ReportService:
         *,
         signer_name: str,
         signer_role: str,
+        file_name: str | None = None,
     ) -> Table:
         qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
         return build_pdf_signature_seal_qr_grid(
@@ -323,6 +324,7 @@ class ReportService:
             qr_value=qr_value,
             signer_name=signer_name,
             signer_role=signer_role,
+            file_name=file_name,
         )
 
     def _append_signature_grid(
@@ -334,6 +336,7 @@ class ReportService:
         document_tag: str,
         signer_name: str = "Usuario del sistema",
         signer_role: str = "Rol no definido",
+        file_name: str | None = None,
     ) -> None:
         story.extend(
             [
@@ -344,6 +347,7 @@ class ReportService:
                     document_tag,
                     signer_name=signer_name,
                     signer_role=signer_role,
+                    file_name=file_name,
                 ),
             ]
         )

@@ -14,6 +14,8 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Image, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import ParagraphStyle
 
+from app.services.pdf_validation_service import create_pdf_validation_token
+
 _PRIMARY_BLUE = colors.HexColor("#123c7a")
 _ACCENT_BLUE = colors.HexColor("#dbe7f7")
 _FOOTER_BLUE = colors.HexColor("#002e6d")
@@ -108,6 +110,7 @@ def build_pdf_signature_seal_qr_grid(
     qr_value: str,
     signer_name: str,
     signer_role: str,
+    file_name: str | None = None,
 ) -> Table:
     building = building or {}
     text_blue = _PRIMARY_BLUE
@@ -150,7 +153,18 @@ def build_pdf_signature_seal_qr_grid(
             ),
         )
 
-    verification_hash = hashlib.sha1(qr_value.encode("utf-8")).hexdigest().upper()[:16]
+    document_id = (qr_value.split("|", 1)[0] or qr_value).strip()
+    display_file_name = file_name or f"{document_id.lower().replace('_', '-').replace(' ', '-')}.pdf"
+    validation_token = create_pdf_validation_token(
+        document_id=document_id,
+        file_name=display_file_name,
+        generated_by=signer_name or "Usuario del sistema",
+        generated_role=signer_role or "Rol no definido",
+        building_name=get_building_name(building),
+        building_id=str(building.get("id") or "") or None,
+    )
+    validation_url = f"{get_app_url().rstrip('/')}/validar-pdf/{validation_token}"
+    verification_hash = hashlib.sha1(validation_token.encode("utf-8")).hexdigest().upper()[:16]
     verification_code = "-".join([
         verification_hash[0:4],
         verification_hash[4:8],
@@ -208,7 +222,7 @@ def build_pdf_signature_seal_qr_grid(
     qr_block = Table(
         [
             [
-                build_pdf_qr(qr_value, size=0.84 * inch),
+                build_pdf_qr(validation_url, size=0.84 * inch),
                 Paragraph(
                     (
                         '<font size="8.5" color="#123c7a">Escanee este código para</font><br/>'

@@ -328,6 +328,7 @@ class AccountStatementService:
         document_tag: str,
         signer_name: str,
         signer_role: str,
+        file_name: str | None = None,
     ) -> Table:
         qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
         return build_pdf_signature_seal_qr_grid(
@@ -336,6 +337,7 @@ class AccountStatementService:
             qr_value=qr_value,
             signer_name=signer_name,
             signer_role=signer_role,
+            file_name=file_name,
         )
 
     async def statement_pdf(self, owner_id: UUID, start_period: Optional[str], end_period: Optional[str]) -> bytes:
@@ -403,6 +405,7 @@ class AccountStatementService:
                 document_tag=f"ESTADO-CUENTA-{owner_id}",
                 signer_name=owner.get("full_name") or "Copropietario",
                 signer_role="Copropietario",
+                file_name="estado-cuenta.pdf",
             )
         )
         story.append(Spacer(1, 0.28 * cm))
@@ -473,6 +476,7 @@ class AccountStatementService:
                 document_tag=verification,
                 signer_name=profile.get("full_name") or "Copropietario",
                 signer_role="Copropietario",
+                file_name="certificado-expensas.pdf",
             )
         )
         story.append(Spacer(1, 0.2 * cm))

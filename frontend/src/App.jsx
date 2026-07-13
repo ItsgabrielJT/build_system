@@ -26,6 +26,7 @@ import OwnerHelpPage from './pages/owner/OwnerHelpPage';
 import OwnerProfilePage from './pages/owner/OwnerProfilePage';
 import AdminAnnouncementsPage from './pages/admin/AdminAnnouncementsPage';
 import AdminEventsPage from './pages/admin/AdminEventsPage';
+import PublicPdfValidationPage from './pages/PublicPdfValidationPage';
 
 function RootRedirect() {
   const { role, loading } = useAuth();
@@ -39,6 +40,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/validar-pdf/:token" element={<PublicPdfValidationPage />} />
 
       <Route
         path="/admin"

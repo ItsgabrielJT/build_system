@@ -105,6 +105,7 @@ async def get_owners_directory(
                 units=units,
                 ingress_date=item.get("ingress_date").date() if item.get("ingress_date") else None,
                 balance=item["balance"],
+                allocated_quota_percent=item.get("allocated_quota_percent") or 0,
                 currency=item.get("currency", "USD"),
             )
         )
@@ -167,6 +168,7 @@ async def get_owner_detail(
         units=units,
         ingress_date=result.get("created_at").date() if result.get("created_at") else None,
         balance_consolidated=result["balance_consolidated"],
+        allocated_quota_percent=result.get("allocated_quota_percent") or 0,
         recent_transactions=transactions,
         currency="USD",
     )
@@ -333,4 +335,3 @@ async def download_owner_ficha(
             "Content-Disposition": f'attachment; filename="ficha-{owner["full_name"].replace(" ", "_")}.pdf"'
         },
     )
-

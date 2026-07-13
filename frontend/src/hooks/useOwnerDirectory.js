@@ -97,6 +97,9 @@ export function useOwnerDirectory(filters = {}) {
           document_id: formData.document_id,
           phone: formData.phone || undefined,
           email: formData.email || undefined,
+          allocated_quota_percent: formData.allocated_quota_percent === ''
+            ? 0
+            : Number(formData.allocated_quota_percent),
         };
         await ownerService.createOwner(payload, token);
         success('Propietario creado con éxito');

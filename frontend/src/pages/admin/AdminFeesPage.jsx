@@ -40,7 +40,14 @@ function getMonthAbbr(period) {
 
 function formatMoney(value) {
   if (value == null) return '—';
-  return `$${Number(value).toLocaleString('es-CL')}`;
+  return `$${Number(value).toLocaleString('es-CL', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
 }
 
 function getCurrentMonthRange() {
@@ -77,6 +84,8 @@ export default function AdminFeesPage() {
   const [period, setPeriod] = useState(currentPeriod);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [bulkValues, setBulkValues] = useState({});
+  const [distributionTotal, setDistributionTotal] = useState('');
+  const [baseFeeAmount, setBaseFeeAmount] = useState('');
   const [bulkResult, setBulkResult] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [reportStartDate, setReportStartDate] = useState(initialRange.startDate);
@@ -119,6 +128,15 @@ export default function AdminFeesPage() {
   const aptMap = {};
   apartments.forEach((a) => { aptMap[a.id] = a; });
 
+  const totalOwnerQuotaPercent = apartments.reduce(
+    (sum, apt) => sum + Number(apt.owner_allocated_quota_percent || 0),
+    0
+  );
+
+  const calculatedBulkTotal = apartments.reduce((sum, apt) => (
+    sum + Number(bulkValues[apt.id] || 0)
+  ), 0);
+
   const filteredPeriods = periods.filter((row) => periodInDateRange(row.period, reportStartDate, reportEndDate));
 
   const handleEmitirProximoMes = () => {
@@ -126,10 +144,26 @@ export default function AdminFeesPage() {
     setPeriod(nextMonth);
     setIsBulkOpen(true);
     setBulkValues({});
+    setDistributionTotal('');
+    setBaseFeeAmount('');
   };
 
   const handleBulkChange = (aptId, value) => {
     setBulkValues((prev) => ({ ...prev, [aptId]: value }));
+  };
+
+  const calculateFeeAmount = (apt) => {
+    const quotaPercent = Number(apt.owner_allocated_quota_percent || 0);
+    const distributedAmount = Number(distributionTotal || 0) * (quotaPercent / 100);
+    return roundMoney(Number(baseFeeAmount || 0) + distributedAmount);
+  };
+
+  const handleApplyQuotaCalculation = () => {
+    const nextValues = {};
+    apartments.forEach((apt) => {
+      nextValues[apt.id] = calculateFeeAmount(apt).toFixed(2);
+    });
+    setBulkValues(nextValues);
   };
 
   const handleBulkSave = async () => {
@@ -347,21 +381,59 @@ export default function AdminFeesPage() {
                 onChange={(event) => setPeriod(event.target.value)}
               />
             </label>
+            <div className={styles.calculationPanel}>
+              <label className={styles.periodField}>
+                <span>Total a distribuir por alícuota</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={distributionTotal}
+                  onChange={(event) => setDistributionTotal(event.target.value)}
+                  placeholder="Ej: 834.93 o 5000.00"
+                />
+              </label>
+              <label className={styles.periodField}>
+                <span>Valor base adicional por unidad</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={baseFeeAmount}
+                  onChange={(event) => setBaseFeeAmount(event.target.value)}
+                  placeholder="Ej: 0.00"
+                />
+              </label>
+              <div className={styles.calculationSummary}>
+                <span>Alícuota detectada: {totalOwnerQuotaPercent.toFixed(2)}%</span>
+                <strong>Total preparado: {formatMoney(calculatedBulkTotal)}</strong>
+              </div>
+              <button type="button" className={styles.btnReportSecondary} onClick={handleApplyQuotaCalculation}>
+                Calcular valores
+              </button>
+            </div>
             <div className={styles.bulkGrid}>
-              {apartments.map((apt) => (
-                <div key={apt.id} className={styles.bulkRow}>
-                  <label className={styles.bulkLabel}>Depto {apt.code}</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className={styles.bulkInput}
-                    value={bulkValues[apt.id] ?? ''}
-                    onChange={(e) => handleBulkChange(apt.id, e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-              ))}
+              {apartments.map((apt) => {
+                const quotaPercent = Number(apt.owner_allocated_quota_percent || 0);
+                const previewAmount = calculateFeeAmount(apt);
+                return (
+                  <div key={apt.id} className={styles.bulkRow}>
+                    <label className={styles.bulkLabel}>
+                      <span>Depto {apt.code}</span>
+                      <small>{apt.owner_name || 'Sin propietario'} · {quotaPercent.toFixed(2)}% · Calc. {formatMoney(previewAmount)}</small>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={styles.bulkInput}
+                      value={bulkValues[apt.id] ?? ''}
+                      onChange={(e) => handleBulkChange(apt.id, e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                );
+              })}
             </div>
             <div className={styles.bulkActions}>
               <button className={styles.btnCancel} onClick={() => setIsBulkOpen(false)}>Cancelar</button>

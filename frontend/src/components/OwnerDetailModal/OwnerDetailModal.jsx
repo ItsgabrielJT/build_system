@@ -10,6 +10,7 @@ const EDIT_FIELDS = [
   { name: 'document_id', label: 'Documento de identidad', required: true },
   { name: 'email', label: 'Correo electrónico', type: 'email' },
   { name: 'phone', label: 'Teléfono', type: 'tel' },
+  { name: 'allocated_quota_percent', label: 'Alícuota (%)', type: 'number', min: '0', step: '0.01' },
 ];
 
 import { useNotification } from '../../context/NotificationContext';
@@ -55,6 +56,9 @@ export default function OwnerDetailModal({ owner, onClose, onRefresh }) {
         document_id: formData.document_id,
         phone: formData.phone || undefined,
         email: formData.email || undefined,
+        allocated_quota_percent: formData.allocated_quota_percent === ''
+          ? 0
+          : Number(formData.allocated_quota_percent),
       };
       await ownerService.updateOwner(owner.id, payload, token);
       success('Propietario actualizado con éxito');
@@ -143,6 +147,10 @@ export default function OwnerDetailModal({ owner, onClose, onRefresh }) {
               <div className={styles.infoItem}>
                 <span className={styles.infoLabel}>Fecha de Ingreso</span>
                 <span className={styles.infoValue}>{formatDate(owner.ingress_date)}</span>
+              </div>
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>Alícuota</span>
+                <span className={styles.infoValue}>{Number(owner.allocated_quota_percent || 0).toFixed(2)}%</span>
               </div>
             </div>
           </div>

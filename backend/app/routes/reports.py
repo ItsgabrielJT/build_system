@@ -11,6 +11,7 @@ from app.config.database import get_db
 from app.models.schemas import MonthlyBalanceResponse
 from app.repositories.delinquency_repository import DelinquencyRepository
 from app.repositories.expense_repository import ExpenseRepository
+from app.repositories.income_repository import IncomeRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.services.delinquency_service import DelinquencyService
 from app.services.report_service import ReportService
@@ -47,6 +48,7 @@ def _get_report_service(db) -> ReportService:
         DelinquencyService(DelinquencyRepository(db)),
         PaymentRepository(db),
         ExpenseRepository(db),
+        IncomeRepository(db),
     )
 
 

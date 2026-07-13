@@ -117,8 +117,15 @@ class AccountStatementService:
             JOIN apartment_fees af ON af.apartment_id = oa.apartment_id
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
-                FROM payments
-                WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
+                FROM (
+                    SELECT apartment_id, period, amount
+                    FROM payments
+                    WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
+                    UNION ALL
+                    SELECT apartment_id, period, amount
+                    FROM incomes
+                    WHERE status = 'REGISTRADO' AND apartment_id IS NOT NULL AND period IS NOT NULL
+                ) paid_sources
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             LEFT JOIN (
@@ -134,8 +141,15 @@ class AccountStatementService:
         last_payment = await self._owner_repo._conn.fetchrow(
             """
             SELECT paid_at, amount, method, reference
-            FROM payments
-            WHERE owner_id = $1 AND status IN ('REGISTRADO', 'APROBADO')
+            FROM (
+                SELECT paid_at, amount, method, reference, created_at
+                FROM payments
+                WHERE owner_id = $1 AND status IN ('REGISTRADO', 'APROBADO')
+                UNION ALL
+                SELECT date AS paid_at, amount, method, reference, created_at
+                FROM incomes
+                WHERE owner_id = $1 AND status = 'REGISTRADO'
+            ) income_sources
             ORDER BY paid_at DESC, created_at DESC
             LIMIT 1
             """,

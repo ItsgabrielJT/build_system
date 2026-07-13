@@ -27,6 +27,7 @@ const CREATE_OWNER_FIELDS = [
   { name: 'document_id', label: 'Documento de identidad', required: true, placeholder: 'Ej: 1234567890' },
   { name: 'email', label: 'Correo electrónico', type: 'email', placeholder: 'correo@ejemplo.com' },
   { name: 'phone', label: 'Teléfono', type: 'tel', placeholder: 'Ej: +57 300 0000000' },
+  { name: 'allocated_quota_percent', label: 'Alícuota (%)', type: 'number', min: '0', step: '0.01', placeholder: 'Ej: 9.69' },
 ];
 
 const OWNER_FILTERS = [

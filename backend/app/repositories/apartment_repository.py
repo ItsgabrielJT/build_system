@@ -27,7 +27,8 @@ class ApartmentRepository:
                 a.created_at,
                 a.updated_at,
                 o.full_name                                 AS owner_name,
-                o.email                                     AS owner_email
+                o.email                                     AS owner_email,
+                COALESCE(o.allocated_quota_percent, 0.0)    AS owner_allocated_quota_percent
             FROM apartments a
             LEFT JOIN (
                 SELECT DISTINCT ON (apartment_id) apartment_id, owner_id
@@ -55,7 +56,8 @@ class ApartmentRepository:
                 a.created_at,
                 a.updated_at,
                 o.full_name                                 AS owner_name,
-                o.email                                     AS owner_email
+                o.email                                     AS owner_email,
+                COALESCE(o.allocated_quota_percent, 0.0)    AS owner_allocated_quota_percent
             FROM apartments a
             LEFT JOIN (
                 SELECT DISTINCT ON (apartment_id) apartment_id, owner_id
@@ -243,6 +245,7 @@ class ApartmentRepository:
                 a.created_at,
                 a.updated_at,
                 o.full_name as owner_name,
+                COALESCE(o.allocated_quota_percent, 0.0) as owner_allocated_quota_percent,
                 CAST(COALESCE(af.allocated_quota, 0.0) as float) as allocated_quota_percent,
                 NULL::text as image_url
             FROM apartments a
@@ -284,7 +287,8 @@ class ApartmentRepository:
                 a.created_at,
                 a.updated_at,
                 o.full_name                                 AS owner_name,
-                o.email                                     AS owner_email
+                o.email                                     AS owner_email,
+                COALESCE(o.allocated_quota_percent, 0.0)    AS owner_allocated_quota_percent
             FROM apartments a
             JOIN owner_apartments oa ON a.id = oa.apartment_id
             JOIN owners o ON oa.owner_id = o.id

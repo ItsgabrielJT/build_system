@@ -18,6 +18,7 @@ from reportlab.platypus import HRFlowable, KeepTogether, Paragraph, SimpleDocTem
 from reportlab.lib import colors
 
 from app.repositories.expense_repository import ExpenseRepository
+from app.repositories.income_repository import IncomeRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.services.pdf_branding import (
     build_pdf_brand_header,
@@ -46,10 +47,12 @@ class ReportService:
         delinquency_service: DelinquencyService,
         payment_repo: PaymentRepository,
         expense_repo: ExpenseRepository,
+        income_repo: Optional[IncomeRepository] = None,
     ) -> None:
         self._delinquency = delinquency_service
         self._payment_repo = payment_repo
         self._expense_repo = expense_repo
+        self._income_repo = income_repo
 
     def _validate_month_period(self, period: str) -> str:
         if not _MONTH_PERIOD_RE.match(period):
@@ -66,6 +69,9 @@ class ReportService:
 
     def _is_valid_expense(self, expense: dict) -> bool:
         return (expense.get("status") or "REGISTRADO").upper() not in _EXCLUDED_EXPENSE_STATUSES
+
+    def _is_valid_income(self, income: dict) -> bool:
+        return (income.get("status") or "REGISTRADO").upper() == "REGISTRADO"
 
     async def _monthly_payments(self, period: str) -> list[dict]:
         period = self._validate_month_period(period)
@@ -87,8 +93,53 @@ class ReportService:
         expenses = expenses_payload.get("data", []) if isinstance(expenses_payload, dict) else expenses_payload
         return [expense for expense in expenses if self._is_valid_expense(expense)]
 
+    async def _monthly_incomes(self, period: str) -> list[dict]:
+        if not self._income_repo:
+            return []
+        period = self._validate_month_period(period)
+        incomes = await self._income_repo.get_all(period=period, status="REGISTRADO")
+        return [income for income in incomes if self._is_valid_income(income)]
+
     def _sum_amount(self, rows: list[dict]) -> Decimal:
         return sum(Decimal(str(row.get("amount", 0) or 0)) for row in rows)
+
+    def _normalize_payment_income(self, payment: dict) -> dict:
+        return {
+            **payment,
+            "income_source_type": "payment",
+            "income_label": "Pago registrado",
+            "income_concept": f"Pago {payment.get('period') or ''}".strip(),
+            "income_date": payment.get("paid_at"),
+            "income_category": "Alícuotas y pagos",
+        }
+
+    def _normalize_manual_income(self, income: dict) -> dict:
+        return {
+            **income,
+            "paid_at": income.get("date"),
+            "income_source_type": "income",
+            "income_label": income.get("source") or income.get("category") or "Ingreso manual",
+            "income_concept": income.get("concept") or "Ingreso",
+            "income_date": income.get("date"),
+            "income_category": income.get("category") or "Otros ingresos",
+            "owner_name": income.get("owner_name") or "Ingreso general",
+            "apartment_code": income.get("apartment_code") or "",
+            "period": income.get("period") or (
+                income.get("date").strftime("%Y-%m") if hasattr(income.get("date"), "strftime") else ""
+            ),
+            "method": income.get("method") or income.get("source") or "",
+            "status": income.get("status") or "REGISTRADO",
+        }
+
+    async def _income_entries(
+        self,
+        period: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> list[dict]:
+        payments = [self._normalize_payment_income(payment) for payment in await self._payments(period, start_date, end_date)]
+        incomes = [self._normalize_manual_income(income) for income in await self._incomes(period, start_date, end_date)]
+        return [*payments, *incomes]
 
     def _build_breakdown(self, rows: list[dict], key: str, fallback: str) -> list[dict]:
         totals: dict[str, Decimal] = {}
@@ -544,6 +595,21 @@ class ReportService:
         )
         return [dict(row) for row in rows]
 
+    async def _incomes(
+        self,
+        period: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> list[dict]:
+        if not self._income_repo:
+            return []
+        return await self._income_repo.get_all(
+            period=period,
+            status="REGISTRADO",
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     async def _expenses(
         self,
         period: Optional[str] = None,
@@ -588,15 +654,20 @@ class ReportService:
         previous_period = self._previous_period(target_period)
 
         payments = await self._monthly_payments(target_period)
+        incomes = await self._monthly_incomes(target_period)
         expenses = await self._monthly_expenses(target_period)
         previous_payments = await self._monthly_payments(previous_period)
+        previous_incomes = await self._monthly_incomes(previous_period)
         previous_expenses = await self._monthly_expenses(previous_period)
 
-        income_total = self._sum_amount(payments)
+        income_rows = [*payments, *incomes]
+        previous_income_rows = [*previous_payments, *previous_incomes]
+
+        income_total = self._sum_amount(income_rows)
         expense_total = self._sum_amount(expenses)
         net_balance = income_total - expense_total
 
-        previous_income_total = self._sum_amount(previous_payments)
+        previous_income_total = self._sum_amount(previous_income_rows)
         previous_expense_total = self._sum_amount(previous_expenses)
         previous_net_balance = previous_income_total - previous_expense_total
 
@@ -605,7 +676,12 @@ class ReportService:
             "income_total": income_total,
             "expense_total": expense_total,
             "net_balance": net_balance,
-            "income_breakdown": self._build_breakdown(payments, "method", "Otros ingresos"),
+            "income_breakdown": self._build_breakdown(
+                [self._normalize_payment_income(row) for row in payments]
+                + [self._normalize_manual_income(row) for row in incomes],
+                "income_category",
+                "Otros ingresos",
+            ),
             "expense_breakdown": self._build_breakdown(expenses, "category", "Sin categoría"),
             "previous_period_variation": {
                 "income_pct": self._variation_percent(income_total, previous_income_total),
@@ -620,10 +696,11 @@ class ReportService:
         end_date: Optional[date] = None,
     ) -> dict:
         payments = await self._payments(start_date=start_date, end_date=end_date)
+        incomes = await self._incomes(start_date=start_date, end_date=end_date)
         expenses = await self._expenses(start_date=start_date, end_date=end_date)
         delinquency = await self._delinquency.get_stats()
 
-        total_revenue = sum(Decimal(str(p.get("amount", 0))) for p in payments)
+        total_revenue = sum(Decimal(str(p.get("amount", 0))) for p in [*payments, *incomes])
         total_expenses = sum(Decimal(str(e.get("amount", 0))) for e in expenses)
         net_income = total_revenue - total_expenses
 
@@ -637,11 +714,15 @@ class ReportService:
                 start_date=previous_start,
                 end_date=previous_end,
             )
+            prev_incomes = await self._incomes(
+                start_date=previous_start,
+                end_date=previous_end,
+            )
             prev_expenses = await self._expenses(
                 start_date=previous_start,
                 end_date=previous_end,
             )
-            previous_revenue = sum(Decimal(str(p.get("amount", 0))) for p in prev_payments)
+            previous_revenue = sum(Decimal(str(p.get("amount", 0))) for p in [*prev_payments, *prev_incomes])
             previous_expenses = sum(Decimal(str(e.get("amount", 0))) for e in prev_expenses)
 
         def change(current: Decimal, previous: Decimal) -> Optional[float]:
@@ -680,9 +761,11 @@ class ReportService:
 
         expected_by_period = {row["period"]: float(row["total"]) for row in fee_rows}
         collected_by_period: dict[str, float] = {}
-        for payment in payments:
+        for payment in [*payments, *incomes]:
             period_key = payment.get("period") or (
                 payment.get("paid_at").strftime("%Y-%m") if payment.get("paid_at") else ""
+            ) or (
+                payment.get("date").strftime("%Y-%m") if payment.get("date") else ""
             )
             if not period_key:
                 continue
@@ -784,16 +867,18 @@ class ReportService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> bytes:
-        payments = await self._payments(period, start_date, end_date)
+        payments = await self._income_entries(period, start_date, end_date)
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(
-            ["Fecha", "Propietario", "Departamento", "Período", "Monto", "Método", "Estado"]
+            ["Fecha", "Origen", "Concepto", "Propietario", "Departamento", "Período", "Monto", "Método", "Estado"]
         )
         for p in payments:
             writer.writerow(
                 [
-                    p.get("paid_at", ""),
+                    p.get("income_date") or p.get("paid_at", ""),
+                    p.get("income_label", ""),
+                    p.get("income_concept", ""),
                     p.get("owner_name", ""),
                     p.get("apartment_code", ""),
                     p.get("period", ""),
@@ -810,7 +895,7 @@ class ReportService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> bytes:
-        payments = await self._payments(period, start_date, end_date)
+        payments = await self._income_entries(period, start_date, end_date)
         expenses = await self._expenses(period, start_date, end_date)
 
         total_income = sum(Decimal(str(p.get("amount", 0))) for p in payments)
@@ -820,7 +905,7 @@ class ReportService:
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["Concepto", "Monto"])
-        writer.writerow(["Ingresos (pagos registrados)", str(total_income)])
+        writer.writerow(["Ingresos consolidados", str(total_income)])
         writer.writerow(["Egresos (gastos)", str(total_expenses)])
         writer.writerow(["Balance neto", str(balance)])
         return output.getvalue().encode("utf-8-sig")
@@ -833,12 +918,14 @@ class ReportService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> bytes:
-        payments = await self._payments(period, start_date, end_date)
-        previous_payments = await self._payments(self._previous_period(period), None, None) if period else []
+        payments = await self._income_entries(period, start_date, end_date)
+        previous_payments = await self._income_entries(self._previous_period(period), None, None) if period else []
         total = sum(Decimal(str(p.get("amount", 0))) for p in payments)
+        payments_total = sum(Decimal(str(p.get("amount", 0))) for p in payments if p.get("income_source_type") == "payment")
+        manual_total = total - payments_total
         by_kind = [
-            {"label": "Ingresos por alícuotas", "amount": total},
-            {"label": "Otros ingresos", "amount": Decimal("0")},
+            {"label": "Ingresos por alícuotas", "amount": payments_total},
+            {"label": "Otros ingresos", "amount": manual_total},
         ]
         previous_total = sum(Decimal(str(p.get("amount", 0))) for p in previous_payments)
 
@@ -860,8 +947,8 @@ class ReportService:
         departments = len({p.get("apartment_code") for p in payments if p.get("apartment_code")})
         story.append(self._metric_cards([
             ("Departamentos", str(departments), "▦"),
-            ("Ingresos por alícuotas", self._usd(total), "$"),
-            ("Otros ingresos", self._usd(0), "✦"),
+            ("Ingresos por alícuotas", self._usd(payments_total), "$"),
+            ("Otros ingresos", self._usd(manual_total), "✦"),
         ], width))
         story.append(Spacer(1, 0.25 * cm))
         story.append(self._section_title("Detalle de ingresos", width))
@@ -871,15 +958,15 @@ class ReportService:
             data.append([
                 apartment.split()[-1] if " " in apartment else "",
                 self._p(apartment, 7),
-                self._p(f"Alícuota {apartment or p.get('period') or ''}", 7),
+                self._p(p.get("income_concept") or f"Alícuota {apartment or p.get('period') or ''}", 7),
                 self._usd(p.get("amount", 0)),
-                self._p("Ingreso por alícuota", 7),
+                self._p(p.get("income_label") or "Ingreso por alícuota", 7),
             ])
         if len(data) == 1:
             data.append(["General", "-", "Sin ingresos registrados", self._usd(0), "-"])
         story.append(self._styled_table(data[:14], [2.5 * cm, 4 * cm, 5.2 * cm, 3.3 * cm, 4.1 * cm], font_size=7))
         story.append(Spacer(1, 0.18 * cm))
-        total_bar = Table([[self._p("v/p Alícuotas de departamentos suma", 10, bold=True, align="LEFT"), self._p(self._usd(total), 12, bold=True)]], colWidths=[width * 0.72, width * 0.28])
+        total_bar = Table([[self._p("v/p Ingresos consolidados suma", 10, bold=True, align="LEFT"), self._p(self._usd(total), 12, bold=True)]], colWidths=[width * 0.72, width * 0.28])
         total_bar.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("BACKGROUND", (0, 0), (-1, -1), colors.white)]))
         story.append(total_bar)
         story.append(Spacer(1, 0.22 * cm))
@@ -903,14 +990,14 @@ class ReportService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> bytes:
-        payments = await self._payments(period, start_date, end_date)
+        payments = await self._income_entries(period, start_date, end_date)
         expenses = await self._expenses(period, start_date, end_date)
 
         total_income = sum(Decimal(str(p.get("amount", 0))) for p in payments)
         total_expenses = sum(Decimal(str(e.get("amount", 0))) for e in expenses)
         balance = total_income - total_expenses
 
-        income_by_method = self._build_breakdown(payments, "method", "Sin método")
+        income_by_method = self._build_breakdown(payments, "income_category", "Otros ingresos")
         expenses_by_category = self._build_breakdown(expenses, "category", "Sin categoría")
 
         output = io.BytesIO()
@@ -1172,14 +1259,14 @@ class ReportService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> bytes:
-        payments = await self._payments(period, start_date, end_date)
+        payments = await self._income_entries(period, start_date, end_date)
         
         wb = Workbook()
         ws = wb.active
         ws.title = "Ingresos"
         
         # Headers
-        headers = ["Fecha", "Propietario", "Departamento", "Período", "Monto", "Método", "Estado"]
+        headers = ["Fecha", "Origen", "Concepto", "Propietario", "Departamento", "Período", "Monto", "Método", "Estado"]
         header_fill = PatternFill(start_color="123C7A", end_color="123C7A", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF")
         
@@ -1192,13 +1279,15 @@ class ReportService:
         
         # Data
         for row, p in enumerate(payments, 2):
-            ws.cell(row=row, column=1).value = str(p.get("paid_at", ""))
-            ws.cell(row=row, column=2).value = p.get("owner_name", "")
-            ws.cell(row=row, column=3).value = p.get("apartment_code", "")
-            ws.cell(row=row, column=4).value = p.get("period", "")
-            ws.cell(row=row, column=5).value = float(p.get("amount", 0))
-            ws.cell(row=row, column=6).value = p.get("method", "")
-            ws.cell(row=row, column=7).value = p.get("status", "")
+            ws.cell(row=row, column=1).value = str(p.get("income_date") or p.get("paid_at") or "")
+            ws.cell(row=row, column=2).value = p.get("income_label", "")
+            ws.cell(row=row, column=3).value = p.get("income_concept", "")
+            ws.cell(row=row, column=4).value = p.get("owner_name", "")
+            ws.cell(row=row, column=5).value = p.get("apartment_code", "")
+            ws.cell(row=row, column=6).value = p.get("period", "")
+            ws.cell(row=row, column=7).value = float(p.get("amount", 0))
+            ws.cell(row=row, column=8).value = p.get("method", "")
+            ws.cell(row=row, column=9).value = p.get("status", "")
         
         # Adjust column widths
         ws.column_dimensions['A'].width = 12
@@ -1206,8 +1295,10 @@ class ReportService:
         ws.column_dimensions['C'].width = 12
         ws.column_dimensions['D'].width = 10
         ws.column_dimensions['E'].width = 12
-        ws.column_dimensions['F'].width = 12
+        ws.column_dimensions['F'].width = 10
         ws.column_dimensions['G'].width = 12
+        ws.column_dimensions['H'].width = 12
+        ws.column_dimensions['I'].width = 12
         
         output = io.BytesIO()
         wb.save(output)
@@ -1219,7 +1310,7 @@ class ReportService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> bytes:
-        payments = await self._payments(period, start_date, end_date)
+        payments = await self._income_entries(period, start_date, end_date)
         expenses = await self._expenses(period, start_date, end_date)
 
         total_income = sum(Decimal(str(p.get("amount", 0))) for p in payments)
@@ -1232,7 +1323,7 @@ class ReportService:
         headers = ["Indicador", "Valor", "Detalle"]
         self._style_excel_header(ws, headers)
         rows = [
-            ["Ingresos confirmados", float(total_income), f"{len(payments)} pagos"],
+            ["Ingresos confirmados", float(total_income), f"{len(payments)} movimientos"],
             ["Gastos registrados", float(total_expenses), f"{len(expenses)} gastos"],
             ["Diferencia neta", float(balance), "Ingresos menos gastos"],
         ]
@@ -1244,12 +1335,23 @@ class ReportService:
         ws.column_dimensions["C"].width = 28
 
         income_ws = wb.create_sheet("Ingresos")
-        self._style_excel_header(income_ws, ["Fecha", "Propietario", "Departamento", "Período", "Monto", "Método", "Estado", "Referencia"])
+        self._style_excel_header(income_ws, ["Fecha", "Origen", "Concepto", "Propietario", "Departamento", "Período", "Monto", "Método", "Estado", "Referencia"])
         for row, p in enumerate(payments, 2):
-            values = [str(p.get("paid_at") or ""), p.get("owner_name") or "", p.get("apartment_code") or "", p.get("period") or "", float(p.get("amount", 0)), p.get("method") or "", p.get("status") or "", p.get("reference") or ""]
+            values = [
+                str(p.get("income_date") or p.get("paid_at") or ""),
+                p.get("income_label") or "",
+                p.get("income_concept") or "",
+                p.get("owner_name") or "",
+                p.get("apartment_code") or "",
+                p.get("period") or "",
+                float(p.get("amount", 0)),
+                p.get("method") or "",
+                p.get("status") or "",
+                p.get("reference") or "",
+            ]
             for col, value in enumerate(values, 1):
                 income_ws.cell(row=row, column=col).value = value
-        for col in "ABCDEFGH":
+        for col in "ABCDEFGHIJ":
             income_ws.column_dimensions[col].width = 16
 
         expense_ws = wb.create_sheet("Gastos")
@@ -1346,8 +1448,15 @@ class ReportService:
             LEFT JOIN owners o ON o.id = oa.owner_id
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
-                FROM payments
-                WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
+                FROM (
+                    SELECT apartment_id, period, amount
+                    FROM payments
+                    WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
+                    UNION ALL
+                    SELECT apartment_id, period, amount
+                    FROM incomes
+                    WHERE status = 'REGISTRADO' AND apartment_id IS NOT NULL AND period IS NOT NULL
+                ) paid_sources
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             {where}

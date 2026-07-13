@@ -17,6 +17,14 @@ def _validate_period(v: str) -> str:
     return v
 
 
+def _validate_percentage(v: Optional[Decimal]) -> Optional[Decimal]:
+    if v is None:
+        return v
+    if v < 0 or v > 100:
+        raise ValueError("El porcentaje debe estar entre 0 y 100")
+    return v
+
+
 # ─── OWNER ────────────────────────────────────────────────────────────────────
 
 class OwnerCreate(BaseModel):
@@ -24,6 +32,12 @@ class OwnerCreate(BaseModel):
     document_id: str
     phone: Optional[str] = None
     email: Optional[str] = None
+    allocated_quota_percent: Optional[Decimal] = Decimal("0")
+
+    @field_validator("allocated_quota_percent")
+    @classmethod
+    def validate_allocated_quota_percent(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return _validate_percentage(v)
 
 
 class OwnerUpdate(BaseModel):
@@ -32,6 +46,12 @@ class OwnerUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     status: Optional[str] = None
+    allocated_quota_percent: Optional[Decimal] = None
+
+    @field_validator("allocated_quota_percent")
+    @classmethod
+    def validate_allocated_quota_percent(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return _validate_percentage(v)
 
 
 class OwnerResponse(BaseModel):
@@ -41,6 +61,7 @@ class OwnerResponse(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     status: str
+    allocated_quota_percent: Decimal = Decimal("0")
     created_at: datetime
     updated_at: datetime
 
@@ -279,6 +300,56 @@ class PaymentResponse(BaseModel):
     apartment_code: Optional[str] = None
     owner_name: Optional[str] = None
     fine_id: Optional[UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ─── INCOME ───────────────────────────────────────────────────────────────────
+
+class IncomeCreate(BaseModel):
+    date: date
+    concept: str
+    amount: Decimal
+    source: Optional[str] = None
+    category: Optional[str] = None
+    method: Optional[str] = None
+    reference: Optional[str] = None
+    period: Optional[str] = None
+    apartment_id: Optional[UUID] = None
+    owner_id: Optional[UUID] = None
+
+    @field_validator("period")
+    @classmethod
+    def validate_period(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_period(v) if v else v
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
+
+
+class IncomeUpdate(BaseModel):
+    status: str
+
+
+class IncomeResponse(BaseModel):
+    id: UUID
+    date: date
+    concept: str
+    amount: Decimal
+    source: Optional[str] = None
+    category: Optional[str] = None
+    method: Optional[str] = None
+    reference: Optional[str] = None
+    period: Optional[str] = None
+    apartment_id: Optional[UUID] = None
+    owner_id: Optional[UUID] = None
+    status: str
+    apartment_code: Optional[str] = None
+    owner_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -644,6 +715,7 @@ class OwnerDirectoryItemResponse(BaseModel):
     units: List[OwnerUnitResponse]
     ingress_date: Optional[date] = None
     balance: Decimal
+    allocated_quota_percent: Decimal = Decimal("0")
     currency: str = "USD"
 
 
@@ -673,6 +745,7 @@ class OwnerDetailResponse(BaseModel):
     units: List[OwnerUnitResponse]
     ingress_date: Optional[date] = None
     balance_consolidated: Decimal
+    allocated_quota_percent: Decimal = Decimal("0")
     recent_transactions: List[TransactionResponse]
     currency: str = "USD"
 
@@ -722,6 +795,7 @@ class OwnerProfileResponse(BaseModel):
     emergency_relation: Optional[str] = None
     emergency_phone: Optional[str] = None
     notifications_enabled: bool = True
+    allocated_quota_percent: Decimal = Decimal("0")
     last_update_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -742,4 +816,9 @@ class OwnerProfileUpdate(BaseModel):
     emergency_relation: Optional[str] = None
     emergency_phone: Optional[str] = None
     notifications_enabled: Optional[bool] = None
+    allocated_quota_percent: Optional[Decimal] = None
 
+    @field_validator("allocated_quota_percent")
+    @classmethod
+    def validate_allocated_quota_percent(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return _validate_percentage(v)

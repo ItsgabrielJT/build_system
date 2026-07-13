@@ -53,6 +53,8 @@ export default function OwnerDirectoryTable({
     return styles.zero;
   };
 
+  const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`;
+
   const renderPaginationButtons = () => {
     const buttons = [];
     const maxButtons = 5;
@@ -125,6 +127,7 @@ export default function OwnerDirectoryTable({
                   <th>Propietario</th>
                   <th>Unidad</th>
                   <th>Contacto</th>
+                  <th>Alícuota</th>
                   <th>Ingreso</th>
                   <th>Balance</th>
                   <th>Acciones</th>
@@ -157,6 +160,10 @@ export default function OwnerDirectoryTable({
                         <ContactCopy type="email" value={owner.email} />
                         <ContactCopy type="phone" value={owner.phone} />
                       </div>
+                    </td>
+
+                    <td>
+                      <span className={styles.quotaBadge}>{formatPercent(owner.allocated_quota_percent)}</span>
                     </td>
 
                     <td className={styles.ingressDate}>{formatDate(owner.ingress_date)}</td>

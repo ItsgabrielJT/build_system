@@ -159,3 +159,34 @@ async def test_monthly_balance_excludes_annulled_expenses():
     assert result["expense_total"] == Decimal("120.00")
     assert result["net_balance"] == Decimal("-120.00")
     assert result["expense_breakdown"] == [{"label": "Mantenimiento", "amount": Decimal("120.00")}]
+
+
+@pytest.mark.asyncio
+async def test_monthly_balance_includes_manual_incomes():
+    payment_repo = MagicMock()
+    expense_repo = MagicMock()
+    income_repo = MagicMock()
+    payment_repo.get_all = AsyncMock(
+        side_effect=[
+            [{"id": "p-1", "amount": Decimal("1000.00"), "method": "transferencia", "status": "REGISTRADO"}],
+            [],
+            [],
+            [],
+        ]
+    )
+    income_repo.get_all = AsyncMock(
+        side_effect=[
+            [{"id": "i-1", "amount": Decimal("250.00"), "category": "Arriendos", "status": "REGISTRADO"}],
+            [],
+        ]
+    )
+    expense_repo.get_by_month = AsyncMock(side_effect=[{"data": []}, {"data": []}])
+    service = ReportService(MagicMock(), payment_repo, expense_repo, income_repo)
+
+    result = await service.monthly_balance_summary("2026-05")
+
+    assert result["income_total"] == Decimal("1250.00")
+    assert result["income_breakdown"] == [
+        {"label": "Alícuotas y pagos", "amount": Decimal("1000.00")},
+        {"label": "Arriendos", "amount": Decimal("250.00")},
+    ]

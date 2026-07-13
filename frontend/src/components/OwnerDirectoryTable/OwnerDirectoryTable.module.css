@@ -96,6 +96,18 @@
   font-weight: 800;
 }
 
+.quotaBadge {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .muted,
 .ingressDate {
   color: var(--color-gray-500);

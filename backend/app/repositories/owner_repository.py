@@ -79,14 +79,15 @@ class OwnerRepository:
     async def create(self, data: OwnerCreate) -> dict:
         row = await self._conn.fetchrow(
             """
-            INSERT INTO owners (full_name, document_id, phone, email)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO owners (full_name, document_id, phone, email, allocated_quota_percent)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *
             """,
             data.full_name,
             data.document_id,
             data.phone,
             data.email,
+            data.allocated_quota_percent if data.allocated_quota_percent is not None else 0,
         )
         return dict(row)
 
@@ -99,6 +100,7 @@ class OwnerRepository:
                 phone       = COALESCE($4, phone),
                 email       = COALESCE($5, email),
                 status      = COALESCE($6, status),
+                allocated_quota_percent = COALESCE($7, allocated_quota_percent),
                 updated_at  = NOW()
             WHERE id = $1
             RETURNING *
@@ -109,6 +111,7 @@ class OwnerRepository:
             data.phone,
             data.email,
             data.status,
+            data.allocated_quota_percent,
         )
         return dict(row) if row else None
 
@@ -171,6 +174,7 @@ class OwnerRepository:
                 o.document_id,
                 o.email,
                 o.phone,
+                COALESCE(o.allocated_quota_percent, 0.0) as allocated_quota_percent,
                 o.created_at as ingress_date,
                 COALESCE(balance.total_balance, 0.0) as balance,
                 'USD' as currency
@@ -246,6 +250,17 @@ class OwnerRepository:
                 COALESCE(p.reference, 'Pago de cuota') as reference
             FROM payments p
             WHERE p.owner_id = $1 AND p.status = 'REGISTRADO'
+
+            UNION ALL
+
+            SELECT
+                'INCOME' as type,
+                COALESCE(i.period, TO_CHAR(i.date, 'YYYY-MM')) as period,
+                i.amount,
+                i.date,
+                COALESCE(i.reference, i.concept, 'Ingreso') as reference
+            FROM incomes i
+            WHERE i.owner_id = $1 AND i.status = 'REGISTRADO'
             
             UNION ALL
             
@@ -280,10 +295,18 @@ class OwnerRepository:
                 WHERE oa.owner_id = current_owner.owner_id
             ) fees ON TRUE
             LEFT JOIN LATERAL (
-                SELECT SUM(p.amount) AS total
-                FROM payments p
-                WHERE p.owner_id = current_owner.owner_id
-                  AND p.status = 'REGISTRADO'
+                SELECT SUM(amount) AS total
+                FROM (
+                    SELECT p.amount
+                    FROM payments p
+                    WHERE p.owner_id = current_owner.owner_id
+                      AND p.status = 'REGISTRADO'
+                    UNION ALL
+                    SELECT i.amount
+                    FROM incomes i
+                    WHERE i.owner_id = current_owner.owner_id
+                      AND i.status = 'REGISTRADO'
+                ) paid_sources
             ) payments ON TRUE
             LEFT JOIN LATERAL (
                 SELECT SUM(f.amount) AS total
@@ -326,6 +349,7 @@ class OwnerRepository:
                 emergency_relation = COALESCE($12, emergency_relation),
                 emergency_phone = COALESCE($13, emergency_phone),
                 notifications_enabled = COALESCE($14, notifications_enabled),
+                allocated_quota_percent = COALESCE($15, allocated_quota_percent),
                 last_update_date = NOW(),
                 updated_at = NOW()
             WHERE id = $1
@@ -345,6 +369,7 @@ class OwnerRepository:
             data.emergency_relation,
             data.emergency_phone,
             data.notifications_enabled,
+            data.allocated_quota_percent,
         )
         if row:
             return await self.get_by_id_with_apartments(owner_id)

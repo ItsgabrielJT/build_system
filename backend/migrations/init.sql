@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS owners (
     document_id  VARCHAR(50)  UNIQUE NOT NULL,
     phone        VARCHAR(20),
     email        VARCHAR(255),
+    allocated_quota_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
     firebase_uid VARCHAR(128),          -- UID de Firebase Auth del propietario
     status       VARCHAR(50)  NOT NULL DEFAULT 'ACTIVO',  -- ACTIVO | INACTIVO
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -94,7 +95,26 @@ CREATE TABLE IF NOT EXISTS expenses (
     created_at TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
--- ── 8. SETTINGS ──────────────────────────────────────────────
+-- ── 8. INCOMES ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS incomes (
+    id           UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    date         DATE          NOT NULL,
+    concept      VARCHAR(255)  NOT NULL,
+    amount       DECIMAL(12,2) NOT NULL,
+    source       VARCHAR(120),
+    category     VARCHAR(100),
+    method       VARCHAR(50),
+    reference    VARCHAR(255),
+    period       CHAR(7),
+    apartment_id UUID          REFERENCES apartments(id) ON DELETE SET NULL,
+    owner_id     UUID          REFERENCES owners(id) ON DELETE SET NULL,
+    status       VARCHAR(50)   NOT NULL DEFAULT 'REGISTRADO',
+    created_by   VARCHAR(128),
+    created_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+-- ── 9. SETTINGS ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS settings (
     id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     building_name    VARCHAR(255),
@@ -113,6 +133,10 @@ CREATE INDEX IF NOT EXISTS idx_payments_owner_id             ON payments(owner_i
 CREATE INDEX IF NOT EXISTS idx_fines_apt_period              ON fines(apartment_id, period);
 CREATE INDEX IF NOT EXISTS idx_fines_owner_id                ON fines(owner_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_date                 ON expenses(date);
+CREATE INDEX IF NOT EXISTS idx_incomes_date                  ON incomes(date);
+CREATE INDEX IF NOT EXISTS idx_incomes_period_status         ON incomes(period, status);
+CREATE INDEX IF NOT EXISTS idx_incomes_apartment_period      ON incomes(apartment_id, period);
+CREATE INDEX IF NOT EXISTS idx_incomes_owner_id              ON incomes(owner_id);
 CREATE INDEX IF NOT EXISTS idx_owners_document               ON owners(document_id);
 CREATE INDEX IF NOT EXISTS idx_owners_firebase_uid           ON owners(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_apartments_code               ON apartments(code);

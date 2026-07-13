@@ -42,6 +42,14 @@ export function usePayments() {
     [token]
   );
 
+  const deletePayment = useCallback(
+    async (paymentId) => {
+      await paymentService.deletePayment(paymentId, token);
+      setPayments((prev) => prev.filter((p) => p.id !== paymentId));
+    },
+    [token]
+  );
+
   const downloadAdminProof = useCallback(
     async (paymentId) => paymentService.downloadAdminPaymentProof(paymentId, token),
     [token]
@@ -64,6 +72,7 @@ export function usePayments() {
     fetchPayments, 
     createPayment, 
     annulPayment,
+    deletePayment,
     downloadAdminProof,
     downloadAdminReceipt,
     downloadAdminAcknowledgement

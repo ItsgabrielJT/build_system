@@ -441,6 +441,74 @@ describe('AdminPaymentsPage', () => {
     expect(within(approvalsTable).queryByText(/Unidad A-101/i)).not.toBeInTheDocument();
   });
 
+  it('permite eliminar solo pagos anulados desde el historial', async () => {
+    const user = userEvent.setup();
+    const deletePayment = vi.fn().mockResolvedValue();
+    const fetchPayments = vi.fn();
+
+    usePayments.mockReturnValue({
+      payments: [
+        {
+          id: 'payment-active',
+          apartment_code: 'A-100',
+          owner_name: 'Pago Activo',
+          period: currentPeriod(),
+          amount: 120,
+          method: 'transferencia',
+          paid_at: currentMonthDate(10),
+          reference: 'ACT-1',
+          status: 'REGISTRADO',
+        },
+        {
+          id: 'payment-annulled',
+          apartment_code: 'A-200',
+          owner_name: 'Pago Anulado',
+          period: currentPeriod(),
+          amount: 80,
+          method: 'efectivo',
+          paid_at: currentMonthDate(12),
+          reference: 'ANU-1',
+          status: 'ANULADO',
+        },
+      ],
+      loading: false,
+      error: null,
+      fetchPayments,
+      createPayment: vi.fn(),
+      annulPayment: vi.fn(),
+      deletePayment,
+      downloadAdminReceipt: vi.fn(),
+    });
+
+    useAdminPaymentReview.mockReturnValue({
+      pendingPayments: [],
+      loading: false,
+      error: null,
+      fetchPending: vi.fn(),
+      approvePayment: vi.fn(),
+      rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
+    });
+
+    useApartments.mockReturnValue({ apartments: [], loading: false, error: null, fetchApartments: vi.fn() });
+    useOwners.mockReturnValue({ owners: [], loading: false, error: null, fetchOwners: vi.fn() });
+
+    render(<AdminPaymentsPage />);
+
+    const overviewPanel = screen.getByRole('tabpanel', { name: /Resumen y pagos/i });
+    const activeRow = within(overviewPanel).getByText('Pago Activo').closest('tr');
+    const annulledRow = within(overviewPanel).getByText('Pago Anulado').closest('tr');
+
+    expect(within(activeRow).queryByRole('button', { name: /Eliminar/i })).not.toBeInTheDocument();
+    await user.click(within(annulledRow).getByRole('button', { name: /Eliminar/i }));
+    const confirmButtons = screen.getAllByRole('button', { name: /^Eliminar$/i });
+    await user.click(confirmButtons.at(-1));
+
+    await waitFor(() => {
+      expect(deletePayment).toHaveBeenCalledWith('payment-annulled');
+    });
+  });
+
   it('abre revisión y aprueba un pago pendiente', async () => {
     const user = userEvent.setup();
     const approvePayment = vi.fn().mockResolvedValue({ id: 'pending-2', status: 'APROBADO' });

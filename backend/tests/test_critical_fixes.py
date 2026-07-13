@@ -86,6 +86,41 @@ async def test_create_payment_with_user_id(mock_user, apartment_id, owner_id, mo
         assert result["status"] == "REGISTRADO"
 
 
+@pytest.mark.asyncio
+async def test_delete_payment_only_allows_annulled_status():
+    """Valida que la eliminación física de pagos solo aplique sobre pagos anulados."""
+    from app.services.payment_service import PaymentService
+
+    payment_id = uuid4()
+    repo = AsyncMock()
+    repo.get_by_id = AsyncMock(return_value={"id": payment_id, "status": "REGISTRADO"})
+    repo.delete = AsyncMock(return_value=True)
+    service = PaymentService(repo)
+
+    with pytest.raises(HTTPException) as exc:
+        await service.delete(payment_id)
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == "Solo se pueden eliminar pagos anulados"
+    repo.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_delete_payment_removes_annulled_payment():
+    """Valida que un pago ya anulado sí pueda eliminarse."""
+    from app.services.payment_service import PaymentService
+
+    payment_id = uuid4()
+    repo = AsyncMock()
+    repo.get_by_id = AsyncMock(return_value={"id": payment_id, "status": "ANULADO"})
+    repo.delete = AsyncMock(return_value=True)
+    service = PaymentService(repo)
+
+    await service.delete(payment_id)
+
+    repo.delete.assert_awaited_once_with(payment_id)
+
+
 # ─── T1-01: FINES - user[user_id] ─────────────────────────────────────────────
 
 @pytest.mark.asyncio

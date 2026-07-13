@@ -37,3 +37,22 @@ class PaymentService:
             )
         updated = await self._repo.update_status(payment_id, data.status)
         return updated
+
+    async def delete(self, payment_id: UUID) -> None:
+        payment = await self._repo.get_by_id(payment_id)
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Pago no encontrado",
+            )
+        if payment["status"] != "ANULADO":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Solo se pueden eliminar pagos anulados",
+            )
+        deleted = await self._repo.delete(payment_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Pago no encontrado",
+            )

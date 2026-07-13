@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.auth.dependencies import require_admin
 from app.config.database import get_db
@@ -47,6 +47,17 @@ async def update_payment(
 ):
     service = PaymentService(PaymentRepository(db))
     return await service.update_status(payment_id, body)
+
+
+@router.delete("/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_payment(
+    payment_id: UUID,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = PaymentService(PaymentRepository(db))
+    await service.delete(payment_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/payments/{payment_id}/receipt")
@@ -102,4 +113,3 @@ async def download_acknowledgement_admin(
             "Content-Disposition": f'attachment; filename="constancia_{payment_id}.pdf"'
         },
     )
-

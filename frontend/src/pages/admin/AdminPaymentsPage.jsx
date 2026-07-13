@@ -102,7 +102,7 @@ import { useNotification } from '../../context/NotificationContext';
 
 export default function AdminPaymentsPage() {
   const initialRange = useMemo(() => getCurrentMonthRange(), []);
-  const { payments, loading, error, fetchPayments, createPayment, annulPayment, downloadAdminReceipt } = usePayments();
+  const { payments, loading, error, fetchPayments, createPayment, annulPayment, deletePayment, downloadAdminReceipt } = usePayments();
   const {
     pendingPayments,
     loading: loadingPending,
@@ -120,6 +120,7 @@ export default function AdminPaymentsPage() {
   const [selectedApartmentId, setSelectedApartmentId] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [annulTarget, setAnnulTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterStartDate, setFilterStartDate] = useState(initialRange.startDate);
@@ -435,6 +436,21 @@ export default function AdminPaymentsPage() {
     }
   };
 
+  const handleDelete = async () => {
+    setActionError(null);
+    try {
+      await deletePayment(deleteTarget.id);
+      success('Pago eliminado con éxito');
+      await fetchPayments(getPaymentFetchParams());
+    } catch (err) {
+      const msg = formatApiError(err, 'Error al eliminar pago');
+      setActionError(msg);
+      toastError(msg);
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
   const handleExport = async (format) => {
     setExportingReport(format);
     setActionError(null);
@@ -745,33 +761,46 @@ export default function AdminPaymentsPage() {
                                 {status.label}
                               </span>
                             </td>
-                            <td className={styles.actionCell}>
-                              <button
-                                className={styles.btnAction}
-                                onClick={async () => {
-                                  try {
-                                    const blob = await downloadAdminReceipt(payment.id);
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `recibo_${payment.id}.pdf`;
-                                    a.click();
-                                    URL.revokeObjectURL(url);
-                                  } catch (e) {
-                                    alert('El recibo oficial solo está disponible para pagos aprobados/registrados');
-                                  }
-                                }}
-                                title="Descargar recibo oficial"
-                              >
-                                Recibo
-                              </button>
-                              <button
-                                className={styles.btnTable}
-                                disabled={payment.status !== 'REGISTRADO'}
-                                onClick={() => setAnnulTarget(payment)}
-                              >
-                                Anular
-                              </button>
+                            <td>
+                              <div className={styles.actionGroup} aria-label={`Acciones para pago ${payment.id}`}>
+                                <button
+                                  type="button"
+                                  className={`${styles.actionButton} ${styles.actionButtonNeutral}`}
+                                  onClick={async () => {
+                                    try {
+                                      const blob = await downloadAdminReceipt(payment.id);
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = `recibo_${payment.id}.pdf`;
+                                      a.click();
+                                      URL.revokeObjectURL(url);
+                                    } catch (e) {
+                                      alert('El recibo oficial solo está disponible para pagos aprobados/registrados');
+                                    }
+                                  }}
+                                  title="Descargar recibo oficial"
+                                >
+                                  Recibo
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`${styles.actionButton} ${styles.actionButtonWarning}`}
+                                  disabled={payment.status !== 'REGISTRADO'}
+                                  onClick={() => setAnnulTarget(payment)}
+                                >
+                                  Anular
+                                </button>
+                                {payment.status === 'ANULADO' && (
+                                  <button
+                                    type="button"
+                                    className={`${styles.actionButton} ${styles.actionButtonDanger}`}
+                                    onClick={() => setDeleteTarget(payment)}
+                                  >
+                                    Eliminar
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -850,6 +879,14 @@ export default function AdminPaymentsPage() {
         confirmLabel="Anular"
         onConfirm={handleAnnul}
         onCancel={() => setAnnulTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        message={`¿Eliminar definitivamente el pago anulado de $${Number(deleteTarget?.amount || 0).toLocaleString()}?`}
+        confirmLabel="Eliminar"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
 
       <PaymentReviewModal

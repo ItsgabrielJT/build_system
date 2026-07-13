@@ -230,6 +230,13 @@ class PaymentRepository:
                 )
             return dict(row) if row else None
 
+    async def delete(self, payment_id: UUID) -> bool:
+        result = await self._conn.execute(
+            "DELETE FROM payments WHERE id = $1",
+            payment_id,
+        )
+        return result == "DELETE 1"
+
     async def approve(self, payment_id: UUID, admin_id: str) -> dict | None:
         async with self._conn.transaction():
             row = await self._conn.fetchrow(

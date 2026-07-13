@@ -26,6 +26,12 @@ export async function annulPayment(paymentId, token) {
   return res.data;
 }
 
+export async function deletePayment(paymentId, token) {
+  await axios.delete(`${API_BASE}/api/v1/payments/${paymentId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 // SPEC-008: Owner payment flow
 export async function submitOwnerPayment(formData, token) {
   const res = await axios.post(`${API_BASE}/api/v1/owner/payments`, formData, {

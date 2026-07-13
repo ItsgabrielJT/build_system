@@ -17,6 +17,7 @@ import OwnerAccountStatementPage from './pages/owner/OwnerAccountStatementPage';
 import OwnerMonthlyBalancePage from './pages/owner/OwnerMonthlyBalancePage';
 import OwnerPaymentsPage from './pages/owner/OwnerPaymentsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminCamerasPage from './pages/admin/AdminCamerasPage';
 
 // Nuevas páginas
 import OwnerInicioPage from './pages/owner/OwnerInicioPage';
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="expenses" element={<AdminExpensesPage />} />
         <Route path="announcements" element={<AdminAnnouncementsPage />} />
         <Route path="events" element={<AdminEventsPage />} />
+        <Route path="cameras" element={<AdminCamerasPage />} />
         <Route index element={<Navigate to="reports" replace />} />
       </Route>
 
@@ -85,4 +87,3 @@ export default function App() {
     </Routes>
   );
 }
-

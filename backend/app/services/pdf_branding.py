@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from reportlab.lib.styles import ParagraphStyle
 _PRIMARY_BLUE = colors.HexColor("#123c7a")
 _ACCENT_BLUE = colors.HexColor("#dbe7f7")
 _FOOTER_BLUE = colors.HexColor("#002e6d")
+_LIGHT_BORDER = colors.HexColor("#c8d6e8")
 
 
 async def get_default_building_config(conn: Any) -> dict:
@@ -29,6 +31,15 @@ async def get_default_building_config(conn: Any) -> dict:
 def get_building_name(building: dict | None) -> str:
     building = building or {}
     return building.get("name") or "Edificio Torres Netanya"
+
+
+def get_app_url() -> str:
+    try:
+        from app.config.settings import settings
+
+        return settings.app_url
+    except Exception:
+        return os.getenv("APP_URL", "http://localhost:5173")
 
 
 def get_building_logo(building: dict | None, *, max_width: float, max_height: float):
@@ -99,12 +110,13 @@ def build_pdf_signature_seal_qr_grid(
     signer_role: str,
 ) -> Table:
     building = building or {}
+    text_blue = _PRIMARY_BLUE
 
     signature_cell = get_building_asset_image(
         building,
         storage_key="signature_storage_path",
-        max_width=1.55 * inch,
-        max_height=0.72 * inch,
+        max_width=2.0 * inch,
+        max_height=0.68 * inch,
     )
     if not signature_cell:
         signature_cell = Paragraph(
@@ -122,8 +134,8 @@ def build_pdf_signature_seal_qr_grid(
     seal_cell = get_building_asset_image(
         building,
         storage_key="seal_storage_path",
-        max_width=1.55 * inch,
-        max_height=0.72 * inch,
+        max_width=1.72 * inch,
+        max_height=1.72 * inch,
     )
     if not seal_cell:
         seal_cell = Paragraph(
@@ -146,16 +158,20 @@ def build_pdf_signature_seal_qr_grid(
         verification_hash[12:16],
     ])
     period_label = f"ADMINISTRACIÓN {datetime.now().year} - {datetime.now().year + 1}"
+    signature_width = width * 0.34
+    seal_width = width * 0.27
+    qr_width = width * 0.39
 
     signature_block = Table(
         [
-            [Paragraph('<font size="9" color="#123c7a"><b>Atentamente,</b></font>', ParagraphStyle("PdfSignGreeting", fontName="Helvetica-Bold", leading=11, textColor=_PRIMARY_BLUE))],
+            [Paragraph('<font size="9.5" color="#123c7a"><b>Atentamente,</b></font>', ParagraphStyle("PdfSignGreeting", fontName="Helvetica-Bold", leading=12, textColor=text_blue))],
             [signature_cell],
-            [Paragraph('<font size="8" color="#123c7a"><b>' + escape(signer_name or "Usuario del sistema") + '</b></font>', ParagraphStyle("PdfSignerName", fontName="Helvetica-Bold", leading=10, textColor=_PRIMARY_BLUE))],
-            [Paragraph('<font size="8" color="#123c7a">' + escape(signer_role or "Rol no definido") + '</font>', ParagraphStyle("PdfSignerRole", fontName="Helvetica", leading=10, textColor=_PRIMARY_BLUE))],
-            [Paragraph('<font size="8" color="#123c7a"><b>' + escape(period_label) + '</b></font>', ParagraphStyle("PdfSignerPeriod", fontName="Helvetica-Bold", leading=10, textColor=_PRIMARY_BLUE))],
+            [Paragraph('<font size="8.5" color="#123c7a"><b>' + escape(signer_name or "Usuario del sistema") + '</b></font>', ParagraphStyle("PdfSignerName", fontName="Helvetica-Bold", leading=10.5, textColor=text_blue))],
+            [Paragraph('<font size="8.5" color="#123c7a">' + escape(signer_role or "Rol no definido") + '</font>', ParagraphStyle("PdfSignerRole", fontName="Helvetica", leading=10.5, textColor=text_blue))],
+            [Paragraph('<font size="8.5" color="#123c7a"><b>' + escape(period_label) + '</b></font>', ParagraphStyle("PdfSignerPeriod", fontName="Helvetica-Bold", leading=11, textColor=text_blue))],
         ],
-        colWidths=[width * 0.34],
+        colWidths=[signature_width],
+        rowHeights=[0.28 * inch, 0.54 * inch, 0.20 * inch, 0.20 * inch, 0.28 * inch],
     )
     signature_block.setStyle(
         TableStyle(
@@ -163,8 +179,8 @@ def build_pdf_signature_seal_qr_grid(
                 ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LINEBELOW", (0, 1), (0, 1), 0.8, _PRIMARY_BLUE),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 1),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ]
@@ -173,8 +189,8 @@ def build_pdf_signature_seal_qr_grid(
 
     seal_block = Table(
         [[seal_cell]],
-        colWidths=[width * 0.30],
-        rowHeights=[1.45 * inch],
+        colWidths=[seal_width],
+        rowHeights=[1.55 * inch],
     )
     seal_block.setStyle(
         TableStyle(
@@ -192,28 +208,29 @@ def build_pdf_signature_seal_qr_grid(
     qr_block = Table(
         [
             [
-                build_pdf_qr(qr_value, size=0.92 * inch),
+                build_pdf_qr(qr_value, size=0.84 * inch),
                 Paragraph(
                     (
-                        '<font size="8" color="#123c7a">Escanee este código para</font><br/>'
-                        '<font size="8" color="#123c7a">verificar la autenticidad</font><br/>'
-                        '<font size="8" color="#123c7a">de este documento.</font><br/><br/>'
-                        '<font size="8" color="#123c7a">Código de verificación:</font><br/>'
-                        f'<font size="10" color="#123c7a"><b>{escape(verification_code)}</b></font>'
+                        '<font size="8.5" color="#123c7a">Escanee este código para</font><br/>'
+                        '<font size="8.5" color="#123c7a">verificar la autenticidad</font><br/>'
+                        '<font size="8.5" color="#123c7a">de este documento.</font><br/><br/>'
+                        '<font size="8.5" color="#123c7a">Código de verificación:</font><br/>'
+                        f'<font size="8.8" color="#123c7a"><b>{escape(verification_code)}</b></font>'
                     ),
-                    ParagraphStyle("PdfQrInfo", fontName="Helvetica", leading=11, textColor=_PRIMARY_BLUE),
+                    ParagraphStyle("PdfQrInfo", fontName="Helvetica", leading=12, textColor=text_blue),
                 ),
             ]
         ],
-        colWidths=[1.12 * inch, width * 0.24],
+        colWidths=[0.94 * inch, qr_width - 0.94 * inch],
+        rowHeights=[1.22 * inch],
     )
     qr_block.setStyle(
         TableStyle(
             [
                 ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ]
@@ -222,18 +239,20 @@ def build_pdf_signature_seal_qr_grid(
 
     grid = Table(
         [[signature_block, seal_block, qr_block]],
-        colWidths=[width * 0.34, width * 0.30, width * 0.36],
-        rowHeights=[1.56 * inch],
+        colWidths=[signature_width, seal_width, qr_width],
+        rowHeights=[1.62 * inch],
     )
     grid.setStyle(
         TableStyle(
             [
-                ("BOX", (0, 0), (-1, -1), 0.8, _PRIMARY_BLUE),
-                ("INNERGRID", (0, 0), (-1, -1), 0.45, colors.HexColor("#c9d8ef")),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (0, 0), 0),
+                ("RIGHTPADDING", (0, 0), (0, 0), 14),
+                ("LEFTPADDING", (1, 0), (1, 0), 8),
+                ("RIGHTPADDING", (1, 0), (1, 0), 8),
+                ("LEFTPADDING", (2, 0), (2, 0), 10),
+                ("RIGHTPADDING", (2, 0), (2, 0), 0),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ]
@@ -305,42 +324,48 @@ def build_pdf_footer_bar(
     notice: str = "Documento generado automáticamente por el sistema.",
 ) -> Table:
     building = building or {}
+    building_name = get_building_name(building)
     address = building.get("address") or ""
     phone = building.get("phone") or ""
     email = building.get("email") or ""
-    website = building.get("website") or building.get("web") or ""
+    website = building.get("website") or building.get("web") or get_app_url()
 
     left_contact = Paragraph(
-        f'<font size="7" color="#123c7a">📍 {escape(address) if address else "Sin dirección registrada"}</font>',
-        ParagraphStyle("PdfFooterAddress", fontName="Helvetica", fontSize=7, leading=9, textColor=_PRIMARY_BLUE),
+        (
+            f'<font size="7.6" color="#123c7a"><b>{escape(building_name)}</b></font><br/>'
+            f'<font size="7.4" color="#123c7a">{escape(address) if address else "Sin dirección registrada"}</font>'
+        ),
+        ParagraphStyle("PdfFooterAddress", fontName="Helvetica", fontSize=7.4, leading=9.4, textColor=_PRIMARY_BLUE),
     )
     middle_contact = Paragraph(
         (
-            f'<font size="7" color="#123c7a">☎ {escape(phone) if phone else "Sin teléfono"}</font><br/>'
-            f'<font size="7" color="#123c7a">✉ {escape(email) if email else "Sin correo"}</font>'
+            f'<font size="7.4" color="#123c7a">Tel. {escape(phone) if phone else "Sin teléfono"}</font><br/>'
+            f'<font size="7.4" color="#123c7a">Email. {escape(email) if email else "Sin correo"}</font>'
         ),
-        ParagraphStyle("PdfFooterMiddle", fontName="Helvetica", fontSize=7, leading=9, textColor=_PRIMARY_BLUE),
+        ParagraphStyle("PdfFooterMiddle", fontName="Helvetica", fontSize=7.4, leading=9.4, textColor=_PRIMARY_BLUE),
     )
-    right_text = website or page_text
     right_contact = Paragraph(
-        f'<font size="7" color="#123c7a">🌐 {escape(right_text)}</font>',
-        ParagraphStyle("PdfFooterRight", fontName="Helvetica", fontSize=7, leading=9, alignment=2, textColor=_PRIMARY_BLUE),
+        (
+            f'<font size="7.6" color="#123c7a"><b>{escape(website)}</b></font><br/>'
+            f'<font size="6.8" color="#6b7280">{escape(page_text)}</font>'
+        ),
+        ParagraphStyle("PdfFooterRight", fontName="Helvetica", fontSize=7.4, leading=9.2, alignment=2, textColor=_PRIMARY_BLUE),
     )
 
     footer = Table(
         [[left_contact, middle_contact, right_contact]],
         colWidths=[width * 0.38, width * 0.34, width * 0.28],
-        rowHeights=[0.52 * inch],
+        rowHeights=[0.50 * inch],
     )
     footer.setStyle(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, -1), colors.white),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LINEABOVE", (0, 0), (-1, 0), 0.9, colors.HexColor("#123c7a")),
-                ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#c8d6e8")),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("LINEABOVE", (0, 0), (-1, 0), 0.9, _PRIMARY_BLUE),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.5, _LIGHT_BORDER),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
                 ("TOPPADDING", (0, 0), (-1, -1), 4),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ]

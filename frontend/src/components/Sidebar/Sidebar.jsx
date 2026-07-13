@@ -147,6 +147,7 @@ const ADMIN_LINKS = [
   { to: '/admin/expenses', label: 'Gastos', Icon: IconExpenses },
   { to: '/admin/announcements', label: 'Avisos', Icon: IconAnnouncements },
   { to: '/admin/events', label: 'Eventos', Icon: IconCalendar },
+  { to: '/admin/cameras', label: 'Cámaras', Icon: IconCameras },
 ];
 
 const OWNER_LINKS = [

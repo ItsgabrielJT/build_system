@@ -145,39 +145,98 @@ class AccountStatementService:
         owner["last_payment"] = dict(last_payment) if last_payment else None
         return owner
 
-    def _doc_header(self, title: str, doc_no: str, building: dict | None, width: float) -> Table:
+    def _doc_header(
+        self,
+        title: str,
+        doc_no: str,
+        building: dict | None,
+        width: float,
+        *,
+        alert_message: str | None = None,
+        alert_label: str | None = None,
+        alert_color: str = "#2f9b43",
+    ) -> Table:
         building_name = get_building_name(building)
-        logo = get_building_logo(building, max_width=4.2 * cm, max_height=2.6 * cm)
+        logo = get_building_logo(building, max_width=4.0 * cm, max_height=2.55 * cm)
         if not logo:
             logo = self._p(
-                f"<font size='15'><b>{escape(building_name.upper())}</b></font><br/>Administración del Edificio",
-                10,
+                f"<font size='14'><b>{escape(building_name.upper())}</b></font><br/><font size='8'>Administración del Edificio</font>",
+                9,
                 raw=True,
             )
-        name_block = self._p(
-            f"<font size='15'><b>{escape(building_name.upper())}</b></font><br/>Administración del Edificio",
-            10,
-            raw=True,
-        )
-        left_width = width * 0.62
-        left = Table([[logo, name_block]], colWidths=[4.5 * cm, max(left_width - 4.5 * cm, 1 * cm)])
+
+        left_width = width * 0.23
+        center_width = width * 0.45
+        right_width = width * 0.32
+
+        left = Table([[logo]], colWidths=[left_width])
         left.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
         ]))
+
+        center_rows = [
+            [
+                self._p(
+                    f"<font size='16'><b>{escape(title.upper()).replace(' DE ', ' DE<br/>')}</b></font>",
+                    12,
+                    color="#092b62",
+                    align="CENTER",
+                    raw=True,
+                )
+            ]
+        ]
+        row_heights = [1.32 * cm]
+        if alert_message or alert_label:
+            alert_width = max(center_width * 0.78, 1 * cm)
+            alert = Table(
+                [
+                    [self._p(alert_message or "", 6, color="#092b62", align="CENTER")],
+                    [self._p(alert_label or "", 12, bold=True, color="#ffffff", align="CENTER")],
+                ],
+                colWidths=[alert_width],
+                rowHeights=[0.70 * cm, 0.62 * cm],
+            )
+            alert.setStyle(TableStyle([
+                ("BACKGROUND", (0, 1), (0, 1), colors.HexColor(alert_color)),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#d4dfef")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]))
+            center_rows.append([alert])
+            row_heights.append(1.32 * cm)
+
+        center = Table(center_rows, colWidths=[center_width], rowHeights=row_heights)
+        center.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+
         right = self._p(
-            f"<font size='18'><b>{escape(doc_no)}</b></font><br/><br/>Fecha de emisión: {self._spanish_date(date.today())}<br/>Documento emitido automáticamente",
-            11,
+            f"<font size='15'><b>{escape(doc_no)}</b></font><br/><br/>Fecha de emisión: {self._spanish_date(date.today())}<br/>Documento emitido automáticamente",
+            10,
             align="RIGHT",
             raw=True,
         )
-        header = Table([[left, right]], colWidths=[left_width, width * 0.38])
+        header = Table([[left, center, right]], colWidths=[left_width, center_width, right_width])
         header.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BOX", (0, 0), (-1, -1), 0.9, colors.HexColor("#123c7a")),
             ("LINEBEFORE", (1, 0), (1, 0), 0.7, colors.HexColor("#9aa8bd")),
-            ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor("#d4dfef")),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+            ("LINEBEFORE", (2, 0), (2, 0), 0.7, colors.HexColor("#9aa8bd")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ]))
         return header
 
@@ -204,13 +263,14 @@ class AccountStatementService:
             ),
         )
 
+        info_width = 4.3 * cm
         info_table = Table(
             [
                 [self._p("Documento", 8, bold=True, color="#123c7a", align="LEFT")],
                 [self._p(doc_no, 10, bold=True, color="#123c7a", align="LEFT")],
                 [self._p("Documento emitido automaticamente", 8, color="#4b5563", align="LEFT")],
             ],
-            colWidths=[4.3 * cm],
+            colWidths=[info_width],
         )
         info_table.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#123c7a")),
@@ -221,17 +281,19 @@ class AccountStatementService:
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
-        header = Table([[logo, title_block, info_table]], colWidths=[3.2 * cm, width - 7.5 * cm, 4.3 * cm])
+        header = Table([[logo, title_block, info_table]], colWidths=[3.2 * cm, width - 7.5 * cm, info_width])
         header.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 1.2, colors.HexColor("#123c7a")),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("ALIGN", (0, 0), (1, -1), "CENTER"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (2, 0), (2, 0), 0),
+            ("RIGHTPADDING", (2, 0), (2, 0), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
             ("LINEAFTER", (0, 0), (0, 0), 0.8, colors.HexColor("#123c7a")),
             ("LINEAFTER", (1, 0), (1, 0), 0.8, colors.HexColor("#123c7a")),
-            ("LINEBELOW", (0, 0), (-1, -1), 1.2, colors.HexColor("#123c7a")),
         ]))
         return [header, Spacer(1, 0.2 * cm)]
 
@@ -359,15 +421,20 @@ class AccountStatementService:
         output = io.BytesIO()
         width = A4[0] - 2 * cm
         doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1 * cm, rightMargin=1 * cm, topMargin=0.7 * cm, bottomMargin=0.7 * cm)
-        story = [self._doc_header("Certificado de Expensas", f"N. CE-{date.today().year}-000312", building, width)]
-        story.append(self._p("<font size='27'><b>CERTIFICADO DE EXPENSAS</b></font>", 18, color="#092b62", align="CENTER", raw=True))
         status_label = "AL DÍA" if balance <= 0 else "PENDIENTE"
         status_color = "#2f9b43" if balance <= 0 else "#d23b3b"
-        story.append(Spacer(1, 0.2 * cm))
-        intro = Table([[self._p("Este certificado se genera automáticamente únicamente cuando el copropietario se encuentra al día en todas sus obligaciones.", 9, align="CENTER"), self._p(status_label, 18, bold=True, color="#ffffff", align="CENTER")]], colWidths=[width * 0.68, width * 0.22])
-        intro.setStyle(TableStyle([("BACKGROUND", (1, 0), (1, 0), colors.HexColor(status_color)), ("BOX", (1, 0), (1, 0), 0.5, colors.HexColor(status_color)), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (1, 0), (1, 0), 7), ("BOTTOMPADDING", (1, 0), (1, 0), 7)]))
-        story.append(intro)
-        story.append(Spacer(1, 0.25 * cm))
+        story = [
+            self._doc_header(
+                "Certificado de Expensas",
+                f"N. CE-{date.today().year}-000312",
+                building,
+                width,
+                alert_message="Este certificado se genera automáticamente únicamente cuando el copropietario se encuentra al día en todas sus obligaciones.",
+                alert_label=status_label,
+                alert_color=status_color,
+            ),
+            Spacer(1, 0.25 * cm),
+        ]
         story.append(self._p("La Administración del Edificio Torres Netanya certifica que el/la copropietario/a detallado/a en el presente documento se encuentra al día en el pago de alícuotas, expensas ordinarias y demás obligaciones registradas en el sistema, a la fecha de emisión de este certificado.", 10, align="JUSTIFY", color="#222222"))
         story.append(Spacer(1, 0.25 * cm))
         story.append(HRFlowable(width=width, thickness=0.7, color=colors.HexColor("#9aa8bd")))

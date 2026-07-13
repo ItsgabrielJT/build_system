@@ -156,13 +156,14 @@ class ReportService:
                 color="#092b62",
                 raw=True,
             )
+        info_width = 4.1 * cm
         info = Table(
             [
                 [self._p("Formatos: Habittauio", 8, bold=True, align="LEFT")],
                 [self._p("Fecha de impresión", 8, bold=True, align="LEFT")],
                 [self._p(self._spanish_date(generated.date()), 8, align="LEFT")],
             ],
-            colWidths=[4.1 * cm],
+            colWidths=[info_width],
         )
         info.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE),
@@ -180,13 +181,18 @@ class ReportService:
             align="LEFT",
             raw=True,
         )
-        header = Table([[logo, title_block, info]], colWidths=[3.3 * cm, width - 7.9 * cm, 4.6 * cm])
+        header = Table([[logo, title_block, info]], colWidths=[3.3 * cm, width - 7.4 * cm, info_width])
         header.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 1.2, _PDF_BLUE),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("LINEAFTER", (0, 0), (0, 0), 0.8, _PDF_BORDER),
-            ("LINEBELOW", (0, 0), (-1, -1), 1.3, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (2, 0), (2, 0), 0),
+            ("RIGHTPADDING", (2, 0), (2, 0), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("LINEAFTER", (0, 0), (0, 0), 0.8, _PDF_BLUE),
+            ("LINEAFTER", (1, 0), (1, 0), 0.8, _PDF_BLUE),
         ]))
         return [header, Spacer(1, 0.25 * cm)]
 
@@ -222,6 +228,7 @@ class ReportService:
             ),
         )
 
+        info_width = 4.3 * cm
         info_table = Table(
             [
                 [self._p("Formatos: Habittauio", 8, bold=True, align="LEFT", raw=True)],
@@ -229,7 +236,7 @@ class ReportService:
                 [self._p(self._spanish_date(datetime.now().date()), 8, align="LEFT", raw=True)],
                 [self._p(escape(right_text or ""), 8, align="LEFT", raw=True)] if right_text else [self._p("", 8, align="LEFT", raw=True)],
             ],
-            colWidths=[4.3 * cm],
+            colWidths=[info_width],
         )
         info_table.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE),
@@ -243,18 +250,20 @@ class ReportService:
 
         header = Table(
             [[logo, title_block, info_table]],
-            colWidths=[3.2 * cm, width - 7.5 * cm, 4.3 * cm],
+            colWidths=[3.2 * cm, width - 7.5 * cm, info_width],
         )
         header.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 1.2, _PDF_BLUE),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ALIGN", (0, 0), (1, -1), "CENTER"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (2, 0), (2, 0), 0),
+            ("RIGHTPADDING", (2, 0), (2, 0), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
             ("LINEAFTER", (0, 0), (0, 0), 0.8, _PDF_BLUE),
             ("LINEAFTER", (1, 0), (1, 0), 0.8, _PDF_BLUE),
-            ("LINEBELOW", (0, 0), (-1, -1), 1.2, _PDF_BLUE),
         ]))
         return [header, Spacer(1, 0.28 * cm)]
 
@@ -1073,15 +1082,12 @@ class ReportService:
             # Fallback resiliente para evitar errores 500 por problemas de layout PDF.
             output = io.BytesIO()
             doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.6 * inch, bottomMargin=0.6 * inch)
-            styles = getSampleStyleSheet()
             building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
-            story = [
-                Paragraph("Reporte de Gastos", styles["Title"]),
-                Spacer(1, 0.14 * inch),
-                Paragraph(f"Rango: {self._date_label(period, start_date, end_date)}", styles["Normal"]),
-                Paragraph(f"Total egresos: {self._money(total)}", styles["Normal"]),
-                Spacer(1, 0.2 * inch),
-            ]
+            story = await self._pdf_header(
+                "Reporte de Gastos",
+                f"Rango: {self._date_label(period, start_date, end_date)} | Total egresos: {self._money(total)}",
+                doc.width,
+            )
 
             table_data = [["Fecha", "Proveedor", "Categoría", "Concepto", "Monto"]]
             for item in expenses[:40]:

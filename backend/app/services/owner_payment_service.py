@@ -379,11 +379,14 @@ class OwnerPaymentService:
         header.setStyle(
             TableStyle(
                 [
+                    ("BOX", (0, 0), (-1, -1), 1.2, _PRIMARY_BLUE),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 0),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                    ("LINEAFTER", (0, 0), (0, 0), 0.8, _PRIMARY_BLUE),
+                    ("LINEAFTER", (1, 0), (1, 0), 0.8, _PRIMARY_BLUE),
                 ]
             )
         )
@@ -438,14 +441,15 @@ class OwnerPaymentService:
         header.setStyle(
             TableStyle(
                 [
+                    ("BOX", (0, 0), (-1, -1), 1.2, _PRIMARY_BLUE),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("ALIGN", (0, 0), (1, 0), "CENTER"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 0),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                    ("LINEAFTER", (0, 0), (0, 0), 0.8, colors.HexColor("#d8e3f2")),
-                    ("LINEBELOW", (0, 0), (-1, -1), 1.2, _PRIMARY_BLUE),
+                    ("LINEAFTER", (0, 0), (0, 0), 0.8, _PRIMARY_BLUE),
+                    ("LINEAFTER", (1, 0), (1, 0), 0.8, _PRIMARY_BLUE),
                 ]
             )
         )

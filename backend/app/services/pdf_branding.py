@@ -282,38 +282,66 @@ def build_pdf_brand_header(
     width: float,
 ) -> list:
     building = building or {}
-    logo_cell = get_building_logo(building, max_width=1.2 * inch, max_height=0.75 * inch)
+    logo_width = min(max(width * 0.20, 1.45 * inch), 1.70 * inch)
+    logo_cell = get_building_logo(
+        building,
+        max_width=max(logo_width - 0.34 * inch, 0.85 * inch),
+        max_height=1.02 * inch,
+    )
 
-    text = Paragraph(
-        (
-            f'<font size="16"><b>{escape(title)}</b></font><br/>'
-            f'<font size="8" color="#6b7280">{escape(subtitle)}</font>'
-        ),
+    title_cell = Paragraph(
+        f'<font size="18" color="#123c7a"><b>{escape(title)}</b></font>',
         ParagraphStyle(
-            "PdfBrandHeaderText",
-            fontName="Helvetica",
-            leading=14,
+            "PdfBrandHeaderTitle",
+            fontName="Helvetica-Bold",
+            leading=22,
+            alignment=1,
             textColor=_PRIMARY_BLUE,
         ),
     )
-    logo_width = 1.45 * inch
+    subtitle_cell = Paragraph(
+        f'<font size="9.2" color="#123c7a">{escape(subtitle)}</font>',
+        ParagraphStyle(
+            "PdfBrandHeaderSubtitle",
+            fontName="Helvetica",
+            leading=12,
+            alignment=1,
+            textColor=_PRIMARY_BLUE,
+        ),
+    )
     header = Table(
-        [[logo_cell, text]],
+        [
+            [logo_cell, title_cell],
+            ["", subtitle_cell],
+        ],
         colWidths=[logo_width, max(width - logo_width, 1 * inch)],
+        rowHeights=[0.78 * inch, 0.62 * inch],
     )
     header.setStyle(
         TableStyle(
             [
+                ("BOX", (0, 0), (-1, -1), 1.05, _PRIMARY_BLUE),
+                ("SPAN", (0, 0), (0, 1)),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-                ("LINEBELOW", (0, 0), (-1, -1), 1.4, _PRIMARY_BLUE),
+                ("ALIGN", (0, 0), (0, 1), "CENTER"),
+                ("LINEAFTER", (0, 0), (0, 1), 1.0, _PRIMARY_BLUE),
+                ("LINEBELOW", (1, 0), (1, 0), 0.8, _PRIMARY_BLUE),
+                ("LEFTPADDING", (0, 0), (0, 1), 12),
+                ("RIGHTPADDING", (0, 0), (0, 1), 12),
+                ("TOPPADDING", (0, 0), (0, 1), 10),
+                ("BOTTOMPADDING", (0, 0), (0, 1), 10),
+                ("LEFTPADDING", (1, 0), (1, 0), 14),
+                ("RIGHTPADDING", (1, 0), (1, 0), 14),
+                ("TOPPADDING", (1, 0), (1, 0), 12),
+                ("BOTTOMPADDING", (1, 0), (1, 0), 8),
+                ("LEFTPADDING", (1, 1), (1, 1), 14),
+                ("RIGHTPADDING", (1, 1), (1, 1), 14),
+                ("TOPPADDING", (1, 1), (1, 1), 8),
+                ("BOTTOMPADDING", (1, 1), (1, 1), 10),
             ]
         )
     )
-    return [header, Spacer(1, 0.2 * inch)]
+    return [header, Spacer(1, 0.22 * inch)]
 
 
 def build_pdf_footer_bar(

@@ -27,6 +27,16 @@ class NotificationRepository:
         data["recipient"] = data.get("target_user_id") or data.get("target_role")
         return data
 
+    @staticmethod
+    def _get_reference_id(metadata: Optional[dict]) -> str | None:
+        if not metadata:
+            return None
+        return (
+            metadata.get("payment_id")
+            or metadata.get("event_id")
+            or metadata.get("announcement_id")
+        )
+
     async def create(
         self,
         notification_type: str,
@@ -46,7 +56,7 @@ class NotificationRepository:
         else:
             target_role = "PROPIETARIO"
             target_user_id = None if recipient == "PROPIETARIO" else recipient
-        reference_id = metadata.get("payment_id") if metadata else None
+        reference_id = self._get_reference_id(metadata)
 
         row = await self._conn.fetchrow(
             """
@@ -112,7 +122,11 @@ class NotificationRepository:
         rows = await self._conn.fetch(
             """
             SELECT * FROM notifications
-            WHERE (target_user_id = $1 OR target_role = 'PROPIETARIO') AND read_at IS NULL
+            WHERE (
+                target_user_id = $1
+                OR (target_user_id IS NULL AND target_role = 'PROPIETARIO')
+            )
+            AND read_at IS NULL
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
             """,
@@ -123,7 +137,11 @@ class NotificationRepository:
         total = await self._conn.fetchval(
             """
             SELECT COUNT(*) FROM notifications
-            WHERE (target_user_id = $1 OR target_role = 'PROPIETARIO') AND read_at IS NULL
+            WHERE (
+                target_user_id = $1
+                OR (target_user_id IS NULL AND target_role = 'PROPIETARIO')
+            )
+            AND read_at IS NULL
             """,
             user_id,
         )

@@ -2,6 +2,24 @@
   color: #10224a;
 }
 
+.loading {
+  color: #657696;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 24px;
+}
+
+.errorBanner {
+  background: #fff3f3;
+  border: 1px solid #ffd6d6;
+  border-radius: 8px;
+  color: #a03333;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+}
+
 .title {
   margin: 0;
   color: #073276;

@@ -71,11 +71,13 @@ async def create_event(
         end_time=end_t,
     )
 
+    owner_ids = list(dict.fromkeys(data.owner_ids))
+
     # Assign to owners
-    await event_repo.assign_to_owners(event["id"], data.owner_ids)
+    await event_repo.assign_to_owners(event["id"], owner_ids)
 
     # Fetch and notify assigned owners
-    for owner_id in data.owner_ids:
+    for owner_id in owner_ids:
         owner = await owner_repo.get_by_id(owner_id)
         if owner:
             # 1. Send Email Notification
@@ -91,14 +93,14 @@ async def create_event(
                 )
 
             # 2. In-App Notification (only if owner is linked to a user account)
-            recipient = owner.get("firebase_uid") or str(owner_id)
-            await notification_repo.create(
-                notification_type="EVENTO_ASIGNADO",
-                title=f"Nuevo evento: {data.title}",
-                recipient=recipient,
-                body=f"Tienes un evento asignado para el {data.event_date} de {data.start_time} a {data.end_time}.",
-                metadata={"event_id": str(event["id"])},
-            )
+            if owner.get("firebase_uid"):
+                await notification_repo.create(
+                    notification_type="EVENTO_ASIGNADO",
+                    title=f"Nuevo evento: {data.title}",
+                    recipient=owner["firebase_uid"],
+                    body=f"Tienes un evento asignado para el {data.event_date} de {data.start_time} a {data.end_time}.",
+                    metadata={"event_id": str(event["id"])},
+                )
 
     return event
 

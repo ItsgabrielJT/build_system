@@ -1,6 +1,52 @@
+import { useEffect, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { getBuildingConfig } from '../../services/buildingService';
 import styles from './OwnerHelpPage.module.css';
 
 export default function OwnerHelpPage() {
+  const { token } = useAuth();
+  const [building, setBuilding] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBuildingConfig() {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        const config = await getBuildingConfig(token);
+        if (!cancelled) setBuilding(config);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.response?.data?.detail || 'No se pudo cargar la información de contacto.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadBuildingConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const supportEmail = building?.email?.trim();
+  const supportPhone = building?.phone?.trim();
+  const buildingName = building?.name?.trim() || 'Administración';
+  const buildingAddress = building?.address?.trim();
+
+  if (loading) {
+    return <div className={styles.loading}>Cargando centro de ayuda...</div>;
+  }
+
   return (
     <div className={styles.page}>
       <header>
@@ -11,22 +57,39 @@ export default function OwnerHelpPage() {
       <div className={styles.grid}>
         <section className={styles.card}>
           <h2>Soporte / contacto</h2>
+          {error ? <div className={styles.errorBanner}>{error}</div> : null}
           <div className={styles.infoRow}>
             <span className={styles.icon}>✉</span>
             <div>
               <h3>Correo de Soporte</h3>
-              <p><a href="mailto:soporte@torresnetanya.com">soporte@torresnetanya.com</a></p>
-              <span className={styles.tag}>Soporte administrativo</span>
+              <p>
+                {supportEmail ? (
+                  <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
+                ) : (
+                  'Correo no configurado'
+                )}
+              </p>
+              <span className={styles.tag}>{buildingName}</span>
             </div>
           </div>
           <div className={styles.infoRow}>
             <span className={styles.icon}>📞</span>
             <div>
               <h3>Teléfono</h3>
-              <p>+593 99 295 3596</p>
-              <span className={styles.tag}>Lunes a viernes: 08:00 - 17:00</span>
+              <p>{supportPhone || 'Teléfono no configurado'}</p>
+              <span className={styles.tag}>Soporte administrativo</span>
             </div>
           </div>
+          {buildingAddress ? (
+            <div className={styles.infoRow}>
+              <span className={styles.icon}>⌂</span>
+              <div>
+                <h3>Dirección</h3>
+                <p>{buildingAddress}</p>
+                <span className={styles.tag}>Ubicación del edificio</span>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className={styles.card}>

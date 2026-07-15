@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import calendar
 import csv
 import io
+import math
 import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -16,6 +18,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm, inch
 from reportlab.platypus import HRFlowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.lib import colors
+from reportlab.graphics.shapes import Drawing, Rect, String, Line, Circle
 
 from app.repositories.expense_repository import ExpenseRepository
 from app.repositories.income_repository import IncomeRepository
@@ -1020,27 +1023,255 @@ class ReportService:
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
+    def _draw_horizontal_bar(self, val: float, max_val: float, width: float, is_percent: bool = False, color="#1155d9") -> Drawing:
+        def format_short_val(v: float) -> str:
+            v = float(v)
+            if abs(v) >= 1_000_000:
+                return f"{v / 1_000_000:.1f}M".replace(".0", "")
+            elif abs(v) >= 1_000:
+                return f"{v / 1_000:.1f}k".replace(".0", "")
+            else:
+                return f"{int(v)}"
+
+        d = Drawing(width, 22)
+        d.add(Rect(0, 10, width, 5, fillColor=colors.HexColor("#e2e8f0"), strokeColor=None))
+        fill_width = (val / max_val) * width if max_val > 0 else 0
+        fill_width = min(max(fill_width, 0), width)
+        if fill_width > 0:
+            d.add(Rect(0, 10, fill_width, 5, fillColor=colors.HexColor(color), strokeColor=None))
+        for pct in [0.0, 0.25, 0.50, 0.75, 1.0]:
+            x = pct * width
+            d.add(Line(x, 10, x, 7, strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+            tick_val = pct * max_val
+            if is_percent:
+                lbl = f"{int(tick_val)}%"
+            else:
+                lbl = format_short_val(tick_val)
+            d.add(String(x, 0, lbl, fontName="Helvetica", fontSize=5.5, fillColor=colors.HexColor("#64748b"), textAnchor="middle"))
+        return d
+
+    def _build_metric_card(self, title: str, value: str, subtitle: str, icon_char: str, card_width: float) -> Table:
+        icon_drawing = Drawing(24, 24)
+        icon_drawing.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_drawing.add(String(12, 8.5, icon_char, fontName="Helvetica-Bold", fontSize=10, fillColor=colors.HexColor("#475569"), textAnchor="middle"))
+        
+        # Calculate dynamic font size based on value length to prevent overflow/wrap
+        font_size = 9.5
+        if len(value) > 16:
+            font_size = 7.0
+        elif len(value) > 12:
+            font_size = 8.0
+
+        card_data = [
+            [icon_drawing],
+            [self._p(title.upper(), 5.5, bold=True, color="#475569", align="CENTER")],
+            [self._p(value, font_size, bold=True, color="#0f172a", align="CENTER")],
+            [self._p(subtitle, 5.5, color="#64748b", align="CENTER")]
+        ]
+        
+        card_table = Table(card_data, colWidths=[card_width])
+        card_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        return card_table
+
+    def _draw_comparison_table(
+        self,
+        prev_name: str,
+        curr_name: str,
+        metrics: list[dict],
+        width: float,
+    ) -> Table:
+        max_currency = max(
+            [float(m["current"]) for m in metrics if not m["is_percent"]] +
+            [float(m["previous"]) for m in metrics if not m["is_percent"]] +
+            [100.0]
+        )
+        max_val_currency = self._round_to_nice_max(max_currency * 1.1)
+        
+        data = [
+            [
+                self._p("COMPARATIVO CON EL MES ANTERIOR", 8, bold=True, color="#ffffff"),
+                "",
+                "",
+                self._p(f"Comparar períodos: {prev_name} - {curr_name}", 8, bold=True, color="#ffffff", align="RIGHT"),
+                ""
+            ],
+            [
+                self._p("Indicador", 7.5, bold=True, color="#ffffff"),
+                self._p(f"Mes Anterior\n({prev_name})", 7.5, bold=True, color="#ffffff", align="CENTER"),
+                self._p(f"Mes Actual\n({curr_name})", 7.5, bold=True, color="#ffffff", align="CENTER"),
+                self._p("Variación (USD)", 7.5, bold=True, color="#ffffff", align="RIGHT"),
+                self._p("Variación (%)", 7.5, bold=True, color="#ffffff", align="RIGHT")
+            ]
+        ]
+        
+        col_w0 = width * 0.22
+        col_w1 = width * 0.28
+        col_w2 = width * 0.28
+        col_w3 = width * 0.11
+        col_w4 = width * 0.11
+        
+        comp_style = [
+            ("SPAN", (0, 0), (2, 0)),
+            ("SPAN", (3, 0), (4, 0)),
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, 1), _PDF_BLUE),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (1, 0), (2, -1), "CENTER"),
+            ("ALIGN", (3, 0), (4, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("ROWBACKGROUNDS", (0, 2), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]
+        
+        for idx, m in enumerate(metrics):
+            curr_val = float(m["current"])
+            prev_val = float(m["previous"])
+            is_percent = m["is_percent"]
+            inverse = m["inverse"]
+            
+            if is_percent:
+                curr_txt = f"{curr_val:.2f}%"
+                prev_txt = f"{prev_val:.2f}%"
+                diff = curr_val - prev_val
+                pct_diff = diff
+            else:
+                curr_txt = self._usd(curr_val)
+                prev_txt = self._usd(prev_val)
+                diff = curr_val - prev_val
+                pct_diff = (diff / prev_val * 100) if prev_val > 0 else 0.0
+                
+            is_positive_change = diff >= 0
+            if is_positive_change:
+                sign_str = "+"
+                arr_str = "^"
+                if inverse:
+                    var_color = "#9a3412"
+                else:
+                    var_color = "#166534"
+            else:
+                sign_str = ""
+                arr_str = "v"
+                if inverse:
+                    var_color = "#166534"
+                else:
+                    var_color = "#9a3412"
+                    
+            if diff == 0:
+                sign_str = ""
+                arr_str = ""
+                var_color = "#475569"
+                
+            if is_percent:
+                var_usd_txt = "-"
+                var_pct_txt = f"{sign_str}{pct_diff:.2f}% {arr_str}"
+            else:
+                var_usd_txt = f"{sign_str}{self._usd(diff)}"
+                var_pct_txt = f"{sign_str}{pct_diff:.2f}% {arr_str}"
+                
+            bar_max = 100.0 if is_percent else max_val_currency
+            prev_bar = self._draw_horizontal_bar(prev_val, bar_max, col_w1 - 12, is_percent, color="#94a3b8")
+            curr_bar = self._draw_horizontal_bar(curr_val, bar_max, col_w2 - 12, is_percent, color="#1155d9")
+            
+            row_idx = len(data)
+            data.append([
+                self._p(m["label"], 7.5, bold=True, color="#1e293b"),
+                [self._p(prev_txt, 7.5, bold=True, color="#475569", align="CENTER"), prev_bar],
+                [self._p(curr_txt, 7.5, bold=True, color="#0f172a", align="CENTER"), curr_bar],
+                self._p(var_usd_txt, 7, bold=True, color=var_color, align="RIGHT"),
+                self._p(var_pct_txt, 7, bold=True, color=var_color, align="RIGHT")
+            ])
+            
+        table = Table(data, colWidths=[col_w0, col_w1, col_w2, col_w3, col_w4])
+        table.setStyle(TableStyle(comp_style))
+        return table
+
+    def _round_to_nice_max(self, val: float) -> float:
+        if val <= 100:
+            return 100.0
+        elif val <= 500:
+            return 500.0
+        elif val <= 1000:
+            return 1000.0
+        elif val <= 5000:
+            return 5000.0
+        elif val <= 10000:
+            return 10000.0
+        else:
+            return math.ceil(val / 5000) * 5000.0
+
+    def _get_period_dates(self, period: str) -> tuple[date, date]:
+        try:
+            year, month = map(int, period.split("-"))
+            last_day = calendar.monthrange(year, month)[1]
+            return date(year, month, 1), date(year, month, last_day)
+        except Exception:
+            today = date.today()
+            last_day = calendar.monthrange(today.year, today.month)[1]
+            return date(today.year, today.month, 1), date(today.year, today.month, last_day)
+
     async def balance_pdf(
         self,
         period: Optional[str],
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
+        compare_period: Optional[str] = None,
     ) -> bytes:
-        payments = await self._income_entries(period, start_date, end_date)
-        expenses = await self._expenses(period, start_date, end_date)
-
-        total_income = sum(Decimal(str(p.get("amount", 0))) for p in payments)
-        total_expenses = sum(Decimal(str(e.get("amount", 0))) for e in expenses)
-        balance = total_income - total_expenses
-
-        income_by_method = self._build_breakdown(payments, "income_category", "Otros ingresos")
-        expenses_by_category = self._build_breakdown(expenses, "category", "Sin categoría")
-
+        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
+        current_start, current_end = self._get_period_dates(current_period)
+        current_start = start_date or current_start
+        current_end = end_date or current_end
+        
+        compare_period = compare_period or self._previous_period(current_period)
+        compare_start, compare_end = self._get_period_dates(compare_period)
+        
+        # Fetch current period data
+        current_payments = await self._income_entries(current_period, current_start, current_end)
+        current_expenses = await self._expenses(current_period, current_start, current_end)
+        current_fee_details = await self._fees_report_rows(current_start, current_end)
+        
+        # Fetch comparison period data
+        compare_payments = await self._income_entries(compare_period, compare_start, compare_end)
+        compare_expenses = await self._expenses(compare_period, compare_start, compare_end)
+        compare_fee_details = await self._fees_report_rows(compare_start, compare_end)
+        
+        # Calculations for current period
+        total_income_current = sum(Decimal(str(p.get("amount", 0))) for p in current_payments)
+        total_expenses_current = sum(Decimal(str(e.get("amount", 0))) for e in current_expenses)
+        balance_current = total_income_current - total_expenses_current
+        projected_current = sum(Decimal(str(row.get("amount") or 0)) for row in current_fee_details)
+        valores_por_recuperar_current = max(Decimal("0"), projected_current - total_income_current)
+        saldo_con_valores_por_recuperar_current = balance_current + valores_por_recuperar_current
+        efficiency_current = (total_income_current / projected_current * 100) if projected_current > 0 else Decimal("0")
+        
+        # Calculations for comparison period
+        total_income_compare = sum(Decimal(str(p.get("amount", 0))) for p in compare_payments)
+        total_expenses_compare = sum(Decimal(str(e.get("amount", 0))) for e in compare_expenses)
+        balance_compare = total_income_compare - total_expenses_compare
+        projected_compare = sum(Decimal(str(row.get("amount") or 0)) for row in compare_fee_details)
+        valores_por_recuperar_compare = max(Decimal("0"), projected_compare - total_income_compare)
+        saldo_con_valores_por_recuperar_compare = balance_compare + valores_por_recuperar_compare
+        efficiency_compare = (total_income_compare / projected_compare * 100) if projected_compare > 0 else Decimal("0")
+        
         output = io.BytesIO()
         width = A4[0] - 2.2 * cm
         doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
         story = []
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+        
+        # Header - original header formatting preserved
         story.extend(
             await self._three_column_report_header(
                 "BALANCE DE FIN DE MES\nINGRESOS Y EGRESOS",
@@ -1050,43 +1281,313 @@ class ReportService:
                 right_text="Moneda: USD - Dólares",
             )
         )
-        story.append(self._metric_cards([
-            ("Ingreso efectivo por alícuotas", self._usd(total_income), "$"),
-            ("Gastos del mes", self._usd(total_expenses), "▤"),
-            ("Saldo (superávit / déficit)", self._usd(balance), "↕"),
-            ("Estado", "Superávit" if balance >= 0 else "Déficit", "✓"),
-        ], width))
+        
+        # 1. Metric Cards (6 cards in a row)
+        col_w_card = (width / 6) - 5
+        cards = [
+            self._build_metric_card("Ingreso proyectado por alícuotas", self._usd(projected_current), "Proyección del mes", "P", col_w_card),
+            self._build_metric_card("Ingreso efectivo por alícuotas", self._usd(total_income_current), "Recaudado al día de hoy", "$", col_w_card),
+            self._build_metric_card("Gastos del mes", self._usd(total_expenses_current), "Total gastos del mes", "▼", col_w_card),
+            self._build_metric_card("Saldo (superávit / déficit)", self._usd(balance_current), "Superávit del mes" if balance_current >= 0 else "Déficit del mes", "S", col_w_card),
+            self._build_metric_card("Saldo con valores por recuperar", self._usd(saldo_con_valores_por_recuperar_current), "Pendiente por cobrar", "R", col_w_card),
+            self._build_metric_card("Eficiencia en recaudación", f"{float(efficiency_current):.2f}%", "Eficiencia este mes", "%", col_w_card),
+        ]
+        cards_table = Table([cards], colWidths=[width / 6] * 6)
+        cards_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(cards_table)
         story.append(Spacer(1, 0.22 * cm))
-        story.append(self._section_title(f"DETALLE DEL MES - {self._period_name(period).upper() if period else self._date_label(period, start_date, end_date).upper()}", width))
-        rows = [["Concepto", "Monto", "Observación"]]
-        for row in income_by_method or [{"label": "Ingresos por alícuotas", "amount": total_income}]:
-            rows.append([row["label"], self._usd(row["amount"]), "Ingreso operativo"])
-        rows.append(["Total ingresos", self._usd(total_income), "Ingreso operativo"])
-        total_income_row = len(rows) - 1
-        for row in expenses_by_category or [{"label": "Gastos registrados", "amount": total_expenses}]:
-            rows.append([row["label"], self._usd(row["amount"]), "Egreso operativo"])
-        rows.append(["Total egresos", self._usd(total_expenses), "Egreso operativo"])
-        total_expense_row = len(rows) - 1
-        rows.append(["Balance del período", self._usd(balance), "Resultado del mes"])
-        balance_row = len(rows) - 1
-        story.append(self._styled_table(rows, [width * 0.36, width * 0.27, width * 0.37], font_size=8, total_rows=[total_income_row, total_expense_row, balance_row]))
-        story.append(Spacer(1, 0.2 * cm))
-        story.append(self._section_title("Resumen de ingresos y egresos por categoría", width))
-        income_data = [["Ingresos", "Monto (USD)"]] + [[r["label"], self._usd(r["amount"])] for r in income_by_method] + [["Subtotal ingresos", self._usd(total_income)]]
-        expense_data = [["Egresos", "Monto (USD)"]] + [[r["label"], self._usd(r["amount"])] for r in expenses_by_category] + [["Subtotal egresos", self._usd(total_expenses)]]
-        details = Table([[self._styled_table(income_data, [width * 0.32, width * 0.16], font_size=7, total_rows=[len(income_data) - 1]), self._styled_table(expense_data, [width * 0.32, width * 0.16], font_size=7, total_rows=[len(expense_data) - 1])]], colWidths=[width * 0.5, width * 0.5])
+        
+        # Section Title: DETALLE DEL MES
+        curr_period_name = self._period_name(current_period).upper()
+        story.append(self._section_title(f"DETALLE DEL MES - {curr_period_name}", width))
+        
+        # 2. Side-by-side Resúmenes tables (Section 2)
+        income_by_category = self._build_breakdown(current_payments, "income_category", "Otros ingresos")
+        alicuotas_amount = Decimal("0")
+        otros_amount = Decimal("0")
+        for item in income_by_category:
+            if "alícuota" in item["label"].lower() or "pago" in item["label"].lower():
+                alicuotas_amount += item["amount"]
+            else:
+                otros_amount += item["amount"]
+                
+        income_rows = [
+            [self._p("RESUMEN DE INGRESOS (POR CATEGORÍA)", 7.5, bold=True, color="#ffffff"), self._p("↗", 8, bold=True, color="#ffffff", align="RIGHT")],
+            [self._p("Concepto", 7, bold=True, color="#ffffff"), self._p("Monto (USD)", 7, bold=True, color="#ffffff", align="RIGHT")],
+            [self._p("Alícuotas y pagos", 7, color="#1e293b"), self._usd(alicuotas_amount)],
+            [self._p("Otros ingresos", 7, color="#1e293b"), self._usd(otros_amount)],
+            [self._p("Proyección alícuotas del mes", 7, color="#64748b"), self._usd(projected_current)],
+            [self._p("TOTAL INGRESOS EFECTIVOS", 7, bold=True, color="#123c7a"), self._usd(total_income_current)]
+        ]
+        
+        income_table = Table(income_rows, colWidths=[width * 0.485 * 0.68, width * 0.485 * 0.32])
+        income_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, 1), _PDF_BLUE),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("ROWBACKGROUNDS", (0, 2), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        
+        expense_by_category = self._build_breakdown(current_expenses, "category", "Otros")
+        expense_rows = [
+            [self._p("RESUMEN DE EGRESOS (POR CATEGORÍA)", 7.5, bold=True, color="#ffffff"), self._p("↓", 8, bold=True, color="#ffffff", align="RIGHT")],
+            [self._p("Categoría", 7, bold=True, color="#ffffff"), self._p("Monto (USD)", 7, bold=True, color="#ffffff", align="RIGHT")]
+        ]
+        for item in expense_by_category[:3]:
+            expense_rows.append([self._p(item["label"], 7, color="#1e293b"), self._usd(item["amount"])])
+            
+        while len(expense_rows) < 5:
+            expense_rows.append([self._p("-", 7, color="#64748b"), self._usd(0)])
+            
+        expense_rows.append([self._p("TOTAL EGRESOS", 7, bold=True, color="#123c7a"), self._usd(total_expenses_current)])
+        
+        expense_table = Table(expense_rows, colWidths=[width * 0.485 * 0.68, width * 0.485 * 0.32])
+        expense_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, 1), _PDF_BLUE),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("ROWBACKGROUNDS", (0, 2), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        
+        details = Table([[income_table, "", expense_table]], colWidths=[width * 0.485, width * 0.03, width * 0.485])
+        details.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
         story.append(details)
-        story.append(Spacer(1, 0.18 * cm))
-        final = Table([[self._p("SALDO (SUPERÁVIT / DÉFICIT)", 12, bold=True, color="#ffffff"), self._p(self._usd(balance), 17, bold=True, color="#ffffff", align="RIGHT")]], colWidths=[width * 0.52, width * 0.48])
-        final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("LINEBEFORE", (1, 0), (1, 0), 1, colors.white), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
-        story.append(final)
-        story.append(Spacer(1, 0.2 * cm))
-        story.append(self._section_title("Comparativo respecto al mes anterior", width))
-        story.append(self._comparison_table([
-            {"label": "Total ingresos", "current": total_income, "previous": 0},
-            {"label": "Total egresos", "current": total_expenses, "previous": 0},
-            {"label": "Balance neto", "current": abs(balance), "previous": 0},
-        ], width))
+        story.append(Spacer(1, 0.22 * cm))
+        
+        # 3. Middle box section side-by-side (Section 4)
+        saldo_drawing = Drawing(30, 24)
+        saldo_drawing.add(Circle(15, 12, 11, fillColor=colors.HexColor("#e0e7ff"), strokeColor=colors.HexColor("#c7d2fe"), strokeWidth=0.5))
+        saldo_drawing.add(String(15, 8.5, "⚖", fontName="Helvetica-Bold", fontSize=11, fillColor=colors.HexColor("#3730a3"), textAnchor="middle"))
+        
+        card_saldo_data = [
+            [saldo_drawing],
+            [self._p("SALDO (SUPERÁVIT / DÉFICIT)", 6.5, bold=True, color="#475569", align="CENTER")],
+            [self._p(self._usd(balance_current), 11, bold=True, color="#1e3a8a", align="CENTER")],
+            [self._p("Superávit del mes" if balance_current >= 0 else "Déficit del mes", 6, color="#64748b", align="CENTER")]
+        ]
+        card_saldo = Table(card_saldo_data, colWidths=[width * 0.31])
+        card_saldo.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        
+        recuperar_drawing = Drawing(30, 24)
+        recuperar_drawing.add(Circle(15, 12, 11, fillColor=colors.HexColor("#e0e7ff"), strokeColor=colors.HexColor("#c7d2fe"), strokeWidth=0.5))
+        recuperar_drawing.add(String(15, 8.5, "R", fontName="Helvetica-Bold", fontSize=11, fillColor=colors.HexColor("#3730a3"), textAnchor="middle"))
+        
+        card_recuperar_data = [
+            [recuperar_drawing],
+            [self._p("SALDO CON VALORES POR RECUPERAR", 6.5, bold=True, color="#475569", align="CENTER")],
+            [self._p(self._usd(saldo_con_valores_por_recuperar_current), 11, bold=True, color="#1e3a8a", align="CENTER")],
+            [self._p("Pendiente por cobrar", 6, color="#64748b", align="CENTER")]
+        ]
+        card_recuperar = Table(card_recuperar_data, colWidths=[width * 0.31])
+        card_recuperar.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        
+        formula_rows = [
+            [self._p("Ingreso proyectado por alícuotas", 7, color="#334155"), self._p(self._usd(projected_current), 7, bold=True, color="#1e293b", align="RIGHT")],
+            [self._p("(-) Ingreso efectivo por alícuotas", 7, color="#334155"), self._p(self._usd(total_income_current), 7, bold=True, color="#1e293b", align="RIGHT")],
+            [self._p("(-) Gastos del mes", 7, color="#334155"), self._p(self._usd(total_expenses_current), 7, bold=True, color="#1e293b", align="RIGHT")],
+            [self._p("SALDO (SUPERÁVIT / DÉFICIT)", 7.5, bold=True, color="#ffffff"), self._p(self._usd(balance_current), 7.5, bold=True, color="#ffffff", align="RIGHT")]
+        ]
+        formula_table = Table(formula_rows, colWidths=[width * 0.32 * 0.60, width * 0.32 * 0.40])
+        formula_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("BACKGROUND", (0, 0), (-1, -2), colors.HexColor("#f8fafc")),
+            ("BACKGROUND", (0, -1), (-1, -1), _PDF_NAVY),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        
+        middle_section = Table([
+            [card_saldo, "", card_recuperar, "", formula_table]
+        ], colWidths=[width * 0.31, width * 0.03, width * 0.31, width * 0.03, width * 0.32])
+        middle_section.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(middle_section)
+        story.append(Spacer(1, 0.22 * cm))
+        
+        # 4. Side-by-side details tables (Section 3)
+        alicuotas_detail_rows = [
+            [self._p("DETALLE DE ALÍCUOTAS (POR DEPARTAMENTO)", 7.5, bold=True, color="#ffffff"), "", "", self._p("🏢", 8, bold=True, color="#ffffff", align="CENTER")],
+            [self._p("Departamento", 7, bold=True, color="#ffffff"), self._p("Propietario", 7, bold=True, color="#ffffff"), self._p("Monto (USD)", 7, bold=True, color="#ffffff", align="RIGHT"), self._p("Estado", 7, bold=True, color="#ffffff", align="CENTER")]
+        ]
+        
+        detail_style = [
+            ("SPAN", (0, 0), (2, 0)),
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, 1), _PDF_BLUE),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (1, -1), "LEFT"),
+            ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+            ("ALIGN", (3, 0), (3, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("ROWBACKGROUNDS", (0, 2), (-1, -3), [colors.white, colors.HexColor("#f8fafc")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ]
+        
+        for row in current_fee_details[:8]:
+            apt_code = row.get("apartment_code") or ""
+            owner = row.get("owner_name") or "Sin propietario"
+            amount = row.get("amount") or 0
+            status = row.get("status") or "PENDIENTE"
+            
+            row_idx = len(alicuotas_detail_rows)
+            if status == "PAGADA":
+                status_p = self._p("Pagado", 6, bold=True, color="#166534", align="CENTER")
+                detail_style.append(("BACKGROUND", (3, row_idx), (3, row_idx), colors.HexColor("#dcfce7")))
+            else:
+                status_p = self._p("Pendiente", 6, bold=True, color="#9a3412", align="CENTER")
+                detail_style.append(("BACKGROUND", (3, row_idx), (3, row_idx), colors.HexColor("#fef3c7")))
+                
+            alicuotas_detail_rows.append([
+                self._p(apt_code, 7, color="#1e293b"),
+                self._p(owner[:20] + "..." if len(owner) > 20 else owner, 7, color="#1e293b"),
+                self._usd(amount),
+                status_p
+            ])
+            
+        while len(alicuotas_detail_rows) < 7:
+            alicuotas_detail_rows.append(["-", "-", self._usd(0), "-"])
+            
+        total_rec_idx = len(alicuotas_detail_rows)
+        alicuotas_detail_rows.append([self._p("TOTAL RECAUDADO", 7, bold=True, color="#123c7a"), "", self._usd(total_income_current), ""])
+        detail_style.append(("SPAN", (0, total_rec_idx), (1, total_rec_idx)))
+        detail_style.append(("BACKGROUND", (0, total_rec_idx), (-1, total_rec_idx), colors.HexColor("#e2e8f0")))
+        
+        total_proj_idx = len(alicuotas_detail_rows)
+        alicuotas_detail_rows.append([self._p("TOTAL PROYECTADO (ALÍCUOTAS)", 7, bold=True, color="#123c7a"), "", self._usd(projected_current), ""])
+        detail_style.append(("SPAN", (0, total_proj_idx), (1, total_proj_idx)))
+        detail_style.append(("BACKGROUND", (0, total_proj_idx), (-1, total_proj_idx), colors.HexColor("#e2e8f0")))
+        
+        apartments_table = Table(alicuotas_detail_rows, colWidths=[width * 0.485 * 0.16, width * 0.485 * 0.38, width * 0.485 * 0.26, width * 0.485 * 0.20])
+        apartments_table.setStyle(TableStyle(detail_style))
+        
+        gastos_detail_rows = [
+            [self._p("DETALLE DE GASTOS (POR MOVIMIENTO)", 7.5, bold=True, color="#ffffff"), "", "", self._p("▤", 8, bold=True, color="#ffffff", align="CENTER")],
+            [self._p("Fecha", 7, bold=True, color="#ffffff"), self._p("Concepto", 7, bold=True, color="#ffffff"), self._p("Categoría", 7, bold=True, color="#ffffff"), self._p("Monto (USD)", 7, bold=True, color="#ffffff", align="RIGHT")]
+        ]
+        
+        gastos_style = [
+            ("SPAN", (0, 0), (2, 0)),
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, 1), _PDF_BLUE),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (2, -1), "LEFT"),
+            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("ROWBACKGROUNDS", (0, 2), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ]
+        
+        sorted_expenses = sorted(current_expenses, key=lambda e: e.get("date") or date.min)
+        for e in sorted_expenses[:8]:
+            dt = e.get("date")
+            date_str = dt.strftime("%d/%m/%Y") if hasattr(dt, "strftime") else str(dt or "")
+            concept = e.get("concept") or ""
+            category = e.get("category") or "Sin categoría"
+            amount = e.get("amount") or 0
+            
+            gastos_detail_rows.append([
+                self._p(date_str, 7, color="#1e293b"),
+                self._p(concept[:22] + "..." if len(concept) > 22 else concept, 7, color="#1e293b"),
+                self._p(category, 7, color="#64748b"),
+                self._usd(amount)
+            ])
+            
+        while len(gastos_detail_rows) < len(alicuotas_detail_rows) - 1:
+            gastos_detail_rows.append(["-", "-", "-", self._usd(0)])
+            
+        total_gastos_idx = len(gastos_detail_rows)
+        gastos_detail_rows.append([self._p("TOTAL EGRESOS DEL MES", 7, bold=True, color="#123c7a"), "", "", self._usd(total_expenses_current)])
+        gastos_style.append(("SPAN", (0, total_gastos_idx), (2, total_gastos_idx)))
+        gastos_style.append(("BACKGROUND", (0, total_gastos_idx), (-1, total_gastos_idx), colors.HexColor("#e2e8f0")))
+        
+        expenses_table = Table(gastos_detail_rows, colWidths=[width * 0.485 * 0.16, width * 0.485 * 0.36, width * 0.485 * 0.20, width * 0.485 * 0.28])
+        expenses_table.setStyle(TableStyle(gastos_style))
+        
+        details_apartments_expenses = Table([[apartments_table, "", expenses_table]], colWidths=[width * 0.485, width * 0.03, width * 0.485])
+        details_apartments_expenses.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(details_apartments_expenses)
+        story.append(Spacer(1, 0.22 * cm))
+        
+        # 5. Comparison Section (Section 5)
+        metrics_list = [
+            {"label": "Ingreso efectivo por alícuotas", "current": total_income_current, "previous": total_income_compare, "is_percent": False, "inverse": False},
+            {"label": "Gastos del mes", "current": total_expenses_current, "previous": total_expenses_compare, "is_percent": False, "inverse": True},
+            {"label": "Resultado del mes (Superávit / Déficit)", "current": balance_current, "previous": balance_compare, "is_percent": False, "inverse": False},
+            {"label": "Valores por recuperar", "current": valores_por_recuperar_current, "previous": valores_por_recuperar_compare, "is_percent": False, "inverse": True},
+            {"label": "Eficiencia en recaudación de alícuotas", "current": efficiency_current, "previous": efficiency_compare, "is_percent": True, "inverse": False},
+        ]
+        
+        prev_name_label = self._period_name(compare_period)
+        curr_name_label = self._period_name(current_period)
+        comparison_table = self._draw_comparison_table(prev_name_label, curr_name_label, metrics_list, width)
+        story.append(comparison_table)
+        
+        # Signature block & Footer callbacks - original formatting preserved
         self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-BALANCE", signer_name="Administración", signer_role="Administrador del edificio")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)

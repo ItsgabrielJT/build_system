@@ -216,6 +216,9 @@ export default function AdminReportsPage() {
     setError(null);
     try {
       const params = { start_date: startDate, end_date: endDate, format };
+      if (selectedReport === 'balance') {
+        params.compare_period = comparePeriod;
+      }
       const downloads = {
         delinquency: () => reportService.downloadDelinquencyReport(token, { format }),
         income: () => reportService.downloadIncomeReport(token, params),

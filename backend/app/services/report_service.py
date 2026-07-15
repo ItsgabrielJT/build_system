@@ -568,17 +568,6 @@ class ReportService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> list[dict]:
-        if period and not start_date and not end_date:
-            return await self._monthly_payments(period)
-        if not start_date and not end_date:
-            payments = await self._payment_repo.get_all(period=period, status="REGISTRADO")
-            approved = await self._payment_repo.get_all(period=period, status="APROBADO")
-            return [
-                payment
-                for payment in [*payments, *approved]
-                if self._is_confirmed_payment(payment)
-            ]
-
         conditions = ["p.status IN ('REGISTRADO', 'APROBADO')"]
         params: list = []
         idx = 1
@@ -593,10 +582,11 @@ class ReportService:
         if end_date:
             conditions.append(f"p.paid_at <= ${idx}")
             params.append(end_date)
+            idx += 1
 
         rows = await self._payment_repo._conn.fetch(
             f"""
-            SELECT p.*, a.code AS apartment_code, o.full_name AS owner_name
+            SELECT p.*, a.code AS apartment_code, a.tower AS apartment_tower, o.full_name AS owner_name
             FROM payments p
             JOIN apartments a ON p.apartment_id = a.id
             JOIN owners o ON p.owner_id = o.id
@@ -951,22 +941,123 @@ class ReportService:
 
     # ─── PDF REPORTS ─────────────────────────────────────────────────────────
 
+    def _draw_double_horizontal_bar(self, val_curr: float, val_prev: float, max_val: float, width: float) -> Drawing:
+        d = Drawing(width, 24)
+        # Background track for current month
+        d.add(Rect(0, 14, width, 6, fillColor=colors.HexColor("#f1f5f9"), strokeColor=None))
+        curr_width = (val_curr / max_val) * width if max_val > 0 else 0
+        curr_width = min(max(curr_width, 0), width)
+        if curr_width > 0:
+            d.add(Rect(0, 14, curr_width, 6, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+            
+        # Background track for previous month
+        d.add(Rect(0, 4, width, 6, fillColor=colors.HexColor("#f1f5f9"), strokeColor=None))
+        prev_width = (val_prev / max_val) * width if max_val > 0 else 0
+        prev_width = min(max(prev_width, 0), width)
+        if prev_width > 0:
+            d.add(Rect(0, 4, prev_width, 6, fillColor=colors.HexColor("#b9cdfb"), strokeColor=None))
+            
+        return d
+
+    def _build_income_metric_card(self, title: str, value: str, icon_char: str, card_width: float) -> Table:
+        icon_drawing = Drawing(24, 24)
+        icon_drawing.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_drawing.add(String(12, 8.5, icon_char, fontName="Helvetica-Bold", fontSize=10, fillColor=colors.HexColor("#0b3c7d"), textAnchor="middle"))
+        
+        # Calculate dynamic font size based on value length to prevent overflow/wrap
+        font_size = 11.0
+        if len(value) > 16:
+            font_size = 7.5
+        elif len(value) > 12:
+            font_size = 9.0
+
+        card_data = [
+            [self._p(title.upper(), 6.5, bold=True, color="#ffffff", align="CENTER")],
+            [Table([
+                [icon_drawing, self._p(value, font_size, bold=True, color="#0b3c7d", align="LEFT")]
+            ], colWidths=[28, card_width - 38], style=[
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ])]
+        ]
+        
+        card_table = Table(card_data, colWidths=[card_width])
+        card_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        return card_table
+
+    def _stacked_monto(self, curr_txt: str, prev_txt: str, cell_width: float) -> Table:
+        t = Table([
+            [self._p(curr_txt, 7.5, bold=True, color="#0b3c7d", align="RIGHT")],
+            [self._p(prev_txt, 7, color="#64748b", align="RIGHT")]
+        ], colWidths=[cell_width])
+        t.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ]))
+        return t
+
+    def _build_legend(self, curr_name: str, prev_name: str) -> Table:
+        box_curr = Drawing(8, 8)
+        box_curr.add(Rect(0, 0, 8, 8, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        box_prev = Drawing(8, 8)
+        box_prev.add(Rect(0, 0, 8, 8, fillColor=colors.HexColor("#b9cdfb"), strokeColor=None))
+        
+        legend_table = Table([
+            [box_curr, self._p(f"Mes actual ({curr_name})", 7.5, bold=True, color="#475569"),
+             box_prev, self._p(f"Mes anterior ({prev_name})", 7.5, bold=True, color="#475569")]
+        ], colWidths=[12, 140, 12, 140])
+        legend_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        return legend_table
+
     async def income_pdf(
         self,
         period: Optional[str],
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
+        compare_period: Optional[str] = None,
     ) -> bytes:
-        payments = await self._income_entries(period, start_date, end_date)
-        previous_payments = await self._income_entries(self._previous_period(period), None, None) if period else []
-        total = sum(Decimal(str(p.get("amount", 0))) for p in payments)
-        payments_total = sum(Decimal(str(p.get("amount", 0))) for p in payments if p.get("income_source_type") == "payment")
-        manual_total = total - payments_total
-        by_kind = [
-            {"label": "Ingresos por alícuotas", "amount": payments_total},
-            {"label": "Otros ingresos", "amount": manual_total},
-        ]
-        previous_total = sum(Decimal(str(p.get("amount", 0))) for p in previous_payments)
+        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
+        current_start, current_end = self._get_period_dates(current_period)
+        current_start = start_date or current_start
+        current_end = end_date or current_end
+        
+        compare_period = compare_period or self._previous_period(current_period)
+        compare_start, compare_end = self._get_period_dates(compare_period)
+        
+        # Fetch current and comparison data
+        payments = await self._income_entries(current_period, current_start, current_end)
+        compare_payments = await self._income_entries(compare_period, compare_start, compare_end)
+        
+        total_current = sum(Decimal(str(p.get("amount", 0))) for p in payments)
+        payments_total_current = sum(Decimal(str(p.get("amount", 0))) for p in payments if p.get("income_source_type") == "payment")
+        manual_total_current = total_current - payments_total_current
+        
+        total_compare = sum(Decimal(str(p.get("amount", 0))) for p in compare_payments)
+        payments_total_compare = sum(Decimal(str(p.get("amount", 0))) for p in compare_payments if p.get("income_source_type") == "payment")
+        manual_total_compare = total_compare - payments_total_compare
 
         output = io.BytesIO()
         width = A4[0] - 2.2 * cm
@@ -974,6 +1065,8 @@ class ReportService:
         story = []
 
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+        
+        # Header
         story.extend(
             await self._three_column_report_header(
                 "Reporte Detallado de Ingresos",
@@ -983,42 +1076,220 @@ class ReportService:
                 right_text=f"Período: {self._date_label(period, start_date, end_date)}",
             )
         )
+        
+        # 1. 3 metric cards at the top
         departments = len({p.get("apartment_code") for p in payments if p.get("apartment_code")})
-        story.append(self._metric_cards([
-            ("Departamentos", str(departments), "▦"),
-            ("Ingresos por alícuotas", self._usd(payments_total), "$"),
-            ("Otros ingresos", self._usd(manual_total), "✦"),
-        ], width))
+        col_w_card = (width / 3) - 5
+        cards = [
+            self._build_income_metric_card("Departamentos", str(departments), "🏢", col_w_card),
+            self._build_income_metric_card("Ingresos por alícuotas", self._usd(payments_total_current), "$", col_w_card),
+            self._build_income_metric_card("Otros ingresos", self._usd(manual_total_current), "🎁", col_w_card),
+        ]
+        cards_table = Table([cards], colWidths=[width / 3] * 3)
+        cards_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(cards_table)
         story.append(Spacer(1, 0.25 * cm))
-        story.append(self._section_title("Detalle de ingresos", width))
-        data = [["Torre", "Departamento", "Concepto", "Monto", "Observación"]]
+        
+        # 2. Custom Title with List Icon
+        list_icon = Drawing(16, 16)
+        list_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        list_icon.add(Line(5, 10, 11, 10, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 8, 11, 8, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 6, 11, 6, strokeColor=colors.white, strokeWidth=1))
+        
+        title_table = Table([[list_icon, self._p("Detalle de ingresos", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 200, width - 220])
+        title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(title_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # 3. Detalle de ingresos table (Grouped by Torre)
+        grouped_entries = {}
         for p in payments:
-            apartment = p.get("apartment_code") or ""
-            data.append([
-                apartment.split()[-1] if " " in apartment else "",
-                self._p(apartment, 7),
-                self._p(p.get("income_concept") or f"Alícuota {apartment or p.get('period') or ''}", 7),
-                self._usd(p.get("amount", 0)),
-                self._p(p.get("income_label") or "Ingreso por alícuota", 7),
-            ])
+            is_payment = p.get("income_source_type") == "payment"
+            tower = p.get("apartment_tower") or ""
+            if not is_payment or not tower:
+                group_name = "General"
+            else:
+                group_name = f"TORRE {tower}"
+            
+            if group_name not in grouped_entries:
+                grouped_entries[group_name] = []
+            grouped_entries[group_name].append(p)
+            
+        sorted_groups = sorted([g for g in grouped_entries.keys() if g != "General"])
+        if "General" in grouped_entries:
+            sorted_groups.append("General")
+            
+        data = [["Torre", "Departamento", "Concepto", "Monto", "Observación"]]
+        span_commands = []
+        current_row_idx = 1
+        
+        for g_name in sorted_groups:
+            group_rows = grouped_entries[g_name]
+            group_rows = sorted(group_rows, key=lambda x: x.get("apartment_code") or "")
+            
+            start_row = current_row_idx
+            end_row = start_row + len(group_rows) - 1
+            
+            for p in group_rows:
+                apt_code = p.get("apartment_code") or ""
+                concept = p.get("income_concept") or ""
+                obs = p.get("income_label") or "Ingreso registrado"
+                if g_name == "General":
+                    apt_code = p.get("method") or "Otros ingresos"
+                    concept = p.get("income_concept") or "Otros ingresos"
+                    obs = p.get("income_label") or "Ingresos adicionales"
+                
+                data.append([
+                    g_name,
+                    self._p(apt_code, 7),
+                    self._p(concept, 7),
+                    self._usd(p.get("amount", 0)),
+                    self._p(obs, 7)
+                ])
+                current_row_idx += 1
+                
+            if end_row > start_row:
+                span_commands.append(("SPAN", (0, start_row), (0, end_row)))
+                
         if len(data) == 1:
             data.append(["General", "-", "Sin ingresos registrados", self._usd(0), "-"])
-        story.append(self._styled_table(data[:14], [2.5 * cm, 4 * cm, 5.2 * cm, 3.3 * cm, 4.1 * cm], font_size=7))
+            
+        table_style_commands = [
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (1, 0), (1, -1), "CENTER"),
+            ("ALIGN", (2, 0), (2, -1), "LEFT"),
+            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+            ("ALIGN", (4, 0), (4, -1), "LEFT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("ROWBACKGROUNDS", (1, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ] + span_commands
+        
+        detail_col_widths = [width * 0.18, width * 0.20, width * 0.26, width * 0.18, width * 0.18]
+        story.append(Table(data, colWidths=detail_col_widths, style=TableStyle(table_style_commands)))
         story.append(Spacer(1, 0.18 * cm))
-        total_bar = Table([[self._p("v/p Ingresos consolidados suma", 10, bold=True, align="LEFT"), self._p(self._usd(total), 12, bold=True)]], colWidths=[width * 0.72, width * 0.28])
-        total_bar.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("BACKGROUND", (0, 0), (-1, -1), colors.white)]))
-        story.append(total_bar)
+        
+        # 4. v/p Alícuotas sum box
+        val_alicuotas_box = Table([[self._p("v/p Alícuotas de departamentos suma", 8, bold=True, color="#0b3c7d"), self._p(self._usd(payments_total_current), 9, bold=True, color="#0b3c7d", align="RIGHT")]], colWidths=[width * 0.75, width * 0.25])
+        val_alicuotas_box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(val_alicuotas_box)
         story.append(Spacer(1, 0.22 * cm))
-        story.append(self._section_title("Comparativo respecto al mes anterior", width))
-        story.append(self._comparison_table([
-            {"label": row["label"], "current": row["amount"], "previous": previous_total if index == 0 else 0}
-            for index, row in enumerate(by_kind + [{"label": "Total ingresos", "amount": total}])
-        ], width))
-        story.append(Spacer(1, 0.2 * cm))
-        final = Table([[self._p("Ingresos totales registrados en el período", 11, bold=True, color="#ffffff", align="LEFT"), self._p(self._usd(total), 14, bold=True, color="#ffffff")]], colWidths=[width * 0.72, width * 0.28])
-        final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("LEFTPADDING", (0, 0), (-1, -1), 10)]))
-        story.append(final)
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-INGRESOS", signer_name="Administración", signer_role="Administrador del edificio")
+        
+        # 5. Section: Comparativo respecto al mes anterior
+        chart_icon = Drawing(16, 16)
+        chart_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        chart_icon.add(Rect(5, 4.5, 1.5, 4, fillColor=colors.white, strokeColor=None))
+        chart_icon.add(Rect(7.25, 4.5, 1.5, 7, fillColor=colors.white, strokeColor=None))
+        chart_icon.add(Rect(9.5, 4.5, 1.5, 5, fillColor=colors.white, strokeColor=None))
+        
+        comp_title_table = Table([[chart_icon, self._p("Comparativo respecto al mes anterior", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
+        comp_title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(comp_title_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # Legend Row
+        curr_period_name = self._period_name(current_period)
+        prev_period_name = self._period_name(compare_period)
+        legend_bar = self._build_legend(curr_period_name, prev_period_name)
+        story.append(legend_bar)
+        story.append(Spacer(1, 0.1 * cm))
+        
+        # Comparison Table
+        max_val = max(total_current, total_compare, Decimal("1"))
+        
+        col_comp_w0 = width * 0.25
+        col_comp_w1 = width * 0.55
+        col_comp_w2 = width * 0.20
+        
+        comp_data = [
+            [
+                "", 
+                "", 
+                self._p("Monto", 7.5, bold=True, color="#ffffff", align="CENTER")
+            ],
+            [
+                self._p("Ingresos por alícuotas", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(payments_total_current), float(payments_total_compare), float(max_val), col_comp_w1 - 12),
+                self._stacked_monto(self._usd(payments_total_current), self._usd(payments_total_compare), col_comp_w2 - 12)
+            ],
+            [
+                self._p("Otros ingresos", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(manual_total_current), float(manual_total_compare), float(max_val), col_comp_w1 - 12),
+                self._stacked_monto(self._usd(manual_total_current), self._usd(manual_total_compare), col_comp_w2 - 12)
+            ],
+            [
+                self._p("Total ingresos", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(total_current), float(total_compare), float(max_val), col_comp_w1 - 12),
+                self._stacked_monto(self._usd(total_current), self._usd(total_compare), col_comp_w2 - 12)
+            ]
+        ]
+        
+        comp_table = Table(comp_data, colWidths=[col_comp_w0, col_comp_w1, col_comp_w2])
+        comp_table.setStyle(TableStyle([
+            ("BACKGROUND", (2, 0), (2, 0), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("LINEAFTER", (1, 0), (1, -1), 0.5, _PDF_BORDER),
+            ("BOX", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ]))
+        story.append(comp_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # 6. Full-width total registrados bar
+        total_bar = Table([[self._p("Ingresos totales registrados en el período", 8, bold=True, color="#ffffff"), self._p(self._usd(total_current), 9, bold=True, color="#ffffff", align="RIGHT")]], colWidths=[width * 0.75, width * 0.25])
+        total_bar.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(total_bar)
+        
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-INGRESOS", signer_name="La Administración", signer_role="Período 2026-2027")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()

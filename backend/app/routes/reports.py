@@ -116,6 +116,7 @@ async def report_income(
     period: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    compare_period: Optional[str] = None,
     format: str = "csv",
     _user: dict = Depends(require_admin_or_owner),
     db=Depends(get_db),
@@ -135,7 +136,10 @@ async def report_income(
         content = await service.income_csv(period, start_date, end_date)
         return _csv_response(content, f"{filename_base}.csv")
     elif format == "pdf":
-        content = await service.income_pdf(period, start_date, end_date)
+        if compare_period is not None:
+            content = await service.income_pdf(period, start_date, end_date, compare_period)
+        else:
+            content = await service.income_pdf(period, start_date, end_date)
         return _pdf_response(content, f"{filename_base}.pdf")
     else:  # excel
         content = await service.income_excel(period, start_date, end_date)

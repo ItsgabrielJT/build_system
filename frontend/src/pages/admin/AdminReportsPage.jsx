@@ -216,7 +216,7 @@ export default function AdminReportsPage() {
     setError(null);
     try {
       const params = { start_date: startDate, end_date: endDate, format };
-      if (selectedReport === 'balance') {
+      if (selectedReport === 'balance' || selectedReport === 'income') {
         params.compare_period = comparePeriod;
       }
       const downloads = {

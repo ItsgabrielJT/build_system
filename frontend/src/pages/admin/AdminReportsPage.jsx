@@ -77,6 +77,12 @@ function formatShortMoney(value) {
   })}`;
 }
 
+function formatAxisMoney(value) {
+  const amount = Number(value || 0);
+  if (Math.abs(amount) >= 1000) return `$${(amount / 1000).toFixed(amount % 1000 === 0 ? 0 : 1)}k`;
+  return `$${Math.round(amount)}`;
+}
+
 function formatChange(value) {
   const sign = Number(value) > 0 ? '+' : '';
   return `${sign}${Number(value || 0).toFixed(2)}%`;
@@ -100,6 +106,58 @@ function formatDate(value) {
   const date = new Date(`${normalized}T00:00:00`);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function IconIncome() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 17l6-6 4 4 6-8" />
+      <path d="M14 7h6v6" />
+      <path d="M4 21h16" />
+    </svg>
+  );
+}
+
+function IconExpense() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7l6 6 4-4 6 8" />
+      <path d="M14 17h6v-6" />
+      <path d="M4 3h16" />
+    </svg>
+  );
+}
+
+function IconWallet() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7h15a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12" />
+      <path d="M16 13h5" />
+      <circle cx="17" cy="13" r="1" />
+    </svg>
+  );
+}
+
+function IconRecover() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19" />
+      <circle cx="10" cy="7" r="4" />
+      <circle cx="18" cy="15" r="3" />
+      <path d="M18 13.5v3" />
+      <path d="M16.5 15h3" />
+    </svg>
+  );
+}
+
+function IconPercent() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M19 5L5 19" />
+      <circle cx="7" cy="7" r="2.2" />
+      <circle cx="17" cy="17" r="2.2" />
+    </svg>
+  );
 }
 
 export default function AdminReportsPage() {
@@ -198,14 +256,14 @@ export default function AdminReportsPage() {
       value: formatMoney(summary.total_revenue),
       change: getChangePercent(summary.total_revenue, comparisonSummary.total_revenue),
       tone: 'income',
-      icon: '↗',
+      Icon: IconIncome,
     },
     {
       label: 'Gastos totales',
       value: formatMoney(summary.total_expenses),
       change: getChangePercent(summary.total_expenses, comparisonSummary.total_expenses),
       tone: 'expense',
-      icon: '↘',
+      Icon: IconExpense,
       inverse: true,
     },
     {
@@ -213,14 +271,14 @@ export default function AdminReportsPage() {
       value: formatMoney(summary.net_income),
       change: getChangePercent(summary.net_income, comparisonSummary.net_income),
       tone: 'balance',
-      icon: '▣',
+      Icon: IconWallet,
     },
     {
       label: 'Valor por recuperar',
       value: formatMoney(recoverable),
       change: getChangePercent(recoverable, comparisonRecoverable),
       tone: 'recover',
-      icon: '●',
+      Icon: IconRecover,
       inverse: true,
     },
     {
@@ -228,7 +286,7 @@ export default function AdminReportsPage() {
       value: `${efficiency.toFixed(2)}%`,
       change: efficiency - comparisonEfficiency,
       tone: 'efficiency',
-      icon: '%',
+      Icon: IconPercent,
     },
   ];
 
@@ -288,7 +346,7 @@ export default function AdminReportsPage() {
           const isGood = metric.inverse ? metric.change <= 0 : metric.change >= 0;
           return (
             <article className={styles.metricCard} key={metric.label}>
-              <i className={`${styles.metricIcon} ${styles[`${metric.tone}Icon`]}`}>{metric.icon}</i>
+              <i className={`${styles.metricIcon} ${styles[`${metric.tone}Icon`]}`}><metric.Icon /></i>
               <div>
                 <span>{metric.label}</span>
                 <strong>{metric.value}</strong>
@@ -305,15 +363,15 @@ export default function AdminReportsPage() {
           <div className={styles.panelHeader}>
             <h2>Comparativo del mes</h2>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={comparisonChart} barGap={7}>
+          <ResponsiveContainer width="100%" height={218}>
+            <BarChart data={comparisonChart} barGap={7} barCategoryGap="24%" margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="#e7ebf3" vertical={false} />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} interval={0} />
-              <YAxis tickFormatter={(value) => (Math.abs(value) <= 100 ? `${Math.round(value)}` : formatShortMoney(value))} tickLine={false} axisLine={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} interval={0} height={34} />
+              <YAxis width={52} tickFormatter={(value) => (Math.abs(value) <= 100 ? `${Math.round(value)}` : formatAxisMoney(value))} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
               <Tooltip formatter={(value, name, item) => (item?.payload?.percent ? `${Number(value).toFixed(2)}%` : formatMoney(value))} />
-              <Legend />
-              <Bar dataKey="comparativo" name={getPeriodLabel(comparePeriod)} fill="#b9cdfb" radius={[5, 5, 0, 0]} />
-              <Bar dataKey="actual" name={getPeriodLabel(period)} fill="#1155d9" radius={[5, 5, 0, 0]} />
+              <Legend verticalAlign="top" align="center" height={28} iconType="square" />
+              <Bar dataKey="comparativo" name={getPeriodLabel(comparePeriod)} fill="#b9cdfb" radius={[5, 5, 0, 0]} maxBarSize={38} />
+              <Bar dataKey="actual" name={getPeriodLabel(period)} fill="#1155d9" radius={[5, 5, 0, 0]} maxBarSize={38} />
             </BarChart>
           </ResponsiveContainer>
         </article>
@@ -321,9 +379,9 @@ export default function AdminReportsPage() {
         <article className={styles.panel}>
           <h2>Categorías de gastos</h2>
           <div className={styles.donutLayout}>
-            <ResponsiveContainer width="48%" height={190}>
+            <ResponsiveContainer width="42%" height={164}>
               <PieChart>
-                <Pie data={categories} dataKey="amount" nameKey="category" innerRadius={48} outerRadius={76}>
+                <Pie data={categories} dataKey="amount" nameKey="category" innerRadius={38} outerRadius={60} paddingAngle={1}>
                   {categories.map((entry, index) => (
                     <Cell key={entry.category} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
                   ))}
@@ -351,15 +409,15 @@ export default function AdminReportsPage() {
           <div className={styles.panelHeader}>
             <h2>Emitido vs cobrado</h2>
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={emittedVsCollected} barGap={10}>
+          <ResponsiveContainer width="100%" height={202}>
+            <BarChart data={emittedVsCollected} barGap={10} barCategoryGap="32%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="#ebedf2" vertical={false} />
-              <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={(value) => formatShortMoney(value)} tickLine={false} axisLine={false} />
+              <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} height={30} />
+              <YAxis width={48} tickFormatter={(value) => formatAxisMoney(value)} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
               <Tooltip formatter={(value) => formatMoney(value)} />
-              <Legend />
-              <Bar dataKey="expected" name="Emitido" fill="#b9cdfb" radius={[5, 5, 0, 0]} />
-              <Bar dataKey="collected" name="Cobrado" fill="#1155d9" radius={[5, 5, 0, 0]} />
+              <Legend verticalAlign="top" align="center" height={28} iconType="square" />
+              <Bar dataKey="expected" name="Emitido" fill="#b9cdfb" radius={[5, 5, 0, 0]} maxBarSize={36} />
+              <Bar dataKey="collected" name="Cobrado" fill="#1155d9" radius={[5, 5, 0, 0]} maxBarSize={36} />
             </BarChart>
           </ResponsiveContainer>
         </article>

@@ -132,6 +132,57 @@ async def validate_and_store_building_asset(
     }
 
 
+def _owner_asset_upload_dir() -> Path:
+    path = Path(settings.upload_dir) / "owner_assets"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+async def validate_and_store_owner_asset(
+    file: UploadFile,
+    label: str,
+    *,
+    allowed_content_types: frozenset[str] = _ALLOWED_IMAGE_TYPES,
+) -> dict:
+    """Valida y persiste una imagen de perfil de copropietario."""
+    if file.content_type not in allowed_content_types:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Tipo de archivo no soportado para {label}: {file.content_type}. "
+                f"Tipos permitidos: {', '.join(sorted(allowed_content_types))}"
+            ),
+        )
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"El archivo de {label} está vacío",
+        )
+
+    if len(contents) > _MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"El archivo de {label} excede el tamaño máximo permitido "
+                f"de {settings.max_proof_size_mb} MB"
+            ),
+        )
+
+    original_name = file.filename or label
+    ext = Path(original_name).suffix.lower()
+    stored_name = f"{label}-{uuid.uuid4().hex}{ext}"
+    storage_path = _owner_asset_upload_dir() / stored_name
+    storage_path.write_bytes(contents)
+
+    return {
+        "file_name": original_name,
+        "content_type": file.content_type,
+        "storage_path": str(storage_path),
+    }
+
+
 BUILDING_ALLOWED_IMAGE_TYPES = _ALLOWED_IMAGE_TYPES
 BUILDING_ALLOWED_PDF_TYPES = _ALLOWED_PDF_TYPES
 

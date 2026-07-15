@@ -796,6 +796,9 @@ class OwnerProfileResponse(BaseModel):
     emergency_phone: Optional[str] = None
     notifications_enabled: bool = True
     allocated_quota_percent: Decimal = Decimal("0")
+    photo_file_name: Optional[str] = None
+    photo_content_type: Optional[str] = None
+    photo_storage_path: Optional[str] = None
     last_update_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../context/NotificationContext';
 import {
   getOwnerProfileDetail,
   updateOwnerProfileDetail,
-  downloadOwnerFicha
+  downloadOwnerFicha,
+  uploadOwnerProfilePhoto,
+  getOwnerProfilePhotoBlob
 } from '../../services/ownerService';
 import axios from 'axios';
 import styles from './OwnerProfilePage.module.css';
@@ -127,6 +130,7 @@ function triggerDownload(blob, filename) {
 export default function OwnerProfilePage() {
   const { token } = useAuth();
   const { success, error: toastError } = useNotification();
+  const { refreshOwnerProfile } = useOutletContext() || {};
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -136,6 +140,57 @@ export default function OwnerProfilePage() {
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
   const [isEditingOccupant, setIsEditingOccupant] = useState(false);
   const [isEditingEmergency, setIsEditingEmergency] = useState(false);
+
+  // Photo state
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+
+  const isAnySectionEditing = isEditingPersonal || isEditingOccupant || isEditingEmergency || !!photoFile;
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file);
+      const url = URL.createObjectURL(file);
+      setPhotoPreview((prev) => {
+        if (prev && prev.startsWith('blob:http')) {
+          URL.revokeObjectURL(prev);
+        }
+        return url;
+      });
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    let url = null;
+    async function loadPhoto() {
+      if (profile?.photo_file_name && !photoFile && profile?.id) {
+        try {
+          const blob = await getOwnerProfilePhotoBlob(profile.id, token);
+          if (!cancelled) {
+            url = URL.createObjectURL(blob);
+            setPhotoPreview(url);
+          }
+        } catch (e) {
+          console.error('Error loading photo in OwnerProfilePage:', e);
+        }
+      }
+    }
+    loadPhoto();
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [profile?.photo_file_name, token, photoFile, profile?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (photoPreview && photoPreview.startsWith('blob:http') && photoFile) {
+        URL.revokeObjectURL(photoPreview);
+      }
+    };
+  }, [photoPreview, photoFile]);
 
   // Editable form fields
   const [formData, setFormData] = useState({
@@ -161,8 +216,6 @@ export default function OwnerProfilePage() {
     confirmPassword: ''
   });
   const [changingPassword, setChangingPassword] = useState(false);
-
-  const isAnySectionEditing = isEditingPersonal || isEditingOccupant || isEditingEmergency;
 
   useEffect(() => {
     async function loadProfile() {
@@ -253,11 +306,28 @@ export default function OwnerProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updated = await updateOwnerProfileDetail(formData, token);
+      let updated = profile;
+      
+      // Update text profile details if any section is in edit mode
+      if (isEditingPersonal || isEditingOccupant || isEditingEmergency) {
+        updated = await updateOwnerProfileDetail(formData, token);
+      }
+      
+      // Update profile photo if a new one is selected
+      if (photoFile) {
+        updated = await uploadOwnerProfilePhoto(photoFile, token);
+        setPhotoFile(null);
+      }
+
       setProfile(updated);
       setIsEditingPersonal(false);
       setIsEditingOccupant(false);
       setIsEditingEmergency(false);
+      
+      if (refreshOwnerProfile) {
+        await refreshOwnerProfile();
+      }
+      
       success('Perfil guardado exitosamente.');
     } catch (err) {
       toastError(err.response?.data?.detail || 'Error al guardar los cambios.');
@@ -343,10 +413,24 @@ export default function OwnerProfilePage() {
           <div className={styles.summaryCard}>
             <div className={styles.avatarContainer}>
               <div className={styles.avatarBig}>
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Foto de perfil" className={styles.avatarImg} />
+                ) : (
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                  </svg>
+                )}
+                <label className={styles.avatarUploadOverlay} htmlFor="profile-photo-input">
+                  <IconPencil />
+                </label>
               </div>
+              <input
+                id="profile-photo-input"
+                type="file"
+                accept="image/png,image/jpeg"
+                onChange={handlePhotoChange}
+                style={{ display: 'none' }}
+              />
             </div>
             <h2 className={styles.ownerName}>{profile.full_name}</h2>
             <p className={styles.ownerRole}>Copropietario</p>

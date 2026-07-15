@@ -38,7 +38,7 @@ const ROLE_LABELS = {
   PROPIETARIO: 'PROPIETARIO',
 };
 
-export default function Navbar({ buildingName = '', onToggleSidebar }) {
+export default function Navbar({ buildingName = '', onToggleSidebar, avatarUrl }) {
   const { user, role } = useAuth();
   const navigate = useNavigate();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -173,7 +173,13 @@ export default function Navbar({ buildingName = '', onToggleSidebar }) {
             <span className={styles.userName}>{displayName}</span>
             <span className={styles.userRole}>{roleLabel}</span>
           </div>
-          <div className={styles.avatar}>{userInitial}</div>
+          <div className={styles.avatar}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Avatar" className={styles.avatarImg} />
+            ) : (
+              userInitial
+            )}
+          </div>
         </div>
       </div>
     </header>

@@ -297,3 +297,97 @@ async def test_get_owners_me_success(
         assert data["balance_consolidated"] == 150.0
         assert len(data["recent_transactions"]) == 1
 
+
+@pytest.mark.asyncio
+async def test_upload_owner_profile_photo_success(
+    async_client: AsyncClient,
+    propietario_headers: dict,
+    db_with_users: AsyncMock
+):
+    """Should successfully upload profile photo and return 200."""
+    owner_mock = {
+        "id": UUID("550e8400-e29b-41d4-a716-446655440020"),
+        "full_name": "Juan Francisco Cuaical",
+        "document_id": "1712345678",
+        "phone": "+593 99 295 3596",
+        "email": "juan.cuaical@example.com",
+        "status": "ACTIVO",
+        "birth_date": date(1985, 4, 15),
+        "occupant_name": "María Fernanda Cuaical",
+        "occupant_relation": "Cónyuge",
+        "occupant_phone": "+593 98 765 4321",
+        "occupant_inhabitants": 3,
+        "emergency_name": "Carlos Cuaical",
+        "emergency_relation": "Hermano",
+        "emergency_phone": "+593 97 123 4567",
+        "notifications_enabled": True,
+        "last_update_date": datetime(2026, 7, 5, 12, 0, 0),
+        "created_at": datetime(2026, 1, 12, 0, 0, 0),
+        "updated_at": datetime(2026, 7, 5, 12, 0, 0),
+    }
+
+    original_fetchrow = db_with_users.fetchrow
+
+    async def mock_fetchrow(query, *args):
+        if "FROM owners" in query:
+            return {"id": owner_mock["id"]}
+        return await original_fetchrow(query, *args)
+
+    # Mock the return value of get_by_id_with_apartments in service
+    async def mock_get_by_id_with_apartments(owner_id):
+        return {**owner_mock, "apartments": []}
+
+    # Mock validate_and_store_owner_asset
+    mock_meta = {
+        "file_name": "profile.jpg",
+        "content_type": "image/jpeg",
+        "storage_path": "/tmp/profile.jpg"
+    }
+
+    with patch.object(db_with_users, 'fetchrow', side_effect=mock_fetchrow), \
+         patch.object(db_with_users, 'execute', return_value="UPDATE 1"), \
+         patch('app.routes.owners.validate_and_store_owner_asset', return_value=mock_meta), \
+         patch('app.services.owner_service.OwnerService.get_by_id_with_apartments', side_effect=mock_get_by_id_with_apartments):
+         
+        files = {"photo_file": ("profile.jpg", b"fake image bytes", "image/jpeg")}
+        response = await async_client.put(
+            "/api/v1/owner/profile/photo",
+            headers=propietario_headers,
+            files=files
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["full_name"] == "Juan Francisco Cuaical"
+
+
+@pytest.mark.asyncio
+async def test_get_owner_photo_success(
+    async_client: AsyncClient,
+    propietario_headers: dict,
+    db_with_users: AsyncMock
+):
+    """Should successfully retrieve profile photo and return 200."""
+    owner_mock = {
+        "photo_file_name": "profile.jpg",
+        "photo_content_type": "image/jpeg",
+        "photo_storage_path": "/tmp/profile.jpg"
+    }
+
+    original_fetchrow = db_with_users.fetchrow
+
+    async def mock_fetchrow(query, *args):
+        if "FROM owners" in query:
+            return owner_mock
+        return await original_fetchrow(query, *args)
+
+    with patch.object(db_with_users, 'fetchrow', side_effect=mock_fetchrow), \
+         patch('pathlib.Path.exists', return_value=True), \
+         patch('pathlib.Path.read_bytes', return_value=b"image bytes"):
+         
+        response = await async_client.get(
+            f"/api/v1/owners/{UUID('550e8400-e29b-41d4-a716-446655440020')}/assets/photo",
+            headers=propietario_headers
+        )
+        assert response.status_code == 200
+        assert response.content == b"image bytes"
+        assert response.headers["content-type"] == "image/jpeg"

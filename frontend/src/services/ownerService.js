@@ -74,4 +74,25 @@ export async function downloadOwnerFicha(token) {
   return res.data;
 }
 
+export async function uploadOwnerProfilePhoto(file, token) {
+  const formData = new FormData();
+  formData.append('photo_file', file);
+  const res = await axios.put(`${API_BASE}/api/v1/owner/profile/photo`, formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data;
+}
+
+export async function getOwnerProfilePhotoBlob(ownerId, token) {
+  const res = await axios.get(`${API_BASE}/api/v1/owners/${ownerId}/assets/photo`, {
+    headers: { Authorization: `Bearer ${token}` },
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
+
 

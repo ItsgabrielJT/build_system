@@ -4,12 +4,15 @@ import Sidebar from '../components/Sidebar/Sidebar';
 import Navbar from '../components/Navbar/Navbar';
 import { useAuth } from '../hooks/useAuth';
 import { getBuildingConfig } from '../services/buildingService';
+import { getOwnerProfile, getOwnerProfilePhotoBlob } from '../services/ownerService';
 import styles from './OwnerLayout.module.css';
 
 export default function OwnerLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { token } = useAuth();
   const [building, setBuilding] = useState(null);
+  const [ownerProfile, setOwnerProfile] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
 
   const fetchPrimaryBuilding = useCallback(async () => {
     if (!token) return null;
@@ -23,9 +26,41 @@ export default function OwnerLayout() {
     }
   }, [token]);
 
+  const fetchOwnerProfile = useCallback(async () => {
+    if (!token) return null;
+    try {
+      const profile = await getOwnerProfile(token);
+      setOwnerProfile(profile);
+      if (profile.photo_file_name) {
+        const blob = await getOwnerProfilePhotoBlob(profile.id, token);
+        const url = URL.createObjectURL(blob);
+        setAvatarUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+      } else {
+        setAvatarUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
+      }
+      return profile;
+    } catch (e) {
+      console.error('Error fetching owner profile in layout:', e);
+      return null;
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchPrimaryBuilding();
-  }, [fetchPrimaryBuilding]);
+    fetchOwnerProfile();
+    return () => {
+      setAvatarUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [fetchPrimaryBuilding, fetchOwnerProfile]);
 
   return (
     <div className={styles.layout}>
@@ -37,9 +72,17 @@ export default function OwnerLayout() {
         <Navbar
           buildingName={building?.name || ''}
           onToggleSidebar={() => setCollapsed(c => !c)}
+          avatarUrl={avatarUrl}
         />
         <main className={styles.content}>
-          <Outlet context={{ building, refreshBuilding: fetchPrimaryBuilding }} />
+          <Outlet
+            context={{
+              building,
+              refreshBuilding: fetchPrimaryBuilding,
+              ownerProfile,
+              refreshOwnerProfile: fetchOwnerProfile
+            }}
+          />
         </main>
       </div>
     </div>

@@ -4,7 +4,10 @@ from datetime import date
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response, UploadFile, File
+from urllib.parse import quote
+from pathlib import Path
+from app.config.storage import validate_and_store_owner_asset
 
 from app.auth.dependencies import get_current_user, require_admin, require_owner
 from app.config.database import get_db
@@ -284,6 +287,99 @@ async def update_owner_profile(
         )
     profile["units"] = profile.get("apartments", [])
     return profile
+
+
+@router.put("/owner/profile/photo", response_model=OwnerProfileResponse)
+async def update_owner_profile_photo(
+    photo_file: UploadFile = File(...),
+    user: dict = Depends(require_owner),
+    db=Depends(get_db),
+):
+    """Sube y actualiza la foto de perfil del propietario autenticado."""
+    if not getattr(photo_file, "filename", ""):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Archivo de foto no válido",
+        )
+    
+    # 1. Resolve owner ID
+    owner = await db.fetchrow(
+        "SELECT id FROM owners WHERE firebase_uid = $1 AND status = 'ACTIVO'",
+        str(user["user_id"]),
+    )
+    if not owner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil de propietario no encontrado para este usuario",
+        )
+        
+    photo_meta = await validate_and_store_owner_asset(photo_file, f"owner-photo-{owner['id']}")
+    
+    # 2. Update database
+    await db.execute(
+        """
+        UPDATE owners SET
+            photo_file_name = $2,
+            photo_content_type = $3,
+            photo_storage_path = $4,
+            last_update_date = NOW(),
+            updated_at = NOW()
+        WHERE id = $1
+        """,
+        owner["id"],
+        photo_meta["file_name"],
+        photo_meta["content_type"],
+        photo_meta["storage_path"],
+    )
+    
+    service = OwnerService(OwnerRepository(db))
+    profile = await service.get_by_id_with_apartments(owner["id"])
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil de propietario no encontrado",
+        )
+    profile["units"] = profile.get("apartments", [])
+    return profile
+
+
+@router.get("/owners/{owner_id}/assets/photo")
+async def get_owner_photo(
+    owner_id: UUID,
+    _user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Descarga o visualiza la foto de perfil configurada para un propietario."""
+    owner = await db.fetchrow(
+        "SELECT photo_file_name, photo_content_type, photo_storage_path FROM owners WHERE id = $1 AND status = 'ACTIVO'",
+        owner_id,
+    )
+    if not owner or not owner["photo_storage_path"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Foto de perfil no configurada para este propietario",
+        )
+        
+    path = Path(owner["photo_storage_path"])
+    if not path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archivo de foto no encontrado en el sistema",
+        )
+        
+    file_name = owner["photo_file_name"] or "photo.png"
+    safe_file_name = file_name.encode("ascii", "ignore").decode("ascii") or "photo.png"
+    encoded_file_name = quote(file_name)
+    
+    return Response(
+        content=path.read_bytes(),
+        media_type=owner["photo_content_type"] or "image/png",
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="{safe_file_name}"; filename*=UTF-8\'\'{encoded_file_name}'
+            )
+        },
+    )
 
 
 @router.get("/owner/ficha")

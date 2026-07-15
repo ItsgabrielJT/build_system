@@ -183,6 +183,7 @@ async def report_payments(
     period: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    compare_period: Optional[str] = None,
     status_filter: Optional[str] = None,
     format: str = "pdf",
     _user: dict = Depends(require_admin),
@@ -198,7 +199,10 @@ async def report_payments(
     service = _get_report_service(db)
     filename_base = f"reporte-pagos{'-' + period if period else ''}"
     if format == "pdf":
-        content = await service.payments_pdf(period, start_date, end_date, status_filter)
+        if compare_period is not None:
+            content = await service.payments_pdf(period, start_date, end_date, compare_period, status_filter)
+        else:
+            content = await service.payments_pdf(period, start_date, end_date, None, status_filter)
         return _pdf_response(content, f"{filename_base}.pdf")
 
     content = await service.payments_excel(period, start_date, end_date, status_filter)
@@ -210,6 +214,7 @@ async def report_expenses(
     period: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    compare_period: Optional[str] = None,
     format: str = "pdf",
     _user: dict = Depends(require_admin_or_owner),
     db=Depends(get_db),
@@ -224,7 +229,10 @@ async def report_expenses(
     service = _get_report_service(db)
     filename_base = f"reporte-gastos{'-' + period if period else ''}"
     if format == "pdf":
-        content = await service.expenses_pdf(period, start_date, end_date)
+        if compare_period is not None:
+            content = await service.expenses_pdf(period, start_date, end_date, compare_period)
+        else:
+            content = await service.expenses_pdf(period, start_date, end_date)
         return _pdf_response(content, f"{filename_base}.pdf")
 
     content = await service.expenses_excel(period, start_date, end_date)
@@ -233,8 +241,10 @@ async def report_expenses(
 
 @router.get("/reports/fees")
 async def report_fees(
+    period: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    compare_period: Optional[str] = None,
     format: str = "pdf",
     _user: dict = Depends(require_admin),
     db=Depends(get_db),
@@ -245,7 +255,10 @@ async def report_fees(
 
     service = _get_report_service(db)
     if format == "pdf":
-        content = await service.fees_pdf(start_date, end_date)
+        if compare_period is not None or period is not None:
+            content = await service.fees_pdf(period, start_date, end_date, compare_period)
+        else:
+            content = await service.fees_pdf(None, start_date, end_date)
         return _pdf_response(content, "reporte-cuotas.pdf")
 
     content = await service.fees_excel(start_date, end_date)

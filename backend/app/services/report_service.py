@@ -541,7 +541,7 @@ class ReportService:
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         rows = await self._payment_repo._conn.fetch(
             f"""
-            SELECT p.*, a.code AS apartment_code, o.full_name AS owner_name
+            SELECT p.*, a.code AS apartment_code, a.tower AS apartment_tower, o.full_name AS owner_name
             FROM payments p
             JOIN apartments a ON p.apartment_id = a.id
             JOIN owners o ON p.owner_id = o.id
@@ -1869,69 +1869,313 @@ class ReportService:
         period: Optional[str],
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
+        compare_period: Optional[str] = None,
         status: Optional[str] = None,
     ) -> bytes:
-        payments = await self._payments_report_rows(period, start_date, end_date, status)
-        total = sum(Decimal(str(p.get("amount", 0))) for p in payments)
-        by_method = self._build_breakdown(payments, "method", "Sin método")
+        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
+        current_start, current_end = self._get_period_dates(current_period)
+        current_start = start_date or current_start
+        current_end = end_date or current_end
+        
+        compare_period = compare_period or self._previous_period(current_period)
+        compare_start, compare_end = self._get_period_dates(compare_period)
+        
+        payments = await self._payments_report_rows(current_period, current_start, current_end, status)
+        compare_payments = await self._payments_report_rows(compare_period, compare_start, compare_end, status)
+        
+        total_current = sum(Decimal(str(p.get("amount", 0))) for p in payments)
+        total_compare = sum(Decimal(str(p.get("amount", 0))) for p in compare_payments)
+        
+        by_method_current = self._build_breakdown(payments, "method", "Sin método")
 
         output = io.BytesIO()
-        doc = SimpleDocTemplate(
-            output,
-            pagesize=letter,
-            leftMargin=0.45 * inch,
-            rightMargin=0.45 * inch,
-            topMargin=0.5 * inch,
-            bottomMargin=0.8 * inch,
-        )
+        width = A4[0] - 2.2 * cm
+        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
         story = []
-        styles = getSampleStyleSheet()
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
-        story.extend(await self._three_column_report_header(
-            "Reporte Detallado de Pagos",
-            f"Rango: {self._date_label(period, start_date, end_date)} | Estado: {status or 'Todos'}",
-            width=doc.width,
-            building=building,
-            right_text=f"Total recaudado: {self._money(total)}",
-        ))
-        summary = Table(
-            [["Pagos", "Total recaudado", "Métodos"], [str(len(payments)), self._money(total), str(len(by_method))]],
-            colWidths=[1.6*inch, 2*inch, 1.6*inch],
+        
+        # Header
+        story.extend(
+            await self._three_column_report_header(
+                "Reporte Detallado de Pagos",
+                f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                width,
+                building=building,
+                right_text=f"Total recaudado: {self._money(total_current)}",
+            )
         )
-        summary.setStyle(self._table_style(9))
-        story.append(summary)
-        story.append(Spacer(1, 0.2*inch))
-        story.append(Paragraph("Detalle de pagos", styles["Heading3"]))
-        data = [["Fecha", "Propietario", "Depto", "Período", "Monto", "Método", "Estado", "Referencia"]]
+        
+        # 1. 3 metric cards at the top
+        icon_payments = Drawing(24, 24)
+        icon_payments.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_payments.add(Rect(9, 6, 6, 12, fillColor=colors.white, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=1))
+        icon_payments.add(Line(11, 9, 13, 9, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=0.5))
+        icon_payments.add(Line(11, 11, 13, 11, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=0.5))
+        icon_payments.add(Line(11, 13, 13, 13, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=0.5))
+        
+        icon_methods = Drawing(24, 24)
+        icon_methods.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_methods.add(Rect(9, 9, 2.5, 2.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        icon_methods.add(Rect(12.5, 9, 2.5, 2.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        icon_methods.add(Rect(9, 12.5, 2.5, 2.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        icon_methods.add(Rect(12.5, 12.5, 2.5, 2.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        
+        col_w_card = (width / 3) - 5
+        cards = [
+            self._build_income_metric_card("Pagos", str(len(payments)), "P", col_w_card),
+            self._build_income_metric_card("Total recaudado", self._money(total_current), "$", col_w_card),
+            self._build_income_metric_card("Métodos", str(len(by_method_current)), "M", col_w_card),
+        ]
+        # Override Card 1 & 3 icons with vector shapes
+        cards[0] = Table([
+            [self._p("PAGOS", 6.5, bold=True, color="#ffffff", align="CENTER")],
+            [Table([
+                [icon_payments, self._p(str(len(payments)), 11, bold=True, color="#0b3c7d", align="LEFT")]
+            ], colWidths=[28, col_w_card - 38], style=[
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ])]
+        ], colWidths=[col_w_card])
+        cards[0].setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        
+        cards[2] = Table([
+            [self._p("MÉTODOS", 6.5, bold=True, color="#ffffff", align="CENTER")],
+            [Table([
+                [icon_methods, self._p(str(len(by_method_current)), 11, bold=True, color="#0b3c7d", align="LEFT")]
+            ], colWidths=[28, col_w_card - 38], style=[
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ])]
+        ], colWidths=[col_w_card])
+        cards[2].setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        
+        cards_table = Table([cards], colWidths=[width / 3] * 3)
+        cards_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(cards_table)
+        story.append(Spacer(1, 0.25 * cm))
+        
+        # 2. Custom Title with List Icon
+        list_icon = Drawing(16, 16)
+        list_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        list_icon.add(Line(5, 10, 11, 10, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 8, 11, 8, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 6, 11, 6, strokeColor=colors.white, strokeWidth=1))
+        
+        title_table = Table([[list_icon, self._p("Detalle de pagos", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 200, width - 220])
+        title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(title_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # 3. Detalle de pagos table (Grouped by Torre)
+        grouped_entries = {}
         for p in payments:
-            data.append([
-                self._p(str(p.get("paid_at") or ""), 6, align="CENTER"),
-                self._p(p.get("owner_name") or "", 6),
-                self._p(p.get("apartment_code") or "", 6, align="CENTER"),
-                self._p(p.get("period") or "", 6, align="CENTER"),
-                self._p(self._money(p.get("amount", 0)), 6, bold=True, align="RIGHT"),
-                self._p(p.get("method") or "", 6),
-                self._p(p.get("status") or "", 6, align="CENTER"),
-                self._p(p.get("reference") or "", 6),
-            ])
-        table = Table(
-            data,
-            colWidths=[
-                doc.width * 0.10,
-                doc.width * 0.20,
-                doc.width * 0.08,
-                doc.width * 0.10,
-                doc.width * 0.11,
-                doc.width * 0.12,
-                doc.width * 0.12,
-                doc.width * 0.17,
+            tower = p.get("apartment_tower") or ""
+            group_name = f"TORRE {tower}" if tower else "General"
+            
+            if group_name not in grouped_entries:
+                grouped_entries[group_name] = []
+            grouped_entries[group_name].append(p)
+            
+        sorted_groups = sorted([g for g in grouped_entries.keys() if g != "General"])
+        if "General" in grouped_entries:
+            sorted_groups.append("General")
+            
+        data = [["Torre", "Departamento", "Propietario", "Concepto", "Monto", "Método", "Estado"]]
+        span_commands = []
+        current_row_idx = 1
+        
+        for g_name in sorted_groups:
+            group_rows = grouped_entries[g_name]
+            group_rows = sorted(group_rows, key=lambda x: x.get("apartment_code") or "")
+            
+            start_row = current_row_idx
+            end_row = start_row + len(group_rows) - 1
+            
+            for p in group_rows:
+                apt_code = p.get("apartment_code") or ""
+                owner = p.get("owner_name") or ""
+                concept = f"Pago {p.get('period') or ''}".strip()
+                amount = p.get("amount", 0)
+                method = p.get("method") or ""
+                status_str = p.get("status") or "REGISTRADO"
+                
+                row_idx = len(data)
+                if status_str == "APROBADO":
+                    status_p = self._p("Aprobado", 6, bold=True, color="#166534", align="CENTER")
+                    table_style_commands_bg = ("BACKGROUND", (6, row_idx), (6, row_idx), colors.HexColor("#dcfce7"))
+                else:
+                    status_p = self._p("Registrado", 6, bold=True, color="#9a3412", align="CENTER")
+                    table_style_commands_bg = ("BACKGROUND", (6, row_idx), (6, row_idx), colors.HexColor("#fef3c7"))
+                
+                data.append([
+                    g_name,
+                    self._p(apt_code, 7, align="CENTER"),
+                    self._p(owner[:20] + "..." if len(owner) > 20 else owner, 7),
+                    self._p(concept, 7),
+                    self._money(amount),
+                    self._p(method, 7),
+                    status_p
+                ])
+                # We need to apply status background styling later
+                span_commands.append(table_style_commands_bg)
+                current_row_idx += 1
+                
+            if end_row > start_row:
+                span_commands.append(("SPAN", (0, start_row), (0, end_row)))
+                
+        if len(data) == 1:
+            data.append(["General", "-", "Sin pagos registrados", "-", self._money(0), "-", "-"])
+            
+        table_style_commands = [
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"), # Torre centered
+            ("ALIGN", (1, 0), (1, -1), "CENTER"), # Depto centered
+            ("ALIGN", (2, 0), (3, -1), "LEFT"),   # Owner & Concept left
+            ("ALIGN", (4, 0), (4, -1), "RIGHT"),  # Monto right
+            ("ALIGN", (5, 0), (5, -1), "LEFT"),   # Método left
+            ("ALIGN", (6, 0), (6, -1), "CENTER"), # Estado centered
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("ROWBACKGROUNDS", (1, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ] + span_commands
+        
+        detail_col_widths = [width * 0.12, width * 0.10, width * 0.22, width * 0.18, width * 0.14, width * 0.12, width * 0.12]
+        story.append(Table(data, colWidths=detail_col_widths, style=TableStyle(table_style_commands)))
+        story.append(Spacer(1, 0.18 * cm))
+        
+        # 4. Total bar
+        icon_total = Drawing(20, 20)
+        icon_total.add(Circle(10, 10, 9, fillColor=colors.white, strokeColor=None))
+        icon_total.add(String(10, 6.5, "$", fontName="Helvetica-Bold", fontSize=10, fillColor=colors.HexColor("#0b3c7d"), textAnchor="middle"))
+        
+        val_total_box = Table([
+            [icon_total, self._p("Total recaudado registrado en el período", 8, bold=True, color="#ffffff"), self._p(self._money(total_current), 9, bold=True, color="#ffffff", align="RIGHT")]
+        ], colWidths=[24, width * 0.70, width * 0.30 - 24])
+        val_total_box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(val_total_box)
+        story.append(Spacer(1, 0.22 * cm))
+        
+        # 5. Section: Comparativo respecto al mes anterior
+        chart_icon = Drawing(16, 16)
+        chart_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        chart_icon.add(Rect(5, 4.5, 1.5, 4, fillColor=colors.white, strokeColor=None))
+        chart_icon.add(Rect(7.25, 4.5, 1.5, 7, fillColor=colors.white, strokeColor=None))
+        chart_icon.add(Rect(9.5, 4.5, 1.5, 5, fillColor=colors.white, strokeColor=None))
+        
+        comp_title_table = Table([[chart_icon, self._p("Comparativo respecto al mes anterior", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
+        comp_title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(comp_title_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # Legend Row
+        curr_period_name = self._period_name(current_period)
+        prev_period_name = self._period_name(compare_period)
+        legend_bar = self._build_legend(curr_period_name, prev_period_name)
+        story.append(legend_bar)
+        story.append(Spacer(1, 0.1 * cm))
+        
+        # Comparison Table
+        max_val_money = max(total_current, total_compare, Decimal("1"))
+        max_val_count = max(len(payments), len(compare_payments), 1)
+        
+        col_comp_w0 = width * 0.35
+        col_comp_w1 = width * 0.45
+        col_comp_w2 = width * 0.20
+        
+        comp_data = [
+            [
+                "", 
+                "", 
+                self._p("Valores", 7.5, bold=True, color="#475569", align="RIGHT")
             ],
-            repeatRows=1,
-        )
-        table.setStyle(self._table_style(6))
-        story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PAGOS", signer_name="Administración", signer_role="Administrador del edificio")
-        footer = self._footer_callback(building, doc.width)
+            [
+                self._p("Total recaudado (USD)", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(total_current), float(total_compare), float(max_val_money), col_comp_w1 - 12),
+                self._stacked_monto(self._money(total_current), self._money(total_compare), col_comp_w2 - 12)
+            ],
+            [
+                self._p("Cantidad de pagos", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(len(payments)), float(len(compare_payments)), float(max_val_count), col_comp_w1 - 12),
+                self._stacked_monto(str(len(payments)), str(len(compare_payments)), col_comp_w2 - 12)
+            ]
+        ]
+        
+        comp_table = Table(comp_data, colWidths=[col_comp_w0, col_comp_w1, col_comp_w2])
+        comp_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("LINEAFTER", (1, 0), (1, -1), 0.5, _PDF_BORDER),
+            ("BOX", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ]))
+        story.append(comp_table)
+        
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-PAGOS", signer_name="La Administración", signer_role="Periodo 2026-2027")
+        footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
@@ -1940,94 +2184,279 @@ class ReportService:
         period: Optional[str],
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
+        compare_period: Optional[str] = None,
     ) -> bytes:
-        expenses = await self._expenses(period, start_date, end_date)
-        previous_expenses = await self._expenses(self._previous_period(period), None, None) if period else []
-        total = sum(Decimal(str(e.get("amount", 0))) for e in expenses)
+        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
+        current_start, current_end = self._get_period_dates(current_period)
+        current_start = start_date or current_start
+        current_end = end_date or current_end
+        
+        compare_period = compare_period or self._previous_period(current_period)
+        compare_start, compare_end = self._get_period_dates(compare_period)
+        
+        expenses = await self._expenses(current_period, current_start, current_end)
+        previous_expenses = await self._expenses(compare_period, compare_start, compare_end)
+        
+        total_current = sum(Decimal(str(e.get("amount", 0))) for e in expenses)
+        total_compare = sum(Decimal(str(e.get("amount", 0))) for e in previous_expenses)
+        
+        by_category_current = self._build_breakdown(expenses, "category", "Sin categoría")
         previous_by_category = {row["label"]: row["amount"] for row in self._build_breakdown(previous_expenses, "category", "Sin categoría")}
-        by_category = self._build_breakdown(expenses, "category", "Sin categoría")
-
-        try:
-            output = io.BytesIO()
-            width = A4[0] - 2.2 * cm
-            doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
-            story = []
-            building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
-            story.extend(await self._three_column_report_header(
+        
+        output = io.BytesIO()
+        width = A4[0] - 2.2 * cm
+        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
+        story = []
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+        
+        # Header
+        story.extend(
+            await self._three_column_report_header(
                 "Reporte Detallado de Gastos",
                 f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
                 width,
                 building=building,
-                right_text=f"Total egresos: {self._money(total)}",
-            ))
-            story.append(self._metric_cards([
-                ("Gastos", str(len(expenses)), "▣"),
-                ("Total", self._money(total), "$"),
-                ("Categorías", str(len(by_category)), "▦"),
-            ], width))
-            story.append(Spacer(1, 0.25 * cm))
-            story.append(self._section_title("Detalle de gastos", width))
-            data = [["Fecha", "Proveedor", "Categoría", "Concepto", "Monto", "Comprobante"]]
-            for e in expenses:
-                data.append([
-                    str(e.get("date") or ""),
-                    self._p(e.get("provider") or "", 6),
-                    self._p(e.get("category") or "Sin categoría", 6),
-                    self._p(e.get("concept") or "", 6),
-                    self._money(e.get("amount", 0)),
-                    self._p(e.get("receipt_file_name") or "Sin adjunto", 6),
-                ])
-            if len(data) == 1:
-                data.append(["-", "-", "-", "Sin gastos registrados", self._money(0), "-"])
-            story.append(self._styled_table(data[:14], [2 * cm, 3.8 * cm, 2.8 * cm, 5.2 * cm, 2 * cm, 3.1 * cm], font_size=6))
-            story.append(Spacer(1, 0.22 * cm))
-            final = Table([[self._p("Egresos totales registrados en el período", 11, bold=True, color="#ffffff", align="LEFT"), self._p(self._money(total), 16, bold=True, color="#ffffff")]], colWidths=[width * 0.76, width * 0.24])
-            final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("LEFTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
-            story.append(final)
-            story.append(Spacer(1, 0.22 * cm))
-            story.append(self._section_title("Comparativo respecto al mes anterior", width))
-            story.append(self._comparison_table([
-                {"label": "Egresos totales registrados en el período", "current": total, "previous": sum(previous_by_category.values())},
-                *[
-                    {"label": row["label"], "current": row["amount"], "previous": previous_by_category.get(row["label"], 0)}
-                    for row in by_category[:4]
-                ],
-            ], width))
-            self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-GASTOS", signer_name="Administración", signer_role="Administrador del edificio")
-            footer = self._footer_callback(building, width)
-            doc.build(story, onFirstPage=footer, onLaterPages=footer)
-            return output.getvalue()
-        except Exception:
-            # Fallback resiliente para evitar errores 500 por problemas de layout PDF.
-            output = io.BytesIO()
-            doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.6 * inch, bottomMargin=0.6 * inch)
-            building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
-            story = await self._pdf_header(
-                "Reporte de Gastos",
-                f"Rango: {self._date_label(period, start_date, end_date)} | Total egresos: {self._money(total)}",
-                doc.width,
+                right_text=f"Total egresos: {self._money(total_current)}",
             )
-
-            table_data = [["Fecha", "Proveedor", "Categoría", "Concepto", "Monto"]]
-            for item in expenses[:40]:
-                table_data.append([
-                    str(item.get("date") or ""),
-                    str(item.get("provider") or "")[:40],
-                    str(item.get("category") or "Sin categoría")[:30],
-                    str(item.get("concept") or "")[:60],
-                    self._money(item.get("amount", 0)),
-                ])
-
-            if len(table_data) == 1:
-                table_data.append(["-", "-", "-", "Sin gastos registrados", self._money(0)])
-
-            table = Table(table_data, colWidths=[1.1 * inch, 1.4 * inch, 1.2 * inch, 2.5 * inch, 1.0 * inch], repeatRows=1)
-            table.setStyle(self._table_style(7))
-            story.append(table)
-            self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-GASTOS", signer_name="Administración", signer_role="Administrador del edificio")
-            story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
-            doc.build(story)
-            return output.getvalue()
+        )
+        
+        # 1. 3 metric cards at the top
+        icon_expenses = Drawing(24, 24)
+        icon_expenses.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_expenses.add(Rect(9, 6, 6, 12, fillColor=colors.white, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=1))
+        icon_expenses.add(Line(11, 9, 13, 9, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=0.5))
+        icon_expenses.add(Line(11, 11, 13, 11, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=0.5))
+        icon_expenses.add(Line(11, 13, 13, 13, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=0.5))
+        
+        icon_categories = Drawing(24, 24)
+        icon_categories.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_categories.add(Rect(9, 9, 2.5, 2.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        icon_categories.add(Rect(12.5, 9, 2.5, 2.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        icon_categories.add(Rect(9, 12.5, 2.5, 2.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        icon_categories.add(Rect(12.5, 12.5, 2.5, 2.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        
+        col_w_card = (width / 3) - 5
+        cards = [
+            self._build_income_metric_card("Gastos", str(len(expenses)), "G", col_w_card),
+            self._build_income_metric_card("Total", self._money(total_current), "$", col_w_card),
+            self._build_income_metric_card("Categorías", str(len(by_category_current)), "C", col_w_card),
+        ]
+        # Override Card 1 & 3 icons with vector shapes
+        cards[0] = Table([
+            [self._p("GASTOS", 6.5, bold=True, color="#ffffff", align="CENTER")],
+            [Table([
+                [icon_expenses, self._p(str(len(expenses)), 11, bold=True, color="#0b3c7d", align="LEFT")]
+            ], colWidths=[28, col_w_card - 38], style=[
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ])]
+        ], colWidths=[col_w_card])
+        cards[0].setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        
+        cards[2] = Table([
+            [self._p("CATEGORÍAS", 6.5, bold=True, color="#ffffff", align="CENTER")],
+            [Table([
+                [icon_categories, self._p(str(len(by_category_current)), 11, bold=True, color="#0b3c7d", align="LEFT")]
+            ], colWidths=[28, col_w_card - 38], style=[
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ])]
+        ], colWidths=[col_w_card])
+        cards[2].setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        
+        cards_table = Table([cards], colWidths=[width / 3] * 3)
+        cards_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(cards_table)
+        story.append(Spacer(1, 0.25 * cm))
+        
+        # 2. Custom Title with List Icon
+        list_icon = Drawing(16, 16)
+        list_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        list_icon.add(Line(5, 10, 11, 10, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 8, 11, 8, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 6, 11, 6, strokeColor=colors.white, strokeWidth=1))
+        
+        title_table = Table([[list_icon, self._p("Detalle de gastos", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 200, width - 220])
+        title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(title_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # 3. Detalle de gastos table
+        data = [["Fecha", "Proveedor", "Categoría", "Concepto", "Monto", "Comprobante"]]
+        for e in expenses:
+            comp_str = e.get("receipt_file_name") or "Sin comprobante"
+            if len(comp_str) > 22:
+                comp_str = comp_str[:22] + "..."
+            
+            dt = e.get("date")
+            date_str = dt.strftime("%Y-%m-%d") if hasattr(dt, "strftime") else str(dt or "")
+            
+            data.append([
+                self._p(date_str, 7, align="CENTER"),
+                self._p(e.get("provider") or "", 7),
+                self._p(e.get("category") or "Sin categoría", 7),
+                self._p(e.get("concept") or "", 7),
+                self._money(e.get("amount", 0)),
+                self._p(comp_str, 7)
+            ])
+        if len(data) == 1:
+            data.append(["-", "-", "-", "Sin gastos registrados", self._money(0), "-"])
+            
+        table_style_commands = [
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (1, 0), (2, -1), "LEFT"),
+            ("ALIGN", (3, 0), (3, -1), "LEFT"),
+            ("ALIGN", (4, 0), (4, -1), "RIGHT"),
+            ("ALIGN", (5, 0), (5, -1), "LEFT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ]
+        
+        detail_col_widths = [width * 0.14, width * 0.22, width * 0.18, width * 0.26, width * 0.10, width * 0.10]
+        story.append(Table(data, colWidths=detail_col_widths, style=TableStyle(table_style_commands)))
+        story.append(Spacer(1, 0.18 * cm))
+        
+        # 4. Total bar
+        icon_total = Drawing(20, 20)
+        icon_total.add(Circle(10, 10, 9, fillColor=colors.white, strokeColor=None))
+        icon_total.add(String(10, 6.5, "$", fontName="Helvetica-Bold", fontSize=10, fillColor=colors.HexColor("#0b3c7d"), textAnchor="middle"))
+        
+        val_total_box = Table([
+            [icon_total, self._p("Egresos totales registrados en el período", 8, bold=True, color="#ffffff"), self._p(self._money(total_current), 9, bold=True, color="#ffffff", align="RIGHT")]
+        ], colWidths=[24, width * 0.70, width * 0.30 - 24])
+        val_total_box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(val_total_box)
+        story.append(Spacer(1, 0.22 * cm))
+        
+        # 5. Section: Comparativo respecto al mes anterior
+        chart_icon = Drawing(16, 16)
+        chart_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        chart_icon.add(Rect(5, 4.5, 1.5, 4, fillColor=colors.white, strokeColor=None))
+        chart_icon.add(Rect(7.25, 4.5, 1.5, 7, fillColor=colors.white, strokeColor=None))
+        chart_icon.add(Rect(9.5, 4.5, 1.5, 5, fillColor=colors.white, strokeColor=None))
+        
+        comp_title_table = Table([[chart_icon, self._p("Comparativo respecto al mes anterior", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
+        comp_title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(comp_title_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # Legend Row
+        curr_period_name = self._period_name(current_period)
+        prev_period_name = self._period_name(compare_period)
+        legend_bar = self._build_legend(curr_period_name, prev_period_name)
+        story.append(legend_bar)
+        story.append(Spacer(1, 0.1 * cm))
+        
+        # Comparison Table
+        max_val = max(total_current, total_compare, Decimal("1"))
+        
+        col_comp_w0 = width * 0.35
+        col_comp_w1 = width * 0.45
+        col_comp_w2 = width * 0.20
+        
+        comp_data = [
+            [
+                "", 
+                "", 
+                self._p("Valores (USD)", 7.5, bold=True, color="#475569", align="RIGHT")
+            ],
+            [
+                self._p("Egresos totales registrados en el período", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(total_current), float(total_compare), float(max_val), col_comp_w1 - 12),
+                self._stacked_monto(self._money(total_current), self._money(total_compare), col_comp_w2 - 12)
+            ]
+        ]
+        for c in by_category_current[:4]:
+            cat_label = c["label"]
+            cat_curr = c["amount"]
+            cat_prev = previous_by_category.get(cat_label, Decimal("0"))
+            
+            comp_data.append([
+                self._p(cat_label, 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(cat_curr), float(cat_prev), float(max_val), col_comp_w1 - 12),
+                self._stacked_monto(self._money(cat_curr), self._money(cat_prev), col_comp_w2 - 12)
+            ])
+            
+        comp_table = Table(comp_data, colWidths=[col_comp_w0, col_comp_w1, col_comp_w2])
+        comp_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("LINEAFTER", (1, 0), (1, -1), 0.5, _PDF_BORDER),
+            ("BOX", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ]))
+        story.append(comp_table)
+        
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-GASTOS", signer_name="La Administración", signer_role="Periodo 2026-2027")
+        footer = self._footer_callback(building, width)
+        doc.build(story, onFirstPage=footer, onLaterPages=footer)
+        return output.getvalue()
 
     async def delinquency_pdf(self) -> bytes:
         owners = await self._delinquency.list_owners()
@@ -2265,6 +2694,7 @@ class ReportService:
             SELECT
                 af.period,
                 a.code AS apartment_code,
+                a.tower AS apartment_tower,
                 COALESCE(o.full_name, 'Sin propietario') AS owner_name,
                 af.amount,
                 COALESCE(p.paid_amount, 0) AS paid_amount,
@@ -2420,27 +2850,286 @@ class ReportService:
         )
         return [dict(row) for row in rows]
 
-    async def fees_pdf(self, start_date: Optional[date] = None, end_date: Optional[date] = None) -> bytes:
-        rows = await self._fees_report_rows(start_date, end_date)
-        total = sum(Decimal(str(row.get("amount", 0))) for row in rows)
-        collected = sum(Decimal(str(row.get("paid_amount", 0))) for row in rows)
+    async def fees_pdf(
+        self,
+        period: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        compare_period: Optional[str] = None,
+    ) -> bytes:
+        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
+        current_start, current_end = self._get_period_dates(current_period)
+        current_start = start_date or current_start
+        current_end = end_date or current_end
+        
+        compare_period = compare_period or self._previous_period(current_period)
+        compare_start, compare_end = self._get_period_dates(compare_period)
+        
+        rows = await self._fees_report_rows(current_start, current_end)
+        compare_rows = await self._fees_report_rows(compare_start, compare_end)
+        
+        total_current = sum(Decimal(str(row.get("amount", 0))) for row in rows)
+        collected_current = sum(Decimal(str(row.get("paid_amount", 0))) for row in rows)
+        pending_current = total_current - collected_current
+        
+        total_compare = sum(Decimal(str(row.get("amount", 0))) for row in compare_rows)
+        collected_compare = sum(Decimal(str(row.get("paid_amount", 0))) for row in compare_rows)
+        pending_compare = total_compare - collected_compare
+        
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         output = io.BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        width = A4[0] - 2.2 * cm
+        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
         story = []
-        styles = getSampleStyleSheet()
-        story.extend(await self._pdf_header("Reporte Detallado de Cuotas", f"Rango: {self._date_label(None, start_date, end_date)}", width=doc.width))
-        summary = Table([["Cuotas", "Emitido", "Recaudado", "Pendiente"], [str(len(rows)), self._money(total), self._money(collected), self._money(total - collected)]])
-        summary.setStyle(self._table_style(8))
-        story.extend([summary, Spacer(1, 0.2*inch), Paragraph("Detalle de cuotas", styles["Heading3"])])
+        
+        # Header
+        story.extend(
+            await self._three_column_report_header(
+                "Reporte Detallado de Cuotas",
+                f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                width,
+                building=building,
+                right_text=f"Total emitido: {self._money(total_current)}",
+            )
+        )
+        
+        # 1. Metric cards
+        icon_cuotas = Drawing(24, 24)
+        icon_cuotas.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_cuotas.add(Rect(9, 6, 6, 12, fillColor=colors.white, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=1))
+        icon_cuotas.add(Line(11, 9, 13, 9, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=0.5))
+        icon_cuotas.add(Line(11, 12, 13, 12, strokeColor=colors.HexColor("#0b3c7d"), strokeWidth=0.5))
+        
+        icon_emitido = Drawing(24, 24)
+        icon_emitido.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_emitido.add(String(12, 8, "$", fontName="Helvetica-Bold", fontSize=11, fillColor=colors.HexColor("#0b3c7d"), textAnchor="middle"))
+        
+        icon_recaudado = Drawing(24, 24)
+        icon_recaudado.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_recaudado.add(Line(8, 12, 11, 9, strokeColor=colors.HexColor("#166534"), strokeWidth=1.5))
+        icon_recaudado.add(Line(11, 9, 16, 15, strokeColor=colors.HexColor("#166534"), strokeWidth=1.5))
+        
+        icon_pendiente = Drawing(24, 24)
+        icon_pendiente.add(Circle(12, 12, 11, fillColor=colors.HexColor("#e2e8f0"), strokeColor=colors.HexColor("#cbd5e1"), strokeWidth=0.5))
+        icon_pendiente.add(Circle(12, 12, 5, fillColor=None, strokeColor=colors.HexColor("#b91c1c"), strokeWidth=1))
+        icon_pendiente.add(Line(12, 12, 12, 15, strokeColor=colors.HexColor("#b91c1c"), strokeWidth=1))
+        icon_pendiente.add(Line(12, 12, 14, 12, strokeColor=colors.HexColor("#b91c1c"), strokeWidth=1))
+        
+        col_w_card = (width / 4) - 5
+        
+        def make_card(title: str, val_str: str, icon_flowable):
+            fs = 10
+            if len(val_str) > 10:
+                fs = 8.5
+            if len(val_str) > 13:
+                fs = 7.5
+            t = Table([
+                [self._p(title.upper(), 6.5, bold=True, color="#ffffff", align="CENTER")],
+                [Table([
+                    [icon_flowable, self._p(val_str, fs, bold=True, color="#0b3c7d", align="LEFT")]
+                ], colWidths=[26, col_w_card - 36], style=[
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ])]
+            ], colWidths=[col_w_card])
+            t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            return t
+            
+        cards = [
+            make_card("Cuotas", str(len(rows)), icon_cuotas),
+            make_card("Emitido", self._money(total_current), icon_emitido),
+            make_card("Recaudado", self._money(collected_current), icon_recaudado),
+            make_card("Pendiente", self._money(pending_current), icon_pendiente),
+        ]
+        cards_table = Table([cards], colWidths=[width / 4] * 4)
+        cards_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(cards_table)
+        story.append(Spacer(1, 0.25 * cm))
+        
+        # 2. Custom Title with List Icon
+        list_icon = Drawing(16, 16)
+        list_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        list_icon.add(Line(5, 10, 11, 10, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 8, 11, 8, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 6, 11, 6, strokeColor=colors.white, strokeWidth=1))
+        
+        title_table = Table([[list_icon, self._p("Detalle de cuotas", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 200, width - 220])
+        title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(title_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # 3. Detalle de cuotas table
         data = [["Período", "Depto", "Propietario", "Emitido", "Pagado", "Pendiente", "Estado"]]
-        data.extend([[r.get("period", ""), r.get("apartment_code", ""), r.get("owner_name", ""), self._money(r.get("amount")), self._money(r.get("paid_amount")), self._money(r.get("pending_amount")), r.get("status", "")] for r in rows])
-        table = Table(data, colWidths=[0.75*inch, 0.65*inch, 1.55*inch, 0.85*inch, 0.85*inch, 0.85*inch, 0.85*inch], repeatRows=1)
-        table.setStyle(self._table_style(7))
-        story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-CUOTAS", signer_name="Administración", signer_role="Administrador del edificio")
-        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
-        doc.build(story)
+        span_commands = []
+        for r in rows:
+            row_idx = len(data)
+            status_str = r.get("status") or "PENDIENTE"
+            
+            if status_str == "PAGADA":
+                status_p = self._p("Pagada", 6, bold=True, color="#166534", align="CENTER")
+                table_style_commands_bg = ("BACKGROUND", (6, row_idx), (6, row_idx), colors.HexColor("#dcfce7"))
+            else:
+                status_p = self._p("Pendiente", 6, bold=True, color="#9a3412", align="CENTER")
+                table_style_commands_bg = ("BACKGROUND", (6, row_idx), (6, row_idx), colors.HexColor("#fef3c7"))
+                
+            owner = r.get("owner_name") or ""
+            if len(owner) > 26:
+                owner = owner[:26] + "..."
+                
+            data.append([
+                self._p(r.get("period", ""), 7, align="CENTER"),
+                self._p(r.get("apartment_code", ""), 7, align="CENTER"),
+                self._p(owner, 7),
+                self._money(r.get("amount")),
+                self._money(r.get("paid_amount")),
+                self._money(r.get("pending_amount")),
+                status_p
+            ])
+            span_commands.append(table_style_commands_bg)
+            
+        if len(data) == 1:
+            data.append(["-", "-", "Sin cuotas emitidas", self._money(0), self._money(0), self._money(0), "-"])
+            
+        table_style_commands = [
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (1, -1), "CENTER"), # Period & Depto centered
+            ("ALIGN", (2, 0), (2, -1), "LEFT"),   # Owner left
+            ("ALIGN", (3, 0), (5, -1), "RIGHT"),  # Amounts right
+            ("ALIGN", (6, 0), (6, -1), "CENTER"), # Estado centered
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ] + span_commands
+        
+        detail_col_widths = [width * 0.12, width * 0.10, width * 0.28, width * 0.12, width * 0.12, width * 0.12, width * 0.14]
+        story.append(Table(data, colWidths=detail_col_widths, style=TableStyle(table_style_commands)))
+        story.append(Spacer(1, 0.18 * cm))
+        
+        # 4. Total bar
+        icon_total = Drawing(20, 20)
+        icon_total.add(Circle(10, 10, 9, fillColor=colors.white, strokeColor=None))
+        icon_total.add(String(10, 6.5, "$", fontName="Helvetica-Bold", fontSize=10, fillColor=colors.HexColor("#0b3c7d"), textAnchor="middle"))
+        
+        val_total_box = Table([
+            [icon_total, self._p("Resumen de cuotas emitidas en el período", 8, bold=True, color="#ffffff"), self._p(self._money(total_current), 9, bold=True, color="#ffffff", align="RIGHT")]
+        ], colWidths=[24, width * 0.70, width * 0.30 - 24])
+        val_total_box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(val_total_box)
+        story.append(Spacer(1, 0.22 * cm))
+        
+        # 5. Section: Comparativo respecto al mes anterior
+        chart_icon = Drawing(16, 16)
+        chart_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        chart_icon.add(Rect(5, 4.5, 1.5, 4, fillColor=colors.white, strokeColor=None))
+        chart_icon.add(Rect(7.25, 4.5, 1.5, 7, fillColor=colors.white, strokeColor=None))
+        chart_icon.add(Rect(9.5, 4.5, 1.5, 5, fillColor=colors.white, strokeColor=None))
+        
+        comp_title_table = Table([[chart_icon, self._p("Comparativo respecto al mes anterior", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
+        comp_title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(comp_title_table)
+        story.append(Spacer(1, 0.15 * cm))
+        
+        # Legend Row
+        curr_period_name = self._period_name(current_period)
+        prev_period_name = self._period_name(compare_period)
+        legend_bar = self._build_legend(curr_period_name, prev_period_name)
+        story.append(legend_bar)
+        story.append(Spacer(1, 0.1 * cm))
+        
+        # Comparison Table
+        max_val_money = max(total_current, total_compare, collected_current, collected_compare, pending_current, pending_compare, Decimal("1"))
+        
+        col_comp_w0 = width * 0.35
+        col_comp_w1 = width * 0.45
+        col_comp_w2 = width * 0.20
+        
+        comp_data = [
+            [
+                "", 
+                "", 
+                self._p("Valores (USD)", 7.5, bold=True, color="#475569", align="RIGHT")
+            ],
+            [
+                self._p("Cuotas emitidas", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(total_current), float(total_compare), float(max_val_money), col_comp_w1 - 12),
+                self._stacked_monto(self._money(total_current), self._money(total_compare), col_comp_w2 - 12)
+            ],
+            [
+                self._p("Cuotas recaudadas", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(collected_current), float(collected_compare), float(max_val_money), col_comp_w1 - 12),
+                self._stacked_monto(self._money(collected_current), self._money(collected_compare), col_comp_w2 - 12)
+            ],
+            [
+                self._p("Saldo pendiente", 7.5, bold=True, color="#1e293b"),
+                self._draw_double_horizontal_bar(float(pending_current), float(pending_compare), float(max_val_money), col_comp_w1 - 12),
+                self._stacked_monto(self._money(pending_current), self._money(pending_compare), col_comp_w2 - 12)
+            ]
+        ]
+        
+        comp_table = Table(comp_data, colWidths=[col_comp_w0, col_comp_w1, col_comp_w2])
+        comp_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (0, -1), "LEFT"),
+            ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("LINEAFTER", (1, 0), (1, -1), 0.5, _PDF_BORDER),
+            ("BOX", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ]))
+        story.append(comp_table)
+        
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-CUOTAS", signer_name="La Administración", signer_role="Periodo 2026-2027")
+        footer = self._footer_callback(building, width)
+        doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
     async def fees_excel(self, start_date: Optional[date] = None, end_date: Optional[date] = None) -> bytes:

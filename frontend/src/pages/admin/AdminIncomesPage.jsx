@@ -82,13 +82,14 @@ const triggerDownload = (blob, filename) => {
 
 export default function AdminIncomesPage() {
   const initialRange = useMemo(() => currentMonthRange(), []);
-  const { incomes, loading, error, fetchIncomes, createIncome, annulIncome } = useIncomes();
+  const { incomes, loading, error, fetchIncomes, createIncome, annulIncome, deleteIncome } = useIncomes();
   const { apartments, fetchApartments } = useApartments();
   const { owners, fetchOwners } = useOwners();
   const { token } = useAuth();
   const { success, error: toastError } = useNotification();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [annulTarget, setAnnulTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterStartDate, setFilterStartDate] = useState(initialRange.startDate);
   const [filterEndDate, setFilterEndDate] = useState(initialRange.endDate);
@@ -230,6 +231,21 @@ export default function AdminIncomesPage() {
       toastError(msg);
     } finally {
       setAnnulTarget(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    setActionError(null);
+    try {
+      await deleteIncome(deleteTarget.id);
+      success('Ingreso eliminado con éxito');
+      await fetchIncomes(fetchParams);
+    } catch (err) {
+      const msg = formatApiError(err, 'Error al eliminar ingreso');
+      setActionError(msg);
+      toastError(msg);
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -400,9 +416,20 @@ export default function AdminIncomesPage() {
                               <span className={`${styles.statusBadge} ${styles[status.className]}`}>{status.label}</span>
                             </td>
                             <td className={styles.actionCell}>
-                              <button className={styles.btnTable} disabled={income.status !== 'REGISTRADO'} onClick={() => setAnnulTarget(income)}>
-                                Anular
-                              </button>
+                              {income.status === 'REGISTRADO' && (
+                                <button className={styles.btnTable} onClick={() => setAnnulTarget(income)}>
+                                  Anular
+                                </button>
+                              )}
+                              {income.status === 'ANULADO' && (
+                                <button
+                                  type="button"
+                                  className={`${styles.actionButton} ${styles.actionButtonDanger}`}
+                                  onClick={() => setDeleteTarget(income)}
+                                >
+                                  Eliminar
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );
@@ -465,6 +492,14 @@ export default function AdminIncomesPage() {
         confirmLabel="Anular"
         onConfirm={handleAnnul}
         onCancel={() => setAnnulTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        message={`¿Eliminar definitivamente el ingreso de ${formatCurrency(deleteTarget?.amount)}?`}
+        confirmLabel="Eliminar"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

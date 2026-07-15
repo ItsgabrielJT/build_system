@@ -25,3 +25,10 @@ export async function annulIncome(incomeId, token) {
   );
   return res.data;
 }
+
+export async function deleteIncome(incomeId, token) {
+  const res = await axios.delete(`${API_BASE}/api/v1/incomes/${incomeId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}

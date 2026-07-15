@@ -109,3 +109,10 @@ class IncomeRepository:
             status,
         )
         return dict(row) if row else None
+
+    async def delete(self, income_id: UUID) -> bool:
+        result = await self._conn.execute(
+            "DELETE FROM incomes WHERE id = $1",
+            income_id,
+        )
+        return result == "DELETE 1"

@@ -763,11 +763,9 @@ class ReportService:
 
         expected_by_period = {row["period"]: float(row["total"]) for row in fee_rows}
         collected_by_period: dict[str, float] = {}
-        for payment in [*payments, *incomes]:
+        for payment in payments:
             period_key = payment.get("period") or (
                 payment.get("paid_at").strftime("%Y-%m") if payment.get("paid_at") else ""
-            ) or (
-                payment.get("date").strftime("%Y-%m") if payment.get("date") else ""
             )
             if not period_key:
                 continue
@@ -2706,15 +2704,8 @@ class ReportService:
             LEFT JOIN owners o ON o.id = oa.owner_id
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
-                FROM (
-                    SELECT apartment_id, period, amount
-                    FROM payments
-                    WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
-                    UNION ALL
-                    SELECT apartment_id, period, amount
-                    FROM incomes
-                    WHERE status = 'REGISTRADO' AND apartment_id IS NOT NULL AND period IS NOT NULL
-                ) paid_sources
+                FROM payments
+                WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             {where}

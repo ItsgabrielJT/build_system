@@ -139,9 +139,8 @@ export default function AdminFeesPage() {
 
   const filteredPeriods = periods.filter((row) => periodInDateRange(row.period, reportStartDate, reportEndDate));
 
-  const handleEmitirProximoMes = () => {
-    const nextMonth = getNextMonth(currentPeriod);
-    setPeriod(nextMonth);
+  const handleEmitirMesCurso = () => {
+    setPeriod(currentPeriod);
     setIsBulkOpen(true);
     setBulkValues({});
     setDistributionTotal('');
@@ -319,8 +318,8 @@ export default function AdminFeesPage() {
             <DownloadIcon />
             {exportingReport === 'excel' ? 'Generando...' : 'Excel'}
           </button>
-          <button className={styles.btnPrimary} onClick={handleEmitirProximoMes}>
-            + Emitir Cuota Próximo Mes
+          <button className={styles.btnPrimary} onClick={handleEmitirMesCurso}>
+            + Emitir Cuota Mes en Curso
           </button>
         </div>
       </div>

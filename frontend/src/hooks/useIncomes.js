@@ -42,5 +42,13 @@ export function useIncomes() {
     [token]
   );
 
-  return { incomes, loading, error, fetchIncomes, createIncome, annulIncome };
+  const deleteIncome = useCallback(
+    async (incomeId) => {
+      await incomeService.deleteIncome(incomeId, token);
+      setIncomes((prev) => prev.filter((income) => income.id !== incomeId));
+    },
+    [token]
+  );
+
+  return { incomes, loading, error, fetchIncomes, createIncome, annulIncome, deleteIncome };
 }

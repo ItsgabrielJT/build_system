@@ -376,3 +376,29 @@ async def test_report_invalid_format(mock_user, mock_db):
     
     assert exc_info.value.status_code == 400
     assert "csv, pdf o excel" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_delete_income_service():
+    """Valida que IncomeService.delete elimina si está ANULADO y lanza error si no."""
+    from app.services.income_service import IncomeService
+    from app.repositories.income_repository import IncomeRepository
+    from uuid import uuid4
+    from unittest.mock import MagicMock, AsyncMock
+    
+    mock_repo = MagicMock(spec=IncomeRepository)
+    mock_repo.get_by_id = AsyncMock(return_value={"status": "REGISTRADO"})
+    
+    service = IncomeService(mock_repo)
+    
+    # 1. Intentar eliminar REGISTRADO -> debe dar 422
+    with pytest.raises(HTTPException) as exc_info:
+        await service.delete(uuid4())
+    assert exc_info.value.status_code == 422
+    assert "Solo se pueden eliminar ingresos anulados" in exc_info.value.detail
+    
+    # 2. Intentar eliminar ANULADO -> debe proceder
+    mock_repo.get_by_id = AsyncMock(return_value={"status": "ANULADO"})
+    mock_repo.delete = AsyncMock(return_value=True)
+    await service.delete(uuid4())
+    mock_repo.delete.assert_called_once()

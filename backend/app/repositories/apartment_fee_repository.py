@@ -35,15 +35,8 @@ class ApartmentFeeRepository:
             FROM apartment_fees f
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
-                FROM (
-                    SELECT apartment_id, period, amount
-                    FROM payments
-                    WHERE status = 'REGISTRADO' AND fine_id IS NULL
-                    UNION ALL
-                    SELECT apartment_id, period, amount
-                    FROM incomes
-                    WHERE status = 'REGISTRADO' AND apartment_id IS NOT NULL AND period IS NOT NULL
-                ) paid_sources
+                FROM payments
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = f.apartment_id AND p.period = f.period
             WHERE f.period = $1
@@ -154,15 +147,8 @@ class ApartmentFeeRepository:
             FROM apartment_fees af
             LEFT JOIN (
                 SELECT apartment_id, period, COALESCE(SUM(amount), 0) AS pagado
-                FROM (
-                    SELECT apartment_id, period, amount
-                    FROM payments
-                    WHERE status = 'REGISTRADO' AND fine_id IS NULL
-                    UNION ALL
-                    SELECT apartment_id, period, amount
-                    FROM incomes
-                    WHERE status = 'REGISTRADO' AND apartment_id IS NOT NULL AND period IS NOT NULL
-                ) paid_sources
+                FROM payments
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             WHERE af.period < $1

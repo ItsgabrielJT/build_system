@@ -37,3 +37,19 @@ class IncomeService:
             )
         updated = await self._repo.update_status(income_id, data.status)
         return updated
+
+    async def delete(self, income_id: UUID) -> None:
+        income = await self._repo.get_by_id(income_id)
+        if not income:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingreso no encontrado")
+        if income["status"] != "ANULADO":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Solo se pueden eliminar ingresos anulados",
+            )
+        deleted = await self._repo.delete(income_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ingreso no encontrado",
+            )

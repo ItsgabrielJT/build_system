@@ -4,7 +4,7 @@ from datetime import date
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 
 from app.auth.dependencies import require_admin
 from app.config.database import get_db
@@ -52,3 +52,14 @@ async def update_income(
 ):
     service = IncomeService(IncomeRepository(db))
     return await service.update_status(income_id, body)
+
+
+@router.delete("/incomes/{income_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_income(
+    income_id: UUID,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = IncomeService(IncomeRepository(db))
+    await service.delete(income_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

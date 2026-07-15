@@ -11,8 +11,6 @@ _PERIOD_DATA_QUERY = """
         UNION
         SELECT apartment_id, period FROM payments
         UNION
-        SELECT apartment_id, period FROM incomes WHERE apartment_id IS NOT NULL AND period IS NOT NULL
-        UNION
         SELECT apartment_id, period FROM fines
     ),
     agg_fines AS (
@@ -32,15 +30,6 @@ _PERIOD_DATA_QUERY = """
         FROM payments
         WHERE status = 'REGISTRADO'
         GROUP BY apartment_id, period
-    ),
-    agg_incomes AS (
-        SELECT
-            apartment_id,
-            period,
-            COALESCE(SUM(amount), 0) AS total_incomes
-        FROM incomes
-        WHERE status = 'REGISTRADO' AND apartment_id IS NOT NULL AND period IS NOT NULL
-        GROUP BY apartment_id, period
     )
     SELECT
         o.id           AS owner_id,
@@ -53,7 +42,7 @@ _PERIOD_DATA_QUERY = """
         ap.period,
         COALESCE(af.amount, 0) AS esperado,
         COALESCE(f.total_fines, 0) AS multas,
-        COALESCE(p.total_payments, 0) + COALESCE(i.total_incomes, 0) AS pagado
+        COALESCE(p.total_payments, 0) AS pagado
     FROM owners o
     JOIN owner_apartments oa ON o.id = oa.owner_id
     JOIN apartments        a  ON oa.apartment_id = a.id
@@ -61,7 +50,6 @@ _PERIOD_DATA_QUERY = """
     LEFT JOIN apartment_fees af ON af.apartment_id = a.id AND af.period = ap.period
     LEFT JOIN agg_fines      f  ON  f.apartment_id = a.id AND  f.period = ap.period
     LEFT JOIN agg_payments   p  ON  p.apartment_id = a.id AND  p.period = ap.period
-    LEFT JOIN agg_incomes    i  ON  i.apartment_id = a.id AND  i.period = ap.period
     WHERE o.status = 'ACTIVO'
 """
 

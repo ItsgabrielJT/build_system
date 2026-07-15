@@ -21,7 +21,11 @@ class ApartmentRepository:
                 a.code,
                 a.floor,
                 a.tower,
-                a.status,
+                CASE
+                    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
+                    WHEN oa.owner_id IS NULL THEN 'VACANTE'
+                    ELSE 'OCUPADO'
+                END AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,
                 a.created_at,
@@ -50,7 +54,11 @@ class ApartmentRepository:
                 a.code,
                 a.floor,
                 a.tower,
-                a.status,
+                CASE
+                    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
+                    WHEN oa.owner_id IS NULL THEN 'VACANTE'
+                    ELSE 'OCUPADO'
+                END AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,
                 a.created_at,
@@ -239,7 +247,11 @@ class ApartmentRepository:
                 a.code,
                 a.floor,
                 a.tower,
-                a.status,
+                CASE
+                    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
+                    WHEN oa.owner_id IS NULL THEN 'VACANTE'
+                    ELSE 'OCUPADO'
+                END AS status,
                 a.building_id,
                 oa.owner_id,
                 a.created_at,
@@ -281,7 +293,11 @@ class ApartmentRepository:
                 a.code,
                 a.floor,
                 a.tower,
-                a.status,
+                CASE
+                    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
+                    WHEN oa.owner_id IS NULL THEN 'VACANTE'
+                    ELSE 'OCUPADO'
+                END AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,
                 a.created_at,

@@ -318,13 +318,18 @@ class AccountStatementService:
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), font_size + 1),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("ALIGN", (0, 1), (-1, -1), "LEFT"),
+            ("ALIGN", (2, 1), (5, -1), "RIGHT"),
+            ("ALIGN", (-1, 1), (-1, -1), "CENTER"),
             ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#c8d6e8")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7faff")]),
             ("FONTSIZE", (0, 1), (-1, -1), font_size),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 7),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ]
         for row in total_rows or []:
             style.extend([

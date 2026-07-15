@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
 
 from app.models.schemas import ApartmentCreate, ApartmentUpdate, OwnerAssign
 from app.repositories.apartment_repository import ApartmentRepository
+
+_VALID_APARTMENT_STATUSES = {"OCUPADO", "VACANTE", "MANTENIMIENTO", "ACTIVO", "ACTIVA"}
 
 
 class ApartmentService:
@@ -33,6 +36,14 @@ class ApartmentService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Código de departamento ya existe",
                 )
+        if data.status:
+            normalized = data.status.upper()
+            if normalized not in _VALID_APARTMENT_STATUSES:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Estado inválido. Use Vacante, Ocupado o En mantenimiento",
+                )
+            data.status = "MANTENIMIENTO" if normalized == "MANTENIMIENTO" else "ACTIVO"
         return await self._repo.update(apartment_id, data)
 
     async def assign_owner(
@@ -61,6 +72,13 @@ class ApartmentService:
             page = 1
         if per_page < 1 or per_page > 100:
             per_page = 4
+
+        if status:
+            status = status.upper()
+            if status == "ACTIVO":
+                status = "OCUPADO"
+            elif status == "ACTIVA":
+                status = "VACANTE"
 
         return await self._repo.get_by_filter_paginated(
             page=page,

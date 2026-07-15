@@ -18,7 +18,7 @@ export default function ApartmentCard({ apartment, onClick }) {
     switch (status) {
       case 'OCUPADO': return 'Ocupado';
       case 'VACANTE': return 'Vacante';
-      case 'MANTENIMIENTO': return 'Mantenimiento';
+      case 'MANTENIMIENTO': return 'En mantenimiento';
       default: return status;
     }
   };

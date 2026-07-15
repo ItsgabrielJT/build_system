@@ -1,84 +1,74 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
   padding: 10px 4px 32px;
 }
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
-
 .header h1 {
-  color: #050505;
-  font-size: 30px;
+  color: #081126;
+  font-size: 32px;
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: 0;
 }
 
 .header p {
-  color: #454a55;
-  font-size: 16px;
-  margin-top: 4px;
+  color: #626b80;
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 6px;
 }
 
 .actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.15fr auto auto;
+  gap: 18px;
+  align-items: end;
 }
 
 .dateField,
 .selectField {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  color: #596070;
+  gap: 6px;
+  color: #626b80;
   font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 800;
 }
 
 .dateField input,
 .selectField select {
-  height: 40px;
-  min-width: 136px;
-  border: 1px solid #dfe2e8;
+  width: 100%;
+  height: 52px;
+  border: 1px solid #dfe5f0;
   border-radius: 8px;
-  padding: 0 12px;
-  color: #1f2430;
+  padding: 0 16px;
+  color: #1b2540;
   background: #fff;
-}
-
-.selectField select {
-  min-width: 190px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .btnPdf,
 .btnExcel {
   height: 52px;
+  min-width: 150px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border-radius: 8px;
-  padding: 0 16px;
+  padding: 0 18px;
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 800;
   white-space: nowrap;
 }
 
 .btnPdf {
   background: #fff;
-  border: 1.5px solid #111;
-  color: #111;
+  border: 1.5px solid #d9e0ec;
+  color: #111827;
 }
 
 .btnExcel {
@@ -104,144 +94,138 @@
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.monthlySection {
-  background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
-  border: 1px solid #e2e8f3;
-  border-radius: 24px;
-  padding: 22px;
-}
-
-.monthlyHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 18px;
-}
-
-.monthlyHeader h2 {
-  color: #070707;
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1.1;
-}
-
-.monthlyHeader p {
-  color: #596070;
-  font-size: 14px;
-  margin-top: 6px;
-}
-
-.monthField {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: #596070;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.monthField input {
-  height: 44px;
-  min-width: 156px;
-  border: 1px solid #dfe2e8;
-  border-radius: 10px;
-  padding: 0 12px;
-  color: #1f2430;
-  background: #fff;
-}
-
-.monthlyGrid {
-  display: grid;
-  gap: 18px;
 }
 
 .metricCard {
-  min-height: 118px;
+  min-height: 126px;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 14px;
+  align-items: center;
   background: #fff;
-  box-shadow: 0 16px 30px rgba(18, 27, 45, 0.04);
-  padding: 22px 24px;
+  border: 1px solid #e2e8f3;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(18, 27, 45, 0.04);
+  padding: 20px 18px;
+}
+
+.metricIcon {
+  width: 58px;
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 26px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.incomeIcon {
+  background: #dcf7e8;
+  color: #17a263;
+}
+
+.expenseIcon {
+  background: #ffe4e7;
+  color: #ef233c;
+}
+
+.balanceIcon {
+  background: #dfe8ff;
+  color: #1155d9;
+}
+
+.recoverIcon {
+  background: #fff0d9;
+  color: #f59e0b;
+}
+
+.efficiencyIcon {
+  background: #ece4ff;
+  color: #6842c2;
 }
 
 .metricCard span {
-  color: #474c58;
+  color: #2e3650;
   display: block;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.metricCard div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
 .metricCard strong {
-  color: #050505;
-  font-size: 36px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0;
+  color: #0d1428;
+  display: block;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.05;
+  margin-top: 4px;
 }
 
 .metricCard em {
+  display: inline-flex;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-style: normal;
-  font-weight: 700;
-  padding: 5px 10px;
+  font-weight: 900;
+  margin-top: 9px;
+  padding: 4px 10px;
+}
+
+.metricCard small {
+  color: #596070;
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 5px;
 }
 
 .positive {
-  background: #e1faef;
+  background: #dff8ec;
   color: #02815b;
 }
 
 .negative {
-  background: #fff0ef;
+  background: #ffe4e7;
   color: #e11d2e;
-}
-
-.netCard {
-  background: #f3f6fd;
-}
-
-.netCard strong {
-  color: #1155d9;
 }
 
 .chartGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2.25fr 1fr 1fr;
   gap: 18px;
 }
 
 .panel,
 .tablePanel {
   background: #fff;
-  box-shadow: 0 16px 30px rgba(18, 27, 45, 0.04);
+  border: 1px solid #e2e8f3;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(18, 27, 45, 0.04);
 }
 
 .panel {
-  min-height: 350px;
-  padding: 22px 24px 20px;
+  min-height: 310px;
+  padding: 18px 20px 14px;
 }
 
 .panel h2,
 .tableTitle h2 {
-  color: #070707;
-  font-size: 22px;
-  font-weight: 800;
+  color: #1b2540;
+  font-size: 17px;
+  font-weight: 900;
   line-height: 1.15;
   letter-spacing: 0;
+}
+
+.tableTitle h2 small {
+  color: #667085;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .panelHeader,
@@ -252,19 +236,71 @@
   gap: 16px;
 }
 
-.panelHeader span {
-  background: #f0f1f4;
-  border-radius: 9px;
-  color: #4d5260;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 7px 12px;
-  white-space: nowrap;
+.panelHeader {
+  margin-bottom: 8px;
 }
 
-.donutWrap {
-  height: 220px;
+.panelHeader span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.donutLayout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 192px;
+}
+
+.categoryLegend {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.categoryLegend span {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 7px 9px;
+  align-items: center;
+  color: #415178;
+  font-size: 12px;
+}
+
+.categoryLegend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  grid-row: span 2;
+}
+
+.categoryLegend b {
+  color: #34405f;
+  font-weight: 800;
+}
+
+.categoryLegend small {
+  color: #667085;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.totalStrip {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 8px;
+  border-radius: 6px;
+  background: #f3f6fc;
+  color: #1155d9;
+  font-size: 15px;
+  font-weight: 900;
+  padding: 0 14px;
 }
 
 .legend {
@@ -298,13 +334,10 @@
   background: #1155d9;
 }
 
-.emptyState {
-  min-height: 190px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #7a808d;
-  font-size: 14px;
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 18px;
 }
 
 .tablePanel {
@@ -312,113 +345,96 @@
 }
 
 .tableTitle {
-  padding: 22px 24px;
-}
-
-.tableTitle span {
-  border: 1px solid #fecaca;
-  border-radius: 999px;
-  background: #fff7f7;
-  color: #dc2626;
-  font-size: 13px;
-  font-weight: 800;
-  padding: 6px 12px;
-  white-space: nowrap;
+  padding: 18px 22px 10px;
 }
 
 .tableScroller {
   overflow-x: auto;
+  padding: 0 16px 16px;
 }
 
 .tableScroller table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 820px;
+  min-width: 640px;
 }
 
 .tableScroller th {
-  background: #f1f2f5;
-  color: #454a55;
+  background: #f1f4fa;
+  color: #18327a;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 14px 18px;
+  font-weight: 900;
+  padding: 12px 14px;
   text-align: left;
-  text-transform: uppercase;
 }
 
 .tableScroller td {
-  border-top: 1px solid #dfe2e8;
-  color: #20242c;
-  font-size: 14px;
-  padding: 17px 18px;
+  border-top: 1px solid #e2e8f0;
+  color: #33416b;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 12px 14px;
 }
 
 .tableScroller td:first-child {
-  font-weight: 800;
+  font-weight: 900;
 }
 
-.riskHigh,
-.riskMedium,
-.riskLow {
-  border-radius: 6px;
+.tableScroller td:nth-child(3),
+.tableScroller td:nth-child(4) {
+  text-align: right;
+}
+
+.tableScroller tfoot td {
+  background: #f3f6fc;
+  border-top: 0;
+  color: #1155d9;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.statusPaid,
+.statusPending {
   display: inline-flex;
-  font-size: 13px;
-  font-weight: 700;
-  min-width: 58px;
   justify-content: center;
+  min-width: 72px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
   padding: 4px 10px;
 }
 
-.riskHigh {
-  background: #fee2e2;
-  color: #b91c1c;
+.statusPaid {
+  background: #dff8ec;
+  color: #0c8f5c;
 }
 
-.riskMedium {
-  background: #ffedd5;
-  color: #9a3412;
-}
-
-.riskLow {
-  background: #d1fae5;
-  color: #047857;
-}
-
-.mailBtn {
-  color: #1155d9;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-}
-
-.mailBtn:hover {
-  background: #eff6ff;
+.statusPending {
+  background: #fff0d9;
+  color: #f59e0b;
 }
 
 .emptyCell {
   color: #7a808d;
-  text-align: center;
+  text-align: center !important;
 }
 
-@media (max-width: 1100px) {
-  .header {
-    flex-direction: column;
-  }
-
-  .monthlyHeader {
-    flex-direction: column;
-  }
-
+@media (max-width: 1240px) {
   .actions {
-    justify-content: flex-start;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .statsGrid,
-  .chartGrid {
+  .btnPdf,
+  .btnExcel {
+    width: 100%;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chartGrid,
+  .detailGrid {
     grid-template-columns: 1fr;
   }
 }
@@ -429,37 +445,20 @@
   }
 
   .header h1 {
-    font-size: 32px;
-  }
-
-  .header p {
-    font-size: 18px;
+    font-size: 30px;
   }
 
   .actions,
-  .dateField,
-  .selectField,
-  .monthField,
-  .dateField input,
-  .selectField select,
-  .monthField input,
-  .btnPdf,
-  .btnExcel {
-    width: 100%;
+  .statsGrid {
+    grid-template-columns: 1fr;
   }
 
-  .metricCard strong {
-    font-size: 42px;
+  .metricCard {
+    grid-template-columns: 60px 1fr;
   }
 
   .panel,
   .metricCard {
-    padding: 24px 20px;
-  }
-
-  .panelHeader,
-  .tableTitle {
-    align-items: flex-start;
-    flex-direction: column;
+    padding: 18px 16px;
   }
 }

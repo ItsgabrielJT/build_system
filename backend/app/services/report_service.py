@@ -182,7 +182,7 @@ class ReportService:
         ]
         return f"{value.day:02d} de {months[value.month - 1]} de {value.year}"
 
-    def _p(self, text: str, size: int = 8, *, bold: bool = False, color="#102a56", align: str = "CENTER", raw: bool = False) -> Paragraph:
+    def _p(self, text: str, size: int = 8, *, bold: bool = False, color="#102a56", align: str = "LEFT", raw: bool = False) -> Paragraph:
         safe_text = str(text or "") if raw else escape(str(text or ""))
         return Paragraph(
             f'<font color="{color}">{"<b>" if bold else ""}{safe_text}{"</b>" if bold else ""}</font>',
@@ -267,8 +267,9 @@ class ReportService:
                 raw=True,
             )
 
+        title_html = escape(title).replace("\n", "<br/>")
         title_block = Paragraph(
-            f"<font size='18'><b>{escape(title)}</b></font><br/><font size='9'>{escape(subtitle)}</font>",
+            f"<font size='18'><b>{title_html}</b></font><br/><font size='9'>{escape(subtitle)}</font>",
             ParagraphStyle(
                 "PdfHeaderTitle",
                 fontName="Helvetica",
@@ -420,13 +421,17 @@ class ReportService:
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), font_size + 1),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("ALIGN", (0, 1), (-1, -1), "LEFT"),
+            ("ALIGN", (-1, 1), (-1, -1), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("GRID", (0, 0), (-1, -1), 0.45, _PDF_BORDER),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f6f9fd")]),
             ("FONTSIZE", (0, 1), (-1, -1), font_size),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ]
         for row in total_rows or []:
             style.extend([
@@ -478,7 +483,9 @@ class ReportService:
         return TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), _PDF_BLUE),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("ALIGN", (0, 1), (-1, -1), "LEFT"),
+            ("ALIGN", (-1, 1), (-1, -1), "RIGHT"),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), font_size + 1),
             ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
@@ -486,6 +493,8 @@ class ReportService:
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
             ("FONTSIZE", (0, 1), (-1, -1), font_size),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ])
 
     def _style_excel_header(self, ws, headers: list[str]) -> None:
@@ -810,6 +819,12 @@ class ReportService:
                 "risk_level": risk_level,
             })
 
+        fee_details = await self._fees_report_rows(start_date, end_date)
+        expense_details = sorted(
+            expenses,
+            key=lambda row: row.get("date") or date.min,
+        )
+
         return {
             "summary": {
                 "total_revenue": float(total_revenue),
@@ -829,6 +844,27 @@ class ReportService:
             ],
             "monthly": monthly,
             "arrears": arrears,
+            "fee_details": [
+                {
+                    "period": row.get("period"),
+                    "apartment_code": row.get("apartment_code"),
+                    "owner_name": row.get("owner_name"),
+                    "amount": float(row.get("amount") or 0),
+                    "paid_amount": float(row.get("paid_amount") or 0),
+                    "pending_amount": float(row.get("pending_amount") or 0),
+                    "status": row.get("status"),
+                }
+                for row in fee_details[:8]
+            ],
+            "expense_details": [
+                {
+                    "date": row.get("date"),
+                    "concept": row.get("concept") or row.get("description") or "",
+                    "category": row.get("category") or "Sin categoría",
+                    "amount": float(row.get("amount") or 0),
+                }
+                for row in expense_details[:8]
+            ],
             "risk_summary": {
                 "high": sum(1 for row in arrears if row["risk_level"] == "High"),
                 "medium": sum(1 for row in arrears if row["risk_level"] == "Medium"),
@@ -1007,21 +1043,21 @@ class ReportService:
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         story.extend(
             await self._three_column_report_header(
-                "Balance de Fin de Mes - Ingresos y Egresos",
+                "BALANCE DE FIN DE MES\nINGRESOS Y EGRESOS",
                 f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
                 width,
                 building=building,
-                right_text=f"Total ingresos: {self._usd(total_income)}",
+                right_text="Moneda: USD - Dólares",
             )
         )
         story.append(self._metric_cards([
-            ("Ingresos", self._usd(total_income), "$"),
-            ("Egresos", self._usd(total_expenses), "▤"),
-            ("Balance neto", self._usd(balance), "↕"),
+            ("Ingreso efectivo por alícuotas", self._usd(total_income), "$"),
+            ("Gastos del mes", self._usd(total_expenses), "▤"),
+            ("Saldo (superávit / déficit)", self._usd(balance), "↕"),
             ("Estado", "Superávit" if balance >= 0 else "Déficit", "✓"),
         ], width))
         story.append(Spacer(1, 0.22 * cm))
-        story.append(self._section_title("Resumen del balance", width))
+        story.append(self._section_title(f"DETALLE DEL MES - {self._period_name(period).upper() if period else self._date_label(period, start_date, end_date).upper()}", width))
         rows = [["Concepto", "Monto", "Observación"]]
         for row in income_by_method or [{"label": "Ingresos por alícuotas", "amount": total_income}]:
             rows.append([row["label"], self._usd(row["amount"]), "Ingreso operativo"])
@@ -1035,13 +1071,13 @@ class ReportService:
         balance_row = len(rows) - 1
         story.append(self._styled_table(rows, [width * 0.36, width * 0.27, width * 0.37], font_size=8, total_rows=[total_income_row, total_expense_row, balance_row]))
         story.append(Spacer(1, 0.2 * cm))
-        story.append(self._section_title("Detalle general", width))
+        story.append(self._section_title("Resumen de ingresos y egresos por categoría", width))
         income_data = [["Ingresos", "Monto (USD)"]] + [[r["label"], self._usd(r["amount"])] for r in income_by_method] + [["Subtotal ingresos", self._usd(total_income)]]
         expense_data = [["Egresos", "Monto (USD)"]] + [[r["label"], self._usd(r["amount"])] for r in expenses_by_category] + [["Subtotal egresos", self._usd(total_expenses)]]
         details = Table([[self._styled_table(income_data, [width * 0.32, width * 0.16], font_size=7, total_rows=[len(income_data) - 1]), self._styled_table(expense_data, [width * 0.32, width * 0.16], font_size=7, total_rows=[len(expense_data) - 1])]], colWidths=[width * 0.5, width * 0.5])
         story.append(details)
         story.append(Spacer(1, 0.18 * cm))
-        final = Table([[self._p("Balance final del mes", 14, bold=True, color="#ffffff"), self._p(self._usd(balance), 19, bold=True, color="#ffffff")]], colWidths=[width * 0.52, width * 0.48])
+        final = Table([[self._p("SALDO (SUPERÁVIT / DÉFICIT)", 12, bold=True, color="#ffffff"), self._p(self._usd(balance), 17, bold=True, color="#ffffff", align="RIGHT")]], colWidths=[width * 0.52, width * 0.48])
         final.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), _PDF_NAVY), ("LINEBEFORE", (1, 0), (1, 0), 1, colors.white), ("BOX", (0, 0), (-1, -1), 0.8, _PDF_BLUE), ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
         story.append(final)
         story.append(Spacer(1, 0.2 * cm))
@@ -1068,7 +1104,14 @@ class ReportService:
         by_method = self._build_breakdown(payments, "method", "Sin método")
 
         output = io.BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.8*inch)
+        doc = SimpleDocTemplate(
+            output,
+            pagesize=letter,
+            leftMargin=0.45 * inch,
+            rightMargin=0.45 * inch,
+            topMargin=0.5 * inch,
+            bottomMargin=0.8 * inch,
+        )
         story = []
         styles = getSampleStyleSheet()
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
@@ -1090,17 +1133,30 @@ class ReportService:
         data = [["Fecha", "Propietario", "Depto", "Período", "Monto", "Método", "Estado", "Referencia"]]
         for p in payments:
             data.append([
-                str(p.get("paid_at") or ""),
-                p.get("owner_name") or "",
-                p.get("apartment_code") or "",
-                p.get("period") or "",
-                self._money(p.get("amount", 0)),
-                p.get("method") or "",
-                p.get("status") or "",
-                p.get("reference") or "",
+                self._p(str(p.get("paid_at") or ""), 6, align="CENTER"),
+                self._p(p.get("owner_name") or "", 6),
+                self._p(p.get("apartment_code") or "", 6, align="CENTER"),
+                self._p(p.get("period") or "", 6, align="CENTER"),
+                self._p(self._money(p.get("amount", 0)), 6, bold=True, align="RIGHT"),
+                self._p(p.get("method") or "", 6),
+                self._p(p.get("status") or "", 6, align="CENTER"),
+                self._p(p.get("reference") or "", 6),
             ])
-        table = Table(data, colWidths=[0.75*inch, 1.1*inch, 0.55*inch, 0.7*inch, 0.75*inch, 0.75*inch, 0.85*inch, 1.05*inch], repeatRows=1)
-        table.setStyle(self._table_style(7))
+        table = Table(
+            data,
+            colWidths=[
+                doc.width * 0.10,
+                doc.width * 0.20,
+                doc.width * 0.08,
+                doc.width * 0.10,
+                doc.width * 0.11,
+                doc.width * 0.12,
+                doc.width * 0.12,
+                doc.width * 0.17,
+            ],
+            repeatRows=1,
+        )
+        table.setStyle(self._table_style(6))
         story.append(table)
         self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PAGOS", signer_name="Administración", signer_role="Administrador del edificio")
         footer = self._footer_callback(building, doc.width)

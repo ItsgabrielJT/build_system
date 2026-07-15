@@ -6,8 +6,9 @@ import * as ownerService from '../../services/ownerService';
 import styles from './ApartmentDetailModal.module.css';
 
 const STATUS_OPTIONS = [
-  { value: 'ACTIVA', label: 'Activo' },
-  { value: 'MANTENIMIENTO', label: 'Mantenimiento' },
+  { value: 'VACANTE', label: 'Vacante' },
+  { value: 'OCUPADO', label: 'Ocupado' },
+  { value: 'MANTENIMIENTO', label: 'En mantenimiento' },
 ];
 
 const EDIT_FIELDS = [
@@ -107,7 +108,7 @@ export default function ApartmentDetailModal({ apartment, onClose, onRefresh }) 
   const getStatusLabel = (status) => {
     if (status === 'OCUPADO') return { label: 'Ocupado', color: '#27ae60', bg: 'rgba(39,174,96,0.12)' };
     if (status === 'VACANTE') return { label: 'Vacante', color: '#3498db', bg: 'rgba(52,152,219,0.12)' };
-    if (status === 'MANTENIMIENTO') return { label: 'Mantenimiento', color: '#e67e22', bg: 'rgba(230,126,34,0.12)' };
+    if (status === 'MANTENIMIENTO') return { label: 'En mantenimiento', color: '#e67e22', bg: 'rgba(230,126,34,0.12)' };
     return { label: status, color: '#666', bg: '#f0f0f0' };
   };
 

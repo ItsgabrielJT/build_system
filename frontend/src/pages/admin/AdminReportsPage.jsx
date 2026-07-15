@@ -5,6 +5,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -12,15 +13,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import MonthlyBalanceCards from '../../components/MonthlyBalanceCards/MonthlyBalanceCards';
-import MonthlyBalanceChart from '../../components/MonthlyBalanceChart/MonthlyBalanceChart';
 import { useAuth } from '../../hooks/useAuth';
-import { useMonthlyBalance } from '../../hooks/useMonthlyBalance';
 import * as reportService from '../../services/reportService';
 import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './AdminReportsPage.module.css';
 
-const CATEGORY_COLORS = ['#1155d9', '#b9c3de', '#81889e', '#121b2d', '#dfe3e8', '#6a7cc2'];
+const CATEGORY_COLORS = ['#1155d9', '#8faef0', '#19b47b', '#9aa5bd', '#dfe3e8', '#6a7cc2'];
 const REPORT_LABELS = {
   delinquency: 'morosidad',
   income: 'ingresos',
@@ -30,11 +28,11 @@ const REPORT_LABELS = {
 };
 
 const REPORT_OPTIONS = [
-  { value: 'delinquency', label: 'Morosidad' },
-  { value: 'income', label: 'Ingresos' },
   { value: 'balance', label: 'Balance ingresos y egresos' },
-  { value: 'payments', label: 'Pagos' },
+  { value: 'income', label: 'Ingresos' },
   { value: 'expenses', label: 'Gastos' },
+  { value: 'payments', label: 'Pagos' },
+  { value: 'delinquency', label: 'Morosidad' },
 ];
 
 function triggerDownload(blob, filename) {
@@ -46,10 +44,10 @@ function triggerDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-function getCurrentMonthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+function getMonthRange(period) {
+  const [year, month] = period.split('-').map(Number);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
@@ -60,76 +58,100 @@ function getCurrentMonthPeriod() {
   return new Date().toISOString().slice(0, 7);
 }
 
-function formatCurrency(value) {
-  return `$${Number(value || 0).toLocaleString('es-EC', {
+function getPreviousMonthPeriod(period) {
+  const [year, month] = period.split('-').map(Number);
+  const previous = new Date(year, month - 2, 1);
+  return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMoney(value) {
+  return `USD ${Number(value || 0).toLocaleString('es-EC', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatShortMoney(value) {
+  return `USD ${Number(value || 0).toLocaleString('es-EC', {
     maximumFractionDigits: 0,
   })}`;
 }
 
 function formatChange(value) {
-  if (value === null || value === undefined) return '0.0%';
   const sign = Number(value) > 0 ? '+' : '';
-  return `${sign}${Number(value).toFixed(1)}%`;
+  return `${sign}${Number(value || 0).toFixed(2)}%`;
 }
 
-function getRangeLabel(startDate) {
-  if (!startDate) return 'Resumen';
-  const date = new Date(`${startDate}T00:00:00`);
+function getPeriodLabel(period) {
+  if (!period) return 'Resumen';
+  const date = new Date(`${period}-01T00:00:00`);
   return new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(date);
 }
 
-function getRiskLabel(riskLevel) {
-  const labels = { High: 'Alto', Medium: 'Medio', Low: 'Bajo' };
-  return labels[riskLevel] || riskLevel;
+function getChangePercent(current, previous) {
+  const previousValue = Number(previous || 0);
+  if (!previousValue) return 0;
+  return ((Number(current || 0) - previousValue) / previousValue) * 100;
 }
 
-function IconMail() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <polyline points="3 7 12 13 21 7" />
-    </svg>
-  );
+function formatDate(value) {
+  if (!value) return '--';
+  const normalized = typeof value === 'string' ? value.slice(0, 10) : value;
+  const date = new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export default function AdminReportsPage() {
   const { token } = useAuth();
   const { building } = useOutletContext() || {};
-  const buildingName = building?.name || 'Edificio Principal';
-  const initialRange = useMemo(() => getCurrentMonthRange(), []);
-  const [startDate, setStartDate] = useState(initialRange.startDate);
-  const [endDate, setEndDate] = useState(initialRange.endDate);
-  const monthlyPeriod = startDate ? startDate.slice(0, 7) : getCurrentMonthPeriod();
+  const buildingName = building?.name || 'edificio';
+  const initialPeriod = useMemo(() => getCurrentMonthPeriod(), []);
+  const [period, setPeriod] = useState(initialPeriod);
+  const [comparePeriod, setComparePeriod] = useState(getPreviousMonthPeriod(initialPeriod));
+  const [{ startDate, endDate }, setDateRange] = useState(getMonthRange(initialPeriod));
   const [stats, setStats] = useState(null);
-  const [selectedReport, setSelectedReport] = useState('income');
+  const [comparisonStats, setComparisonStats] = useState(null);
+  const [selectedReport, setSelectedReport] = useState('balance');
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingExport, setLoadingExport] = useState({});
   const [error, setError] = useState(null);
-  const {
-    data: monthlyBalance,
-    loading: loadingMonthlyBalance,
-    error: monthlyBalanceError,
-  } = useMonthlyBalance('ADMIN', monthlyPeriod);
+
+  useEffect(() => {
+    setDateRange(getMonthRange(period));
+  }, [period]);
 
   useEffect(() => {
     let cancelled = false;
+
     async function loadStats() {
       setLoadingStats(true);
       setError(null);
       try {
-        const data = await reportService.getDashboardStats(token, { start_date: startDate, end_date: endDate });
-        if (!cancelled) setStats(data);
+        const compareRange = getMonthRange(comparePeriod);
+        const [currentData, previousData] = await Promise.all([
+          reportService.getDashboardStats(token, { start_date: startDate, end_date: endDate }),
+          reportService.getDashboardStats(token, {
+            start_date: compareRange.startDate,
+            end_date: compareRange.endDate,
+          }),
+        ]);
+        if (!cancelled) {
+          setStats(currentData);
+          setComparisonStats(previousData);
+        }
       } catch {
         if (!cancelled) setError('Error al cargar estadísticas de reportes.');
       } finally {
         if (!cancelled) setLoadingStats(false);
       }
     }
+
     loadStats();
     return () => {
       cancelled = true;
     };
-  }, [token, startDate, endDate]);
+  }, [token, startDate, endDate, comparePeriod]);
 
   const handleDownloadSelected = async (format) => {
     setLoadingExport((prev) => ({ ...prev, [format]: true }));
@@ -154,183 +176,281 @@ export default function AdminReportsPage() {
   };
 
   const summary = stats?.summary || {};
+  const comparisonSummary = comparisonStats?.summary || {};
   const categories = stats?.expense_categories || [];
   const monthly = stats?.monthly || [];
-  const arrears = stats?.arrears || [];
-  const highRisk = stats?.risk_summary?.high || 0;
+  const comparisonMonthly = comparisonStats?.monthly || [];
+  const feeDetails = stats?.fee_details || [];
+  const expenseDetails = stats?.expense_details || [];
+
+  const currentExpected = monthly.at(-1)?.expected || 0;
+  const currentCollected = monthly.at(-1)?.collected || summary.total_revenue || 0;
+  const comparisonExpected = comparisonMonthly.at(-1)?.expected || 0;
+  const comparisonCollected = comparisonMonthly.at(-1)?.collected || comparisonSummary.total_revenue || 0;
+  const recoverable = Math.max(currentExpected - currentCollected, 0);
+  const comparisonRecoverable = Math.max(comparisonExpected - comparisonCollected, 0);
+  const efficiency = currentExpected ? (currentCollected / currentExpected) * 100 : 0;
+  const comparisonEfficiency = comparisonExpected ? (comparisonCollected / comparisonExpected) * 100 : 0;
+
+  const metrics = [
+    {
+      label: 'Ingresos totales',
+      value: formatMoney(summary.total_revenue),
+      change: getChangePercent(summary.total_revenue, comparisonSummary.total_revenue),
+      tone: 'income',
+      icon: '↗',
+    },
+    {
+      label: 'Gastos totales',
+      value: formatMoney(summary.total_expenses),
+      change: getChangePercent(summary.total_expenses, comparisonSummary.total_expenses),
+      tone: 'expense',
+      icon: '↘',
+      inverse: true,
+    },
+    {
+      label: 'Balance neto',
+      value: formatMoney(summary.net_income),
+      change: getChangePercent(summary.net_income, comparisonSummary.net_income),
+      tone: 'balance',
+      icon: '▣',
+    },
+    {
+      label: 'Valor por recuperar',
+      value: formatMoney(recoverable),
+      change: getChangePercent(recoverable, comparisonRecoverable),
+      tone: 'recover',
+      icon: '●',
+      inverse: true,
+    },
+    {
+      label: 'Eficiencia recaudación',
+      value: `${efficiency.toFixed(2)}%`,
+      change: efficiency - comparisonEfficiency,
+      tone: 'efficiency',
+      icon: '%',
+    },
+  ];
+
+  const comparisonChart = [
+    { name: 'Ingreso efectivo', actual: summary.total_revenue || 0, comparativo: comparisonSummary.total_revenue || 0 },
+    { name: 'Gastos', actual: summary.total_expenses || 0, comparativo: comparisonSummary.total_expenses || 0 },
+    { name: 'Resultado', actual: summary.net_income || 0, comparativo: comparisonSummary.net_income || 0 },
+    { name: 'Valores por recuperar', actual: recoverable, comparativo: comparisonRecoverable },
+    { name: 'Eficiencia', actual: efficiency, comparativo: comparisonEfficiency, percent: true },
+  ];
+
+  const emittedVsCollected = [
+    { period: getPeriodLabel(comparePeriod), expected: comparisonExpected, collected: comparisonCollected },
+    { period: getPeriodLabel(period), expected: currentExpected, collected: currentCollected },
+  ];
 
   return (
     <div className={styles.page}>
       <section className={styles.header}>
         <div>
           <h1>Reportes financieros</h1>
-          <p>{getRangeLabel(startDate)} de {buildingName}</p>
+          <p>Genera y consulta los reportes financieros del {buildingName}.</p>
         </div>
-        <div className={styles.actions}>
-          <label className={styles.dateField}>
-            <span>Inicio</span>
-            <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-          </label>
-          <label className={styles.dateField}>
-            <span>Fin</span>
-            <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-          </label>
-          <label className={styles.selectField}>
-            <span>Reporte</span>
-            <select value={selectedReport} onChange={(event) => setSelectedReport(event.target.value)}>
-              {REPORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <button className={styles.btnPdf} onClick={() => handleDownloadSelected('pdf')} disabled={loadingExport.pdf}>
-            <DownloadIcon />
-            {loadingExport.pdf ? 'Descargando...' : 'Descargar PDF'}
-          </button>
-          <button className={styles.btnExcel} onClick={() => handleDownloadSelected('excel')} disabled={loadingExport.excel}>
-            <DownloadIcon />
-            {loadingExport.excel ? 'Descargando...' : 'Descargar Excel'}
-          </button>
-        </div>
+      </section>
+
+      <section className={styles.actions}>
+        <label className={styles.dateField}>
+          <span>Periodo</span>
+          <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} />
+        </label>
+        <label className={styles.dateField}>
+          <span>Comparar con</span>
+          <input type="month" value={comparePeriod} onChange={(event) => setComparePeriod(event.target.value)} />
+        </label>
+        <label className={styles.selectField}>
+          <span>Tipo de reporte</span>
+          <select value={selectedReport} onChange={(event) => setSelectedReport(event.target.value)}>
+            {REPORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+        <button className={styles.btnPdf} onClick={() => handleDownloadSelected('pdf')} disabled={loadingExport.pdf}>
+          <DownloadIcon />
+          {loadingExport.pdf ? 'Descargando...' : 'Descargar PDF'}
+        </button>
+        <button className={styles.btnExcel} onClick={() => handleDownloadSelected('excel')} disabled={loadingExport.excel}>
+          <DownloadIcon />
+          {loadingExport.excel ? 'Descargando...' : 'Descargar Excel'}
+        </button>
       </section>
 
       {error && <div className={styles.errorBanner}>{error}</div>}
 
       <section className={styles.statsGrid} aria-busy={loadingStats}>
-        <article className={styles.metricCard}>
-          <span>Ingresos totales</span>
-          <div>
-            <strong>{formatCurrency(summary.total_revenue)}</strong>
-            <em className={styles.positive}>{formatChange(summary.revenue_change_percent)}</em>
-          </div>
-        </article>
-        <article className={styles.metricCard}>
-          <span>Gastos totales</span>
-          <div>
-            <strong>{formatCurrency(summary.total_expenses)}</strong>
-            <em className={styles.negative}>{formatChange(summary.expense_change_percent)}</em>
-          </div>
-        </article>
-        <article className={`${styles.metricCard} ${styles.netCard}`}>
-          <span>Ingreso neto</span>
-          <div>
-            <strong>{formatCurrency(summary.net_income)}</strong>
-          </div>
-        </article>
-      </section>
-
-      <section className={styles.monthlySection} aria-busy={loadingMonthlyBalance}>
-        <div className={styles.monthlyHeader}>
-          <div>
-            <h2>Balance mensual del edificio</h2>
-            <p>Vista contable consolidada para contrastar el mes actual contra el anterior.</p>
-          </div>
-        </div>
-
-        {monthlyBalanceError ? <div className={styles.errorBanner}>{monthlyBalanceError}</div> : null}
-
-        <div className={styles.monthlyGrid}>
-          <MonthlyBalanceCards summary={monthlyBalance} loading={loadingMonthlyBalance} />
-          <MonthlyBalanceChart summary={monthlyBalance} loading={loadingMonthlyBalance} />
-        </div>
+        {metrics.map((metric) => {
+          const isGood = metric.inverse ? metric.change <= 0 : metric.change >= 0;
+          return (
+            <article className={styles.metricCard} key={metric.label}>
+              <i className={`${styles.metricIcon} ${styles[`${metric.tone}Icon`]}`}>{metric.icon}</i>
+              <div>
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+                <em className={isGood ? styles.positive : styles.negative}>{formatChange(metric.change)}</em>
+                <small>vs. mes anterior</small>
+              </div>
+            </article>
+          );
+        })}
       </section>
 
       <section className={styles.chartGrid}>
+        <article className={`${styles.panel} ${styles.comparisonPanel}`}>
+          <div className={styles.panelHeader}>
+            <h2>Comparativo del mes</h2>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={comparisonChart} barGap={7}>
+              <CartesianGrid stroke="#e7ebf3" vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} interval={0} />
+              <YAxis tickFormatter={(value) => (Math.abs(value) <= 100 ? `${Math.round(value)}` : formatShortMoney(value))} tickLine={false} axisLine={false} />
+              <Tooltip formatter={(value, name, item) => (item?.payload?.percent ? `${Number(value).toFixed(2)}%` : formatMoney(value))} />
+              <Legend />
+              <Bar dataKey="comparativo" name={getPeriodLabel(comparePeriod)} fill="#b9cdfb" radius={[5, 5, 0, 0]} />
+              <Bar dataKey="actual" name={getPeriodLabel(period)} fill="#1155d9" radius={[5, 5, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </article>
+
         <article className={styles.panel}>
           <h2>Categorías de gastos</h2>
-          <div className={styles.donutWrap}>
-            {categories.length ? (
-              <ResponsiveContainer width="100%" height={210}>
-                <PieChart>
-                  <Pie data={categories} dataKey="amount" nameKey="category" innerRadius={58} outerRadius={92} paddingAngle={0}>
-                    {categories.map((entry, index) => (
-                      <Cell key={entry.category} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className={styles.emptyState}>Sin gastos en el rango</div>
-            )}
+          <div className={styles.donutLayout}>
+            <ResponsiveContainer width="48%" height={190}>
+              <PieChart>
+                <Pie data={categories} dataKey="amount" nameKey="category" innerRadius={48} outerRadius={76}>
+                  {categories.map((entry, index) => (
+                    <Cell key={entry.category} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => formatMoney(value)} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className={styles.categoryLegend}>
+              {categories.slice(0, 4).map((item, index) => (
+                <span key={item.category}>
+                  <i style={{ background: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }} />
+                  <b>{item.category}</b>
+                  <small>{formatMoney(item.amount)}</small>
+                </span>
+              ))}
+            </div>
           </div>
-          <div className={styles.legend}>
-            {categories.slice(0, 6).map((item, index) => (
-              <span key={item.category}>
-                <i style={{ background: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }} />
-                {item.category}
-              </span>
-            ))}
+          <div className={styles.totalStrip}>
+            <span>Total egresos</span>
+            <strong>{formatMoney(summary.total_expenses)}</strong>
           </div>
         </article>
 
         <article className={styles.panel}>
           <div className={styles.panelHeader}>
             <h2>Emitido vs cobrado</h2>
-            <span>{getRangeLabel(startDate).replace('Resumen ', '')}</span>
           </div>
-          {monthly.length ? (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={monthly} barGap={6}>
-                <CartesianGrid stroke="#ebedf2" vertical={false} />
-                <XAxis dataKey="period" tickLine={false} axisLine={false} />
-                <YAxis tickFormatter={(value) => `$${Math.round(value / 1000)}k`} tickLine={false} axisLine={false} />
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Bar dataKey="expected" name="Emitido" fill="#dfe3e8" radius={[5, 5, 0, 0]} />
-                <Bar dataKey="collected" name="Cobrado" fill="#1155d9" radius={[5, 5, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className={styles.emptyState}>Sin datos mensuales</div>
-          )}
-          <div className={styles.legend}>
-            <span><i className={styles.grayDot} />Emitido</span>
-            <span><i className={styles.blueDot} />Cobrado</span>
-          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={emittedVsCollected} barGap={10}>
+              <CartesianGrid stroke="#ebedf2" vertical={false} />
+              <XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={(value) => formatShortMoney(value)} tickLine={false} axisLine={false} />
+              <Tooltip formatter={(value) => formatMoney(value)} />
+              <Legend />
+              <Bar dataKey="expected" name="Emitido" fill="#b9cdfb" radius={[5, 5, 0, 0]} />
+              <Bar dataKey="collected" name="Cobrado" fill="#1155d9" radius={[5, 5, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </article>
       </section>
 
-      <section className={styles.tablePanel}>
-        <div className={styles.tableTitle}>
-          <h2>Mora y saldos pendientes</h2>
-          <span>Riesgo alto: {highRisk}</span>
-        </div>
-        <div className={styles.tableScroller}>
-          <table>
-            <thead>
-              <tr>
-                <th>Unidad</th>
-                <th>Propietario</th>
-                <th>Monto pendiente</th>
-                <th>Vencimiento</th>
-                <th>Riesgo</th>
-                <th>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {arrears.length ? arrears.map((row) => (
-                <tr key={`${row.unit}-${row.owner}`}>
-                  <td>{row.unit}</td>
-                  <td>{row.owner}</td>
-                  <td>{formatCurrency(row.amount_due)}</td>
-                  <td>{row.days_overdue}</td>
-                  <td><span className={styles[`risk${row.risk_level}`]}>{getRiskLabel(row.risk_level)}</span></td>
-                  <td>
-                    {row.email ? (
-                      <a className={styles.mailBtn} href={`mailto:${row.email}`} aria-label={`Enviar correo a ${row.owner}`}>
-                        <IconMail />
-                      </a>
-                    ) : null}
-                  </td>
-                </tr>
-              )) : (
+      <section className={styles.detailGrid}>
+        <article className={styles.tablePanel}>
+          <div className={styles.tableTitle}>
+            <h2>Detalle de alícuotas <small>(por departamento)</small></h2>
+          </div>
+          <div className={styles.tableScroller}>
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan="6" className={styles.emptyCell}>No hay saldos pendientes</td>
+                  <th>Departamento</th>
+                  <th>Propietario</th>
+                  <th>Monto (USD)</th>
+                  <th>Estado</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {feeDetails.length ? feeDetails.slice(0, 5).map((row) => (
+                  <tr key={`${row.period}-${row.apartment_code}-${row.owner_name}`}>
+                    <td>{row.apartment_code}</td>
+                    <td>{row.owner_name}</td>
+                    <td>{formatMoney(row.amount)}</td>
+                    <td>
+                      <span className={row.status === 'PAGADA' ? styles.statusPaid : styles.statusPending}>
+                        {row.status === 'PAGADA' ? 'Pagado' : 'Pendiente'}
+                      </span>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="4" className={styles.emptyCell}>Sin alícuotas en el período</td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan="2">Total recaudado</td>
+                  <td>{formatMoney(currentCollected)}</td>
+                  <td />
+                </tr>
+                <tr>
+                  <td colSpan="2">Total proyectado (alícuotas)</td>
+                  <td>{formatMoney(currentExpected)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </article>
+
+        <article className={styles.tablePanel}>
+          <div className={styles.tableTitle}>
+            <h2>Detalle de gastos <small>(por movimiento)</small></h2>
+          </div>
+          <div className={styles.tableScroller}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Concepto</th>
+                  <th>Categoría</th>
+                  <th>Monto (USD)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expenseDetails.length ? expenseDetails.map((row) => (
+                  <tr key={`${row.date}-${row.concept}-${row.amount}`}>
+                    <td>{formatDate(row.date)}</td>
+                    <td>{row.concept}</td>
+                    <td>{row.category}</td>
+                    <td>{formatMoney(row.amount)}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="4" className={styles.emptyCell}>Sin gastos en el período</td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan="3">Total egresos del mes</td>
+                  <td>{formatMoney(summary.total_expenses)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </article>
       </section>
     </div>
   );

@@ -160,6 +160,54 @@ export default function AdminFeesPage() {
   const aptMap = {};
   apartments.forEach((a) => { aptMap[a.id] = a; });
 
+  // Función comparadora para ordenar torres y departamentos según especificación
+  const compareApartments = (aptA, aptB) => {
+    const tA = aptA.tower ? aptA.tower.toString().trim() : '';
+    const tB = aptB.tower ? aptB.tower.toString().trim() : '';
+
+    // 1. Las torres vacías van al final
+    if (!tA && tB) return 1;
+    if (tA && !tB) return -1;
+    
+    if (tA || tB) {
+      // Torres con nombres largos como "Suit", "Suite" o de 4 o más caracteres van primero (quemado)
+      const isSuitA = tA.toLowerCase() === 'suit' || tA.toLowerCase() === 'suite' || tA.length >= 4;
+      const isSuitB = tB.toLowerCase() === 'suit' || tB.toLowerCase() === 'suite' || tB.length >= 4;
+
+      if (isSuitA && !isSuitB) return -1;
+      if (!isSuitA && isSuitB) return 1;
+
+      // Orden descendente por torre en abecedario y numeración (e.g. C1, B, A)
+      const towerCompare = tB.localeCompare(tA, undefined, { numeric: true, sensitivity: 'base' });
+      if (towerCompare !== 0) return towerCompare;
+    }
+
+    // 2. Orden secundario por Piso (floor) en orden descendente (piso más alto primero)
+    const fA = aptA.floor != null ? Number(aptA.floor) : -Infinity;
+    const fB = aptB.floor != null ? Number(aptB.floor) : -Infinity;
+    if (fA !== fB) {
+      return fB - fA;
+    }
+
+    // 3. Orden terciario por código de departamento (code) en orden descendente
+    const codeA = aptA.code ? aptA.code.toString().trim() : '';
+    const codeB = aptB.code ? aptB.code.toString().trim() : '';
+    return codeB.localeCompare(codeA, undefined, { numeric: true });
+  };
+
+  const sortApartments = (aptsList) => {
+    return [...aptsList].sort(compareApartments);
+  };
+
+  const sortDetailFees = (feesList) => {
+    return [...feesList].sort((a, b) => {
+      const aptA = aptMap[a.apartment_id] || {};
+      const aptB = aptMap[b.apartment_id] || {};
+      return compareApartments(aptA, aptB);
+    });
+  };
+
+
   const totalOwnerQuotaPercent = apartments.reduce(
     (sum, apt) => sum + Number(apt.owner_allocated_quota_percent || 0),
     0
@@ -551,7 +599,7 @@ export default function AdminFeesPage() {
               </button>
             </div>
             <div className={styles.bulkGrid}>
-              {apartments.map((apt) => {
+              {sortApartments(apartments).map((apt) => {
                 const quotaPercent = Number(apt.owner_allocated_quota_percent || 0);
                 const previewAmount = calculateFeeAmount(apt);
                 return (
@@ -638,7 +686,7 @@ export default function AdminFeesPage() {
                           </td>
                         </tr>
                       ) : (
-                        detailFees.map((fee) => {
+                        sortDetailFees(detailFees).map((fee) => {
                           const apt = aptMap[fee.apartment_id] || {};
                           const status = getFeeStatus(fee);
                           const isEditing = editingFeeId === fee.id;
@@ -712,8 +760,8 @@ export default function AdminFeesPage() {
 
                 {/* Formulario de asignación individual */}
                 {(() => {
-                  const apartmentsWithoutFee = apartments.filter(
-                    (apt) => !detailFees.some((fee) => fee.apartment_id === apt.id)
+                  const apartmentsWithoutFee = sortApartments(
+                    apartments.filter((apt) => !detailFees.some((fee) => fee.apartment_id === apt.id))
                   );
                   if (apartmentsWithoutFee.length === 0) return null;
 

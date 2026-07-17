@@ -5,6 +5,8 @@ import { useApartmentFees } from '../../hooks/useApartmentFees';
 import { useApartments } from '../../hooks/useApartments';
 import { useApartmentFeeStats } from '../../hooks/useApartmentFeeStats';
 import { usePeriodsSummary } from '../../hooks/usePeriodsSummary';
+import { getFeesByPeriod } from '../../services/apartmentFeeService';
+
 
 vi.mock('../../hooks/useApartmentFees', () => ({ useApartmentFees: vi.fn() }));
 vi.mock('../../hooks/useApartments', () => ({ useApartments: vi.fn() }));
@@ -139,4 +141,56 @@ describe('AdminFeesPage', () => {
       expect(deleteFee).toHaveBeenCalledWith('fee1');
     });
   });
+
+  it('ordena las cuotas y departamentos según torre, piso y código descendente', async () => {
+    useApartments.mockReturnValue({
+      apartments: [
+        { id: 'apt_empty', code: '100', floor: 1, tower: null, owner_name: 'Empty Tower' },
+        { id: 'apt_c1_f1', code: '101', floor: 1, tower: 'C1', owner_name: 'C1 F1' },
+        { id: 'apt_c1_f2', code: '102', floor: 2, tower: 'C1', owner_name: 'C1 F2' },
+        { id: 'apt_c1_f2_code2', code: '103', floor: 2, tower: 'C1', owner_name: 'C1 F2 Code 2' },
+        { id: 'apt_b', code: '104', floor: 1, tower: 'B', owner_name: 'B Tower' },
+        { id: 'apt_suit_f1', code: '105', floor: 1, tower: 'Suit', owner_name: 'Suit F1' },
+        { id: 'apt_suit_f2', code: '106', floor: 2, tower: 'Suit', owner_name: 'Suit F2' },
+        { id: 'apt_a', code: '107', floor: 1, tower: 'A', owner_name: 'A Tower' },
+      ],
+      loading: false,
+      fetchApartments,
+    });
+
+    vi.mocked(getFeesByPeriod).mockResolvedValue([
+      { id: 'fee_empty', apartment_id: 'apt_empty', period: '2026-07', amount: 100 },
+      { id: 'fee_c1_f1', apartment_id: 'apt_c1_f1', period: '2026-07', amount: 100 },
+      { id: 'fee_c1_f2', apartment_id: 'apt_c1_f2', period: '2026-07', amount: 100 },
+      { id: 'fee_c1_f2_code2', apartment_id: 'apt_c1_f2_code2', period: '2026-07', amount: 100 },
+      { id: 'fee_b', apartment_id: 'apt_b', period: '2026-07', amount: 100 },
+      { id: 'fee_suit_f1', apartment_id: 'apt_suit_f1', period: '2026-07', amount: 100 },
+      { id: 'fee_suit_f2', apartment_id: 'apt_suit_f2', period: '2026-07', amount: 100 },
+      { id: 'fee_a', apartment_id: 'apt_a', period: '2026-07', amount: 100 },
+    ]);
+
+    render(<AdminFeesPage />);
+
+    const viewDetailBtn = screen.getByTitle('Ver detalle');
+    fireEvent.click(viewDetailBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cuotas — Julio 2026')).toBeInTheDocument();
+    });
+
+    // Encontrar los códigos en las celdas para verificar el orden exacto de las filas:
+    const codeCells = screen.getAllByRole('cell').filter((cell) => {
+      return ['106', '105', '103', '102', '101', '104', '107', '100'].includes(cell.textContent);
+    });
+    const codeTexts = codeCells.map(cell => cell.textContent);
+    expect(codeTexts).toEqual(['106', '105', '103', '102', '101', '104', '107', '100']);
+
+    // Verificar las torres correspondientes:
+    const towerCells = screen.getAllByRole('cell').filter((cell) => {
+      return ['Suit', 'C1', 'B', 'A', '—'].includes(cell.textContent);
+    });
+    const towerTexts = towerCells.map(cell => cell.textContent);
+    expect(towerTexts).toEqual(['Suit', 'Suit', 'C1', 'C1', 'C1', 'B', 'A', '—']);
+  });
 });
+

@@ -50,6 +50,13 @@ class TestAnnouncementsAndEvents:
                     "target_user_id": args[3],
                     "reference_id": args[4],
                 }
+            elif "SELECT * FROM announcements WHERE id = $1" in query:
+                return {
+                    "id": ann_id,
+                    "title": "Aviso de prueba",
+                    "description": "Detalle del aviso de prueba",
+                    "created_at": datetime.now(),
+                }
             return await original_fetchrow(query, *args)
             
         async def mock_fetch(query: str, *args):
@@ -101,6 +108,25 @@ class TestAnnouncementsAndEvents:
         recent_data = response_recent.json()
         assert len(recent_data) >= 1
         assert recent_data[0]["title"] == "Aviso de prueba"
+
+        # Test GET all announcements (owner)
+        response_owner_list = await async_client.get(
+            "/api/v1/owner/announcements",
+            headers=propietario_headers,
+        )
+        assert response_owner_list.status_code == 200
+        owner_list_data = response_owner_list.json()
+        assert len(owner_list_data) >= 1
+        assert owner_list_data[0]["description"] == "Detalle del aviso de prueba"
+
+        # Test GET announcement detail (owner)
+        response_owner_detail = await async_client.get(
+            f"/api/v1/owner/announcements/{ann_id}",
+            headers=propietario_headers,
+        )
+        assert response_owner_detail.status_code == 200
+        detail_data = response_owner_detail.json()
+        assert detail_data["title"] == "Aviso de prueba"
 
     @pytest.mark.asyncio
     @patch("app.services.email_service.EmailService.send_email", new_callable=AsyncMock)

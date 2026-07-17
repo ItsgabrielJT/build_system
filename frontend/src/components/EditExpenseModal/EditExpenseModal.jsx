@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { EXPENSE_CATEGORIES } from '../../constants/expenseCategories';
 import styles from './EditExpenseModal.module.css';
-
-const CATEGORIES = ['Servicios', 'Mantenimiento', 'Seguridad', 'Limpieza', 'Administración', 'Otros'];
 
 export default function EditExpenseModal({ isOpen, onClose, expense, onSubmit }) {
   const [form, setForm] = useState({
@@ -36,6 +35,10 @@ export default function EditExpenseModal({ isOpen, onClose, expense, onSubmit })
   }, [isOpen, expense]);
 
   if (!isOpen || !expense) return null;
+
+  const categoryOptions = EXPENSE_CATEGORIES.includes(form.category) || !form.category
+    ? EXPENSE_CATEGORIES
+    : [form.category, ...EXPENSE_CATEGORIES];
 
   function validateForm(f) {
     const errors = {};
@@ -154,7 +157,7 @@ export default function EditExpenseModal({ isOpen, onClose, expense, onSubmit })
               onChange={handleChange}
             >
               <option value="">Seleccionar Categoría</option>
-              {CATEGORIES.map((c) => (
+              {categoryOptions.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

@@ -73,6 +73,7 @@ export default function OwnerLayout() {
           buildingName={building?.name || ''}
           onToggleSidebar={() => setCollapsed(c => !c)}
           avatarUrl={avatarUrl}
+          ownerProfile={ownerProfile}
         />
         <main className={styles.content}>
           <Outlet
@@ -88,4 +89,3 @@ export default function OwnerLayout() {
     </div>
   );
 }
-

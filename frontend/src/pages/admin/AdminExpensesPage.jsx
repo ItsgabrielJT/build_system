@@ -18,9 +18,8 @@ import {
 } from '../../services/expenseService';
 import { downloadExpensesReport } from '../../services/reportService';
 import DownloadIcon from '../../components/icons/DownloadIcon';
+import { EXPENSE_CATEGORIES } from '../../constants/expenseCategories';
 import styles from './AdminExpensesPage.module.css';
-
-const CATEGORIES = ['Servicios', 'Mantenimiento', 'Seguridad', 'Limpieza', 'Administración', 'Otros'];
 
 const EMPTY_FORM = { provider: '', category: '', date: '', amount: '', concept: '', description: '' };
 
@@ -389,7 +388,7 @@ export default function AdminExpensesPage() {
                 onChange={handleChange}
               >
                 <option value="">Seleccionar Categoría</option>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 

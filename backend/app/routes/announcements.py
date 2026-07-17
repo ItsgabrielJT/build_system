@@ -118,3 +118,34 @@ async def list_recent_announcements(
     """Lista los avisos más recientes para el propietario."""
     repo = AnnouncementRepository(db)
     return await repo.get_recent(limit=limit)
+
+
+@router.get(
+    "/owner/announcements",
+    dependencies=[Depends(require_authenticated)],
+)
+async def list_owner_announcements(
+    db=Depends(get_db),
+):
+    """Lista todos los avisos publicados para el propietario."""
+    repo = AnnouncementRepository(db)
+    return await repo.get_all()
+
+
+@router.get(
+    "/owner/announcements/{announcement_id}",
+    dependencies=[Depends(require_authenticated)],
+)
+async def get_owner_announcement(
+    announcement_id: UUID,
+    db=Depends(get_db),
+):
+    """Obtiene el detalle completo de un aviso para el propietario."""
+    repo = AnnouncementRepository(db)
+    announcement = await repo.get_by_id(announcement_id)
+    if not announcement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aviso no encontrado",
+        )
+    return announcement

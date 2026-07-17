@@ -38,7 +38,15 @@ const ROLE_LABELS = {
   PROPIETARIO: 'PROPIETARIO',
 };
 
-export default function Navbar({ buildingName = '', onToggleSidebar, avatarUrl }) {
+function getShortDisplayName(fullName, fallbackEmail) {
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 4) return `${parts[0]} ${parts[parts.length - 2]}`;
+  if (parts.length >= 2) return `${parts[0]} ${parts[parts.length - 1]}`;
+  if (parts.length === 1) return parts[0];
+  return fallbackEmail?.split('@')[0] || 'Usuario';
+}
+
+export default function Navbar({ buildingName = '', onToggleSidebar, avatarUrl, ownerProfile }) {
   const { user, role } = useAuth();
   const navigate = useNavigate();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -52,8 +60,11 @@ export default function Navbar({ buildingName = '', onToggleSidebar, avatarUrl }
     markAsRead,
     enabled: notificationsEnabled,
   } = useAdminNotifications();
-  const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
-  const displayName = user?.email?.split('@')[0] || 'Usuario';
+  const displayName = getShortDisplayName(
+    role === 'PROPIETARIO' ? ownerProfile?.full_name : user?.full_name || user?.name,
+    user?.email
+  );
+  const userInitial = displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U';
   const roleLabel = ROLE_LABELS[role] || role || '';
 
   useEffect(() => {
@@ -84,7 +95,23 @@ export default function Navbar({ buildingName = '', onToggleSidebar, avatarUrl }
     if (notification && notification.id) {
       await markAsRead(notification.id);
     }
-    navigate(role === 'ADMIN' ? '/admin/payments' : '/owner/payments');
+    if (role === 'ADMIN') {
+      navigate('/admin/payments');
+      return;
+    }
+
+    const announcementId = notification?.metadata?.announcement_id;
+    const eventId = notification?.metadata?.event_id;
+    if (announcementId) {
+      navigate(`/owner/announcements?announcementId=${announcementId}`);
+      return;
+    }
+    if (eventId) {
+      navigate(`/owner/announcements?eventId=${eventId}`);
+      return;
+    }
+
+    navigate('/owner/payments');
   };
 
   const handleSettingsClick = () => {

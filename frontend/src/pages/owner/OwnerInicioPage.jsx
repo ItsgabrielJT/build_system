@@ -5,6 +5,7 @@ import { getOwnerProfile } from '../../services/ownerService';
 import { getRecentAnnouncements } from '../../services/announcementService';
 import { getMyEvents } from '../../services/eventService';
 import { getBuildingAssetBlob, getBuildingConfig } from '../../services/buildingService';
+import { getOwnerPayments } from '../../services/paymentService';
 import { useNotification } from '../../context/NotificationContext';
 import styles from './OwnerInicioPage.module.css';
 
@@ -26,6 +27,7 @@ export default function OwnerInicioPage() {
   const [buildingConfig, setBuildingConfig] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [events, setEvents] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [downloadingRegulation, setDownloadingRegulation] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -34,11 +36,12 @@ export default function OwnerInicioPage() {
       if (!token) return;
       try {
         setLoading(true);
-        const [profileResult, announcementsResult, eventsResult, buildingConfigResult] = await Promise.allSettled([
+        const [profileResult, announcementsResult, eventsResult, buildingConfigResult, paymentsResult] = await Promise.allSettled([
           getOwnerProfile(token),
           getRecentAnnouncements(token, 5),
           getMyEvents(token),
           getBuildingConfig(token),
+          getOwnerPayments({}, token),
         ]);
 
         if (profileResult.status === 'fulfilled') {
@@ -65,7 +68,13 @@ export default function OwnerInicioPage() {
           console.error('Error loading building config:', buildingConfigResult.reason);
         }
 
-        if ([profileResult, announcementsResult, eventsResult, buildingConfigResult].some((result) => result.status === 'rejected')) {
+        if (paymentsResult.status === 'fulfilled') {
+          setPayments(paymentsResult.value);
+        } else {
+          console.error('Error loading payments:', paymentsResult.reason);
+        }
+
+        if ([profileResult, announcementsResult, eventsResult, buildingConfigResult, paymentsResult].some((result) => result.status === 'rejected')) {
           toastError('No se pudo cargar toda la información del panel');
         }
       } catch (err) {
@@ -85,10 +94,19 @@ export default function OwnerInicioPage() {
 
   // Format currency
   const formatCurrency = (val) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(val || 0);
+    return `USD ${Number(val || 0).toLocaleString('es-EC', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const formatDate = (value) => {
+    if (!value) return 'Sin registro';
+    return new Intl.DateTimeFormat('es-EC', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(new Date(`${String(value).slice(0, 10)}T00:00:00`));
   };
 
   // Resolve profile attributes
@@ -97,14 +115,19 @@ export default function OwnerInicioPage() {
   const primaryApt = profile?.apartments?.[0];
   const aptCode = primaryApt?.code || 'S/N';
   const aptTower = primaryApt?.tower || 'S/N';
-  const balanceConsolidated = profile?.balance_consolidated || 0;
+  const balanceConsolidated = Number(profile?.balance_consolidated || 0);
   const isUpToDate = balanceConsolidated <= 0;
+  const pendingDebtAmount = Math.max(balanceConsolidated, 0);
 
   // Resolve latest payment
   const paymentTransactions = profile?.recent_transactions?.filter(t => t.type === 'PAYMENT') || [];
-  const latestPayment = paymentTransactions[0];
+  const latestOwnerPayment = payments.find((payment) => payment.status === 'REGISTRADO') || payments[0];
+  const latestProfilePayment = paymentTransactions[0];
+  const latestPayment = latestOwnerPayment || latestProfilePayment;
   const latestPaymentAmount = latestPayment ? formatCurrency(latestPayment.amount) : 'USD 0.00';
-  const latestPaymentDate = latestPayment ? new Date(`${latestPayment.date}T00:00:00`).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sin registro';
+  const latestPaymentDate = latestPayment
+    ? formatDate(latestPayment.paid_at || latestPayment.date || latestPayment.created_at)
+    : 'Sin registro';
 
   // Build Recent Activity lists (combination of events and payments/fines)
   const recentActivity = [];
@@ -140,6 +163,16 @@ export default function OwnerInicioPage() {
 
   // Get first 2 announcements
   const displayAnnouncements = announcements.slice(0, 2);
+
+  const formatEventDate = (event) => {
+    if (!event?.event_date) return 'Sin fecha';
+    const dateLabel = new Date(`${event.event_date}T00:00:00`).toLocaleDateString('es-EC', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    return `${dateLabel} • ${event.start_time || 'Sin hora'}`;
+  };
 
   const handleDownloadRegulation = async () => {
     if (!token || !buildingConfig?.id) {
@@ -180,8 +213,12 @@ export default function OwnerInicioPage() {
           </div>
           <div className={styles.metricInfo}>
             <span className={styles.metricLabel}>Estado de cuenta</span>
-            <strong className={styles.textSuccess}>Al día</strong>
-            <span className={styles.metricSub}>No tiene deudas pendientes</span>
+            <strong className={isUpToDate ? styles.textSuccess : styles.textDanger}>
+              {isUpToDate ? 'Al día' : 'Con deuda'}
+            </strong>
+            <span className={styles.metricSub}>
+              {isUpToDate ? 'No tiene deudas pendientes' : `${formatCurrency(pendingDebtAmount)} pendiente`}
+            </span>
           </div>
         </div>
 
@@ -196,8 +233,8 @@ export default function OwnerInicioPage() {
           </div>
           <div className={styles.metricInfo}>
             <span className={styles.metricLabel}>Último pago</span>
-            <strong>USD 78,61</strong>
-            <span className={styles.metricSub}>05/07/2026</span>
+            <strong>{latestPaymentAmount}</strong>
+            <span className={styles.metricSub}>{latestPaymentDate}</span>
           </div>
         </div>
 
@@ -295,7 +332,9 @@ export default function OwnerInicioPage() {
                   </div>
                   <div className={styles.fieldInfoContainer}>
                     <span className={styles.fieldLabel}>Estado:</span>
-                    <strong className={`${styles.fieldValue} ${styles.textSuccess}`}>Al día</strong>
+                    <strong className={`${styles.fieldValue} ${isUpToDate ? styles.textSuccess : styles.textDanger}`}>
+                      {isUpToDate ? 'Al día' : 'Pendiente'}
+                    </strong>
                   </div>
                 </div>
               </div>
@@ -493,13 +532,13 @@ export default function OwnerInicioPage() {
             </div>
             <div className={styles.summaryMetricsGrid}>
               <div className={styles.summaryMetricItem}>
-                <div className={`${styles.sumIcon} ${styles.sumBgDangerCircle}`}>
+                <div className={`${styles.sumIcon} ${isUpToDate ? styles.sumBgSuccessCircle : styles.sumBgDangerCircle}`}>
                   <span className={styles.sumDollar}>$</span>
                 </div>
                 <div className={styles.sumContent}>
                   <span>Deuda pendiente</span>
-                  <strong>USD 0,00</strong>
-                  <small>No tiene deudas</small>
+                  <strong>{formatCurrency(pendingDebtAmount)}</strong>
+                  <small>{isUpToDate ? 'No tiene deudas pendientes' : 'Valor pendiente de pago'}</small>
                 </div>
               </div>
 
@@ -558,34 +597,34 @@ export default function OwnerInicioPage() {
                 </svg>
                 Próximos eventos
               </h2>
-              <span className={styles.headerLink}>Ver todos</span>
+              <button type="button" className={styles.headerLink} onClick={() => navigate('/owner/announcements')}>
+                Ver todos
+              </button>
             </div>
             <div className={styles.listContainer}>
-              <div className={styles.eventItem}>
-                <div className={`${styles.eventIconCircle} ${styles.eventBgBlue}`}>
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className={styles.eventDetails}>
-                  <strong>Asamblea general ordinaria</strong>
-                  <span>15/07/2026 • 18:30</span>
-                  <small>Salón social</small>
-                </div>
-              </div>
-              <div className={styles.eventItem}>
-                <div className={`${styles.eventIconCircle} ${styles.eventBgOrange}`}>
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div className={styles.eventDetails}>
-                  <strong>Mantenimiento de tuberías</strong>
-                  <span>18/07/2026 • 08:00</span>
-                  <small>Áreas comunes</small>
-                </div>
-              </div>
+              {displayEvents.length ? (
+                displayEvents.map((event, index) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    className={styles.eventItem}
+                    onClick={() => navigate(`/owner/announcements?eventId=${event.id}`)}
+                  >
+                    <div className={`${styles.eventIconCircle} ${index % 2 === 0 ? styles.eventBgBlue : styles.eventBgOrange}`}>
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className={styles.eventDetails}>
+                      <strong>{event.title}</strong>
+                      <span>{formatEventDate(event)}</span>
+                      <small>{event.description || 'Sin detalle adicional.'}</small>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className={styles.emptyList}>No hay eventos asignados.</div>
+              )}
             </div>
           </div>
 
@@ -598,31 +637,33 @@ export default function OwnerInicioPage() {
                 </svg>
                 Avisos importantes
               </h2>
-              <span className={styles.headerLink}>Ver todos</span>
+              <button type="button" className={styles.headerLink} onClick={() => navigate('/owner/announcements')}>
+                Ver todos
+              </button>
             </div>
             <div className={styles.listContainer}>
-              <div className={styles.noticeItem}>
-                <div className={styles.noticeIconCircle}>
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '14px', height: '14px' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className={styles.noticeDetails}>
-                  <strong>Actualización de reglamento</strong>
-                  <p>Se ha publicado la versión 2026 del reglamento interno del edificio.</p>
-                </div>
-              </div>
-              <div className={styles.noticeItem}>
-                <div className={styles.noticeIconCircle}>
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '14px', height: '14px' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className={styles.noticeDetails}>
-                  <strong>Pago oportuno</strong>
-                  <p>Recuerde realizar sus pagos antes del 10 de cada mes para evitar recargos.</p>
-                </div>
-              </div>
+              {displayAnnouncements.length ? (
+                displayAnnouncements.map((announcement) => (
+                  <button
+                    key={announcement.id}
+                    type="button"
+                    className={styles.noticeItem}
+                    onClick={() => navigate(`/owner/announcements?announcementId=${announcement.id}`)}
+                  >
+                    <div className={styles.noticeIconCircle}>
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '14px', height: '14px' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className={styles.noticeDetails}>
+                      <strong>{announcement.title}</strong>
+                      <p>{announcement.description || 'Sin detalle adicional.'}</p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className={styles.emptyList}>No hay avisos publicados.</div>
+              )}
             </div>
           </div>
 

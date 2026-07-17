@@ -69,8 +69,7 @@ class OwnerService:
         owner = await self._repo.get_by_user_id(user_id)
         if not owner:
             return None
-        return await self._repo.get_by_id_with_apartments(owner["id"])
+        return await self._repo.get_detail_with_transactions(owner["id"], limit_transactions=0)
 
     async def update_profile(self, owner_id: UUID, data: OwnerProfileUpdate) -> dict | None:
         return await self._repo.update_profile(owner_id, data)
-

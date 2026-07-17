@@ -1,13 +1,5 @@
+import { getExpenseCategoryIcon } from '../../constants/expenseCategories';
 import styles from './RecentExpensesList.module.css';
-
-const CATEGORY_ICONS = {
-  Mantenimiento: '🔧',
-  Servicios: '💧',
-  Seguridad: '🔒',
-  Limpieza: '🧹',
-  Administración: '📋',
-  Otros: '📌',
-};
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -31,7 +23,7 @@ export default function RecentExpensesList({ expenses, loading, onViewAll }) {
           {expenses.map((exp) => (
             <li key={exp.id} className={styles.item}>
               <div className={styles.iconWrap}>
-                <span className={styles.icon}>{CATEGORY_ICONS[exp.category] || '📌'}</span>
+                <span className={styles.icon}>{getExpenseCategoryIcon(exp.category)}</span>
               </div>
               <div className={styles.info}>
                 <p className={styles.concept}>{exp.concept}</p>

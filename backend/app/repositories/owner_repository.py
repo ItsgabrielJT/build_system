@@ -35,8 +35,20 @@ class OwnerRepository:
             return None
         apartments = await self._conn.fetch(
             """
-            SELECT a.* FROM apartments a
+            SELECT
+                a.*,
+                current_fee.amount AS current_monthly_fee
+            FROM apartments a
             JOIN owner_apartments oa ON a.id = oa.apartment_id
+            LEFT JOIN LATERAL (
+                SELECT af.amount
+                FROM apartment_fees af
+                WHERE af.apartment_id = a.id
+                ORDER BY
+                    CASE WHEN af.period = TO_CHAR(CURRENT_DATE, 'YYYY-MM') THEN 0 ELSE 1 END,
+                    af.period DESC
+                LIMIT 1
+            ) current_fee ON TRUE
             WHERE oa.owner_id = $1
             ORDER BY a.code
             """,
@@ -372,5 +384,5 @@ class OwnerRepository:
             data.allocated_quota_percent,
         )
         if row:
-            return await self.get_by_id_with_apartments(owner_id)
+            return await self.get_detail_with_transactions(owner_id, limit_transactions=0)
         return None

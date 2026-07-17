@@ -1,16 +1,6 @@
 import { useState, useMemo } from 'react';
+import { EXPENSE_CATEGORIES, getExpenseCategoryIcon } from '../../constants/expenseCategories';
 import styles from './ViewAllExpensesModal.module.css';
-
-const CATEGORIES = ['Servicios', 'Mantenimiento', 'Seguridad', 'Limpieza', 'Administración', 'Otros'];
-
-const CATEGORY_ICONS = {
-  Mantenimiento: '🔧',
-  Servicios: '💧',
-  Seguridad: '🔒',
-  Limpieza: '🧹',
-  Administración: '📋',
-  Otros: '📌',
-};
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -47,6 +37,13 @@ export default function ViewAllExpensesModal({
   const totalAmount = useMemo(() => {
     return filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0);
   }, [filteredExpenses]);
+
+  const categoryOptions = useMemo(() => {
+    const existingCategories = expenses
+      .map((exp) => exp.category)
+      .filter(Boolean);
+    return [...new Set([...EXPENSE_CATEGORIES, ...existingCategories])];
+  }, [expenses]);
 
   if (!isOpen) return null;
 
@@ -85,9 +82,9 @@ export default function ViewAllExpensesModal({
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
               <option value="">Todas las Categorías</option>
-              {CATEGORIES.map((cat) => (
+              {categoryOptions.map((cat) => (
                 <option key={cat} value={cat}>
-                  {CATEGORY_ICONS[cat] || '📌'} {cat}
+                  {getExpenseCategoryIcon(cat)} {cat}
                 </option>
               ))}
             </select>
@@ -134,8 +131,8 @@ export default function ViewAllExpensesModal({
                     <tr key={exp.id}>
                       <td className={styles.dateCol}>{formatDate(exp.date)}</td>
                       <td>
-                        <span className={`${styles.categoryBadge} ${styles[exp.category || 'Otros']}`}>
-                          {CATEGORY_ICONS[exp.category] || '📌'} {exp.category || 'Otros'}
+                        <span className={styles.categoryBadge}>
+                          {getExpenseCategoryIcon(exp.category)} {exp.category || 'Otros'}
                         </span>
                       </td>
                       <td className={styles.providerCol}>{exp.provider || '—'}</td>

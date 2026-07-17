@@ -36,3 +36,17 @@ export async function getRecentAnnouncements(token, limit = 5) {
   });
   return res.data;
 }
+
+export async function getOwnerAnnouncements(token) {
+  const res = await axios.get(`${API_BASE}/api/v1/owner/announcements`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export async function getOwnerAnnouncement(announcementId, token) {
+  const res = await axios.get(`${API_BASE}/api/v1/owner/announcements/${announcementId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}

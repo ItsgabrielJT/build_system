@@ -6,6 +6,12 @@ from typing import Optional
 from app.models.schemas import ExpenseCreate
 from app.repositories.expense_repository import ExpenseRepository
 
+_MAINTENANCE_CATEGORIES = {
+    "Mantenimiento",
+    "Mantenimiento preventivo",
+    "Mantenimiento correctivo y reparaciones",
+}
+
 
 class ExpenseService:
     def __init__(self, repo: ExpenseRepository) -> None:
@@ -41,14 +47,13 @@ class ExpenseService:
 
         maintenance_spend = Decimal("0")
         for r in category_rows:
-            if r["category"] == "Mantenimiento":
-                maintenance_spend = Decimal(str(r["total"]))
-                break
+            if r["category"] in _MAINTENANCE_CATEGORIES:
+                maintenance_spend += Decimal(str(r["total"]))
         maintenance_budget = Decimal(str(settings.budget_maintenance))
 
         categories = []
         for r in category_rows:
-            cat_budget = settings.budget_maintenance if r["category"] == "Mantenimiento" else None
+            cat_budget = settings.budget_maintenance if r["category"] in _MAINTENANCE_CATEGORIES else None
             cat_pct = float((Decimal(str(r["total"])) / Decimal(str(cat_budget)) * 100).quantize(Decimal("0.01"))) if cat_budget else None
             categories.append({
                 "category": r["category"],
@@ -95,4 +100,3 @@ class ExpenseService:
 
     async def delete(self, expense_id: UUID) -> bool:
         return await self._repo.delete(expense_id)
-

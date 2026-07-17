@@ -144,6 +144,7 @@ class OwnerPaymentService:
                 "rejection_reason": r.get("rejection_reason"),
                 "apartment_id": r["apartment_id"],
                 "apartment_code": r.get("apartment_code"),
+                "paid_at": r.get("paid_at"),
                 "created_at": r["created_at"],
             }
             for r in rows

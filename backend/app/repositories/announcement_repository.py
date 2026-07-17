@@ -33,7 +33,7 @@ class AnnouncementRepository:
         )
         return [dict(r) for r in rows]
 
-    async def get_by_id(self, announcement_id: str) -> dict | None:
+    async def get_by_id(self, announcement_id: UUID) -> dict | None:
         row = await self._conn.fetchrow(
             "SELECT * FROM announcements WHERE id = $1",
             announcement_id,

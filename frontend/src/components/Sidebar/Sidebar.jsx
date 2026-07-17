@@ -155,6 +155,7 @@ const OWNER_LINKS = [
   { to: '/owner/inicio', label: 'Inicio', Icon: IconInicio },
   { to: '/owner/profile', label: 'Mi perfil', Icon: IconProfile },
   { to: '/owner/payments', label: 'Pagos', Icon: IconPayments },
+  { to: '/owner/announcements', label: 'Avisos', Icon: IconAnnouncements },
   { to: '/owner/account-statement', label: 'Estado de cuenta', Icon: IconStatement },
   { to: '/owner/monthly-balance', label: 'Balance mensual', Icon: IconBalance },
   { to: '/owner/cameras', label: 'Cámaras', Icon: IconCameras },

@@ -127,6 +127,13 @@ function triggerDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(Number(value) || 0);
+};
+
 export default function OwnerProfilePage() {
   const { token } = useAuth();
   const { success, error: toastError } = useNotification();
@@ -393,8 +400,10 @@ export default function OwnerProfilePage() {
 
   // Get primary unit details if exists
   const primaryUnit = profile?.units?.[0] || {};
-  const currentStatusLabel = profile?.units?.some(u => u.current_balance > 0) ? 'Con deuda' : 'Al día';
+  const pendingBalance = Math.max(Number(profile?.balance_consolidated) || 0, 0);
+  const currentStatusLabel = pendingBalance > 0 ? 'Con deuda' : 'Al día';
   const isPaidUp = currentStatusLabel === 'Al día';
+  const monthlyFee = Number(primaryUnit.current_monthly_fee ?? profile?.current_monthly_fee ?? 0);
 
   return (
     <div className={styles.container}>
@@ -448,7 +457,7 @@ export default function OwnerProfilePage() {
                 </span>
                 <div>
                   <span className={styles.metaLabel}>Departamento</span>
-                  <span className={styles.metaValue}>DEP {primaryUnit.code || '2B'}</span>
+                  <span className={styles.metaValue}>DEP {primaryUnit.code || 'S/N'}</span>
                 </div>
               </div>
               <div className={styles.metaRow}>
@@ -459,7 +468,7 @@ export default function OwnerProfilePage() {
                 </span>
                 <div>
                   <span className={styles.metaLabel}>Torre</span>
-                  <span className={styles.metaValue}>{primaryUnit.tower || 'B'}</span>
+                  <span className={styles.metaValue}>{primaryUnit.tower || 'S/N'}</span>
                 </div>
               </div>
               <div className={styles.metaRow}>
@@ -470,7 +479,7 @@ export default function OwnerProfilePage() {
                 </span>
                 <div>
                   <span className={styles.metaLabel}>Teléfono</span>
-                  <span className={styles.metaValue}>{profile.phone || '+593 99 295 3596'}</span>
+                  <span className={styles.metaValue}>{profile.phone || 'Sin registrar'}</span>
                 </div>
               </div>
               <div className={styles.metaRow}>
@@ -481,7 +490,7 @@ export default function OwnerProfilePage() {
                 </span>
                 <div>
                   <span className={styles.metaLabel}>Correo</span>
-                  <span className={styles.metaValue}>{profile.email || 'juan.cuaical@example.com'}</span>
+                  <span className={styles.metaValue}>{profile.email || 'Sin registrar'}</span>
                 </div>
               </div>
             </div>
@@ -586,11 +595,11 @@ export default function OwnerProfilePage() {
               <div className={styles.unitInfoGrid}>
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Departamento</span>
-                  <span className={styles.unitMetaValue}>DEP {primaryUnit.code || '2B'}</span>
+                  <span className={styles.unitMetaValue}>DEP {primaryUnit.code || 'S/N'}</span>
                 </div>
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Torre</span>
-                  <span className={styles.unitMetaValue}>{primaryUnit.tower || 'B'}</span>
+                  <span className={styles.unitMetaValue}>{primaryUnit.tower || 'S/N'}</span>
                 </div>
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Tipo de unidad</span>
@@ -601,7 +610,7 @@ export default function OwnerProfilePage() {
                 <div className={styles.unitMetaItem}>
                   <span className={styles.unitMetaLabel}>Alícuota mensual</span>
                   <span className={styles.quotaValue}>
-                    USD {(78.61).toFixed(2)}
+                    {formatCurrency(monthlyFee)}
                   </span>
                 </div>
                 <div className={styles.unitMetaItem}>

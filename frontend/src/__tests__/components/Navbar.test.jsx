@@ -90,4 +90,32 @@ describe('Navbar', () => {
     expect(fetchNotifications).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/Pago aprobado/i)).toBeInTheDocument();
   });
+
+  it('muestra primer nombre y primer apellido del perfil del propietario', () => {
+    useAuth.mockReturnValue({
+      user: { email: 'gerencia@test.com' },
+      role: 'PROPIETARIO',
+    });
+
+    useAdminNotifications.mockReturnValue({
+      notifications: [],
+      total: 0,
+      loading: false,
+      error: null,
+      fetchNotifications: vi.fn(),
+      enabled: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/owner/profile']}>
+        <Navbar
+          onToggleSidebar={vi.fn()}
+          ownerProfile={{ full_name: 'Jaime Alberto Pazmiño Yanez' }}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Jaime Pazmiño')).toBeInTheDocument();
+    expect(screen.queryByText('gerencia')).not.toBeInTheDocument();
+  });
 });

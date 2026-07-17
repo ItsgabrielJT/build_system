@@ -25,6 +25,7 @@ import OwnerInicioPage from './pages/owner/OwnerInicioPage';
 import OwnerCamerasPage from './pages/owner/OwnerCamerasPage';
 import OwnerHelpPage from './pages/owner/OwnerHelpPage';
 import OwnerProfilePage from './pages/owner/OwnerProfilePage';
+import OwnerAnnouncementsPage from './pages/owner/OwnerAnnouncementsPage';
 import AdminAnnouncementsPage from './pages/admin/AdminAnnouncementsPage';
 import AdminEventsPage from './pages/admin/AdminEventsPage';
 import PublicPdfValidationPage from './pages/PublicPdfValidationPage';
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="account-statement" element={<OwnerAccountStatementPage />} />
         <Route path="monthly-balance" element={<OwnerMonthlyBalancePage />} />
         <Route path="payments" element={<OwnerPaymentsPage />} />
+        <Route path="announcements" element={<OwnerAnnouncementsPage />} />
         <Route path="cameras" element={<OwnerCamerasPage />} />
         <Route path="help" element={<OwnerHelpPage />} />
         <Route path="profile" element={<OwnerProfilePage />} />

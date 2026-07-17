@@ -703,6 +703,7 @@ class OwnerUnitResponse(BaseModel):
     storage: Optional[str] = None
     acquisition_date: Optional[date] = None
     use_type: Optional[str] = None
+    current_monthly_fee: Optional[Decimal] = None
 
 
 
@@ -796,6 +797,7 @@ class OwnerProfileResponse(BaseModel):
     emergency_phone: Optional[str] = None
     notifications_enabled: bool = True
     allocated_quota_percent: Decimal = Decimal("0")
+    balance_consolidated: Decimal = Decimal("0")
     photo_file_name: Optional[str] = None
     photo_content_type: Optional[str] = None
     photo_storage_path: Optional[str] = None

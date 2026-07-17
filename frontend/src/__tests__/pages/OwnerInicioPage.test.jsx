@@ -4,6 +4,7 @@ import OwnerInicioPage from '../../pages/owner/OwnerInicioPage';
 import { getRecentAnnouncements } from '../../services/announcementService';
 import { getMyEvents } from '../../services/eventService';
 import { getOwnerProfile } from '../../services/ownerService';
+import { getOwnerPayments } from '../../services/paymentService';
 
 const toastError = vi.hoisted(() => vi.fn());
 
@@ -16,6 +17,7 @@ vi.mock('../../hooks/useAuth', () => ({
 
 vi.mock('../../context/NotificationContext', () => ({
   useNotification: () => ({
+    success: vi.fn(),
     error: toastError,
   }),
 }));
@@ -32,9 +34,19 @@ vi.mock('../../services/eventService', () => ({
   getMyEvents: vi.fn(),
 }));
 
+vi.mock('../../services/paymentService', () => ({
+  getOwnerPayments: vi.fn(),
+}));
+
+vi.mock('../../services/buildingService', () => ({
+  getBuildingConfig: vi.fn().mockResolvedValue({ id: 'building-1' }),
+  getBuildingAssetBlob: vi.fn(),
+}));
+
 describe('OwnerInicioPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getOwnerPayments.mockResolvedValue([]);
   });
 
   it('renders recent announcements from the owner API', async () => {
@@ -68,7 +80,6 @@ describe('OwnerInicioPage', () => {
 
     expect(screen.getByText('El ascensor estará fuera de servicio de 09:00 a 11:00.')).toBeInTheDocument();
     expect(screen.getByText('Pago oportuno')).toBeInTheDocument();
-    expect(screen.getByText('Publicados recientemente')).toBeInTheDocument();
     expect(getRecentAnnouncements).toHaveBeenCalledWith('owner-token', 5);
   });
 
@@ -87,5 +98,26 @@ describe('OwnerInicioPage', () => {
     await waitFor(() => {
       expect(screen.getByText('No hay avisos publicados.')).toBeInTheDocument();
     });
+  });
+
+  it('renders pending debt from the owner profile balance', async () => {
+    getOwnerProfile.mockResolvedValue({
+      full_name: 'Propietario Demo',
+      apartments: [],
+      balance_consolidated: 125.5,
+      recent_transactions: [],
+    });
+    getRecentAnnouncements.mockResolvedValue([]);
+    getMyEvents.mockResolvedValue([]);
+
+    render(<OwnerInicioPage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Con deuda').length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getByText('USD 125,50')).toBeInTheDocument();
+    expect(screen.getByText('USD 125,50 pendiente')).toBeInTheDocument();
+    expect(screen.getByText('Valor pendiente de pago')).toBeInTheDocument();
   });
 });

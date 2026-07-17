@@ -329,6 +329,9 @@
 }
 
 .headerLink {
+  border: 0;
+  background: transparent;
+  padding: 0;
   font-size: 12px;
   font-weight: 700;
   color: #2563eb;
@@ -534,6 +537,13 @@
   align-items: center;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid #f8fafc;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
 }
 
 .eventItem:last-child {
@@ -595,6 +605,13 @@
   align-items: center;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid #f8fafc;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
 }
 
 .noticeItem:last-child {
@@ -632,6 +649,16 @@
   margin: 1px 0 0 0;
   line-height: 1.4;
   font-weight: 500;
+}
+
+.emptyList {
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 0.85rem;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
 }
 
 /* Support Items */

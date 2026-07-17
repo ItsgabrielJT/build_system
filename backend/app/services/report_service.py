@@ -185,6 +185,13 @@ class ReportService:
         ]
         return f"{value.day:02d} de {months[value.month - 1]} de {value.year}"
 
+    def _delinquency_status_label(self, status: str | None) -> str:
+        labels = {
+            "OVERDUE": "Vencido",
+            "CURRENT": "Al día",
+        }
+        return labels.get((status or "").upper(), status or "")
+
     def _p(self, text: str, size: int = 8, *, bold: bool = False, color="#102a56", align: str = "LEFT", raw: bool = False) -> Paragraph:
         safe_text = str(text or "") if raw else escape(str(text or ""))
         return Paragraph(
@@ -195,6 +202,48 @@ class ReportService:
                 fontSize=size,
                 leading=size + 2,
                 alignment={"LEFT": 0, "CENTER": 1, "RIGHT": 2}.get(align, 1),
+            ),
+        )
+
+    def _pdf_table_text(self, text: str, *, chunk_size: int = 16) -> str:
+        """Add break opportunities to long table values before ReportLab lays them out."""
+        normalized = re.sub(r"\s+", " ", str(text or "").strip())
+        if not normalized:
+            return ""
+
+        def split_token(token: str) -> str:
+            if len(token) <= chunk_size:
+                return token
+            parts = re.split(r"([_./\\-])", token)
+            if len(parts) > 1:
+                token = "".join(
+                    part + (" " if part in {"_", ".", "/", "\\", "-"} else "")
+                    for part in parts
+                )
+            return " ".join(token[i:i + chunk_size] for i in range(0, len(token), chunk_size))
+
+        return " ".join(split_token(token) for token in normalized.split(" "))
+
+    def _table_p(
+        self,
+        text: str,
+        size: int = 7,
+        *,
+        bold: bool = False,
+        color="#102a56",
+        align: str = "LEFT",
+    ) -> Paragraph:
+        safe_text = escape(self._pdf_table_text(text))
+        return Paragraph(
+            f'<font color="{color}">{"<b>" if bold else ""}{safe_text}{"</b>" if bold else ""}</font>',
+            ParagraphStyle(
+                f"PdfTableP{size}{bold}{align}",
+                fontName="Helvetica-Bold" if bold else "Helvetica",
+                fontSize=size,
+                leading=size + 2,
+                alignment={"LEFT": 0, "CENTER": 1, "RIGHT": 2}.get(align, 0),
+                splitLongWords=1,
+                wordWrap="CJK",
             ),
         )
 
@@ -883,7 +932,7 @@ class ReportService:
                     o["document_id"],
                     o["deuda_total"],
                     o["periodos_vencidos"],
-                    o["status"],
+                    self._delinquency_status_label(o["status"]),
                 ]
             )
         return output.getvalue().encode("utf-8-sig")
@@ -1533,6 +1582,9 @@ class ReportService:
         valores_por_recuperar_compare = max(Decimal("0"), projected_compare - total_income_compare)
         saldo_con_valores_por_recuperar_compare = balance_compare + valores_por_recuperar_compare
         efficiency_compare = (total_income_compare / projected_compare * 100) if projected_compare > 0 else Decimal("0")
+
+        def money_cell(value, *, bold: bool = False, color: str = "#1e293b"):
+            return self._p(self._usd(value), 7, bold=bold, color=color, align="RIGHT")
         
         output = io.BytesIO()
         width = A4[0] - 2.2 * cm
@@ -1575,7 +1627,18 @@ class ReportService:
         
         # Section Title: DETALLE DEL MES
         curr_period_name = self._period_name(current_period).upper()
-        story.append(self._section_title(f"DETALLE DEL MES - {curr_period_name}", width))
+        detail_title = Table(
+            [[self._p(f"DETALLE DEL MES - {curr_period_name}", 14, bold=True, color="#0b3c7d", align="CENTER")]],
+            colWidths=[width],
+        )
+        detail_title.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.7, _PDF_BORDER),
+        ]))
+        story.append(detail_title)
         
         # 2. Side-by-side Resúmenes tables (Section 2)
         income_by_category = self._build_breakdown(current_payments, "income_category", "Otros ingresos")
@@ -1590,10 +1653,10 @@ class ReportService:
         income_rows = [
             [self._p("RESUMEN DE INGRESOS (POR CATEGORÍA)", 7.5, bold=True, color="#ffffff"), self._p("↗", 8, bold=True, color="#ffffff", align="RIGHT")],
             [self._p("Concepto", 7, bold=True, color="#ffffff"), self._p("Monto (USD)", 7, bold=True, color="#ffffff", align="RIGHT")],
-            [self._p("Alícuotas y pagos", 7, color="#1e293b"), self._usd(alicuotas_amount)],
-            [self._p("Otros ingresos", 7, color="#1e293b"), self._usd(otros_amount)],
-            [self._p("Proyección alícuotas del mes", 7, color="#64748b"), self._usd(projected_current)],
-            [self._p("TOTAL INGRESOS EFECTIVOS", 7, bold=True, color="#123c7a"), self._usd(total_income_current)]
+            [self._p("Alícuotas y pagos", 7, color="#1e293b"), money_cell(alicuotas_amount)],
+            [self._p("Otros ingresos", 7, color="#1e293b"), money_cell(otros_amount)],
+            [self._p("Proyección alícuotas del mes", 7, color="#64748b"), money_cell(projected_current, color="#64748b")],
+            [self._p("TOTAL INGRESOS EFECTIVOS", 7, bold=True, color="#123c7a"), money_cell(total_income_current, bold=True, color="#123c7a")]
         ]
         
         income_table = Table(income_rows, colWidths=[width * 0.485 * 0.68, width * 0.485 * 0.32])
@@ -1618,12 +1681,12 @@ class ReportService:
             [self._p("Categoría", 7, bold=True, color="#ffffff"), self._p("Monto (USD)", 7, bold=True, color="#ffffff", align="RIGHT")]
         ]
         for item in expense_by_category[:3]:
-            expense_rows.append([self._p(item["label"], 7, color="#1e293b"), self._usd(item["amount"])])
+            expense_rows.append([self._p(item["label"], 7, color="#1e293b"), money_cell(item["amount"])])
             
         while len(expense_rows) < 5:
-            expense_rows.append([self._p("-", 7, color="#64748b"), self._usd(0)])
+            expense_rows.append([self._p("-", 7, color="#64748b"), money_cell(0, color="#64748b")])
             
-        expense_rows.append([self._p("TOTAL EGRESOS", 7, bold=True, color="#123c7a"), self._usd(total_expenses_current)])
+        expense_rows.append([self._p("TOTAL EGRESOS", 7, bold=True, color="#123c7a"), money_cell(total_expenses_current, bold=True, color="#123c7a")])
         
         expense_table = Table(expense_rows, colWidths=[width * 0.485 * 0.68, width * 0.485 * 0.32])
         expense_table.setStyle(TableStyle([
@@ -1660,7 +1723,7 @@ class ReportService:
         card_saldo_data = [
             [saldo_drawing],
             [self._p("SALDO (SUPERÁVIT / DÉFICIT)", 6.5, bold=True, color="#475569", align="CENTER")],
-            [self._p(self._usd(balance_current), 11, bold=True, color="#1e3a8a", align="CENTER")],
+            [self._p(self._usd(balance_current), 9, bold=True, color="#1e3a8a", align="CENTER")],
             [self._p("Superávit del mes" if balance_current >= 0 else "Déficit del mes", 6, color="#64748b", align="CENTER")]
         ]
         card_saldo = Table(card_saldo_data, colWidths=[width * 0.31])
@@ -1680,7 +1743,7 @@ class ReportService:
         card_recuperar_data = [
             [recuperar_drawing],
             [self._p("SALDO CON VALORES POR RECUPERAR", 6.5, bold=True, color="#475569", align="CENTER")],
-            [self._p(self._usd(saldo_con_valores_por_recuperar_current), 11, bold=True, color="#1e3a8a", align="CENTER")],
+            [self._p(self._usd(saldo_con_valores_por_recuperar_current), 9, bold=True, color="#1e3a8a", align="CENTER")],
             [self._p("Pendiente por cobrar", 6, color="#64748b", align="CENTER")]
         ]
         card_recuperar = Table(card_recuperar_data, colWidths=[width * 0.31])
@@ -1694,10 +1757,10 @@ class ReportService:
         ]))
         
         formula_rows = [
-            [self._p("Ingreso proyectado por alícuotas", 7, color="#334155"), self._p(self._usd(projected_current), 7, bold=True, color="#1e293b", align="RIGHT")],
-            [self._p("(-) Ingreso efectivo por alícuotas", 7, color="#334155"), self._p(self._usd(total_income_current), 7, bold=True, color="#1e293b", align="RIGHT")],
-            [self._p("(-) Gastos del mes", 7, color="#334155"), self._p(self._usd(total_expenses_current), 7, bold=True, color="#1e293b", align="RIGHT")],
-            [self._p("SALDO (SUPERÁVIT / DÉFICIT)", 7.5, bold=True, color="#ffffff"), self._p(self._usd(balance_current), 7.5, bold=True, color="#ffffff", align="RIGHT")]
+            [self._p("Ingreso proyectado por alícuotas", 7, color="#334155"), money_cell(projected_current, bold=True)],
+            [self._p("(-) Ingreso efectivo por alícuotas", 7, color="#334155"), money_cell(total_income_current, bold=True)],
+            [self._p("(-) Gastos del mes", 7, color="#334155"), money_cell(total_expenses_current, bold=True)],
+            [self._p("SALDO (SUPERÁVIT / DÉFICIT)", 7.5, bold=True, color="#ffffff"), money_cell(balance_current, bold=True, color="#ffffff")]
         ]
         formula_table = Table(formula_rows, colWidths=[width * 0.32 * 0.60, width * 0.32 * 0.40])
         formula_table.setStyle(TableStyle([
@@ -1765,20 +1828,20 @@ class ReportService:
             alicuotas_detail_rows.append([
                 self._p(apt_code, 7, color="#1e293b"),
                 self._p(owner[:20] + "..." if len(owner) > 20 else owner, 7, color="#1e293b"),
-                self._usd(amount),
+                money_cell(amount),
                 status_p
             ])
             
         while len(alicuotas_detail_rows) < 7:
-            alicuotas_detail_rows.append(["-", "-", self._usd(0), "-"])
+            alicuotas_detail_rows.append(["-", "-", money_cell(0, color="#64748b"), "-"])
             
         total_rec_idx = len(alicuotas_detail_rows)
-        alicuotas_detail_rows.append([self._p("TOTAL RECAUDADO", 7, bold=True, color="#123c7a"), "", self._usd(total_income_current), ""])
+        alicuotas_detail_rows.append([self._p("TOTAL RECAUDADO", 7, bold=True, color="#123c7a"), "", money_cell(total_income_current, bold=True, color="#123c7a"), ""])
         detail_style.append(("SPAN", (0, total_rec_idx), (1, total_rec_idx)))
         detail_style.append(("BACKGROUND", (0, total_rec_idx), (-1, total_rec_idx), colors.HexColor("#e2e8f0")))
         
         total_proj_idx = len(alicuotas_detail_rows)
-        alicuotas_detail_rows.append([self._p("TOTAL PROYECTADO (ALÍCUOTAS)", 7, bold=True, color="#123c7a"), "", self._usd(projected_current), ""])
+        alicuotas_detail_rows.append([self._p("TOTAL PROYECTADO (ALÍCUOTAS)", 7, bold=True, color="#123c7a"), "", money_cell(projected_current, bold=True, color="#123c7a"), ""])
         detail_style.append(("SPAN", (0, total_proj_idx), (1, total_proj_idx)))
         detail_style.append(("BACKGROUND", (0, total_proj_idx), (-1, total_proj_idx), colors.HexColor("#e2e8f0")))
         
@@ -1817,14 +1880,14 @@ class ReportService:
                 self._p(date_str, 7, color="#1e293b"),
                 self._p(concept[:22] + "..." if len(concept) > 22 else concept, 7, color="#1e293b"),
                 self._p(category, 7, color="#64748b"),
-                self._usd(amount)
+                money_cell(amount)
             ])
             
         while len(gastos_detail_rows) < len(alicuotas_detail_rows) - 1:
-            gastos_detail_rows.append(["-", "-", "-", self._usd(0)])
+            gastos_detail_rows.append(["-", "-", "-", money_cell(0, color="#64748b")])
             
         total_gastos_idx = len(gastos_detail_rows)
-        gastos_detail_rows.append([self._p("TOTAL EGRESOS DEL MES", 7, bold=True, color="#123c7a"), "", "", self._usd(total_expenses_current)])
+        gastos_detail_rows.append([self._p("TOTAL EGRESOS DEL MES", 7, bold=True, color="#123c7a"), "", "", money_cell(total_expenses_current, bold=True, color="#123c7a")])
         gastos_style.append(("SPAN", (0, total_gastos_idx), (2, total_gastos_idx)))
         gastos_style.append(("BACKGROUND", (0, total_gastos_idx), (-1, total_gastos_idx), colors.HexColor("#e2e8f0")))
         
@@ -2320,28 +2383,41 @@ class ReportService:
         story.append(Spacer(1, 0.15 * cm))
         
         # 3. Detalle de gastos table
-        data = [["Fecha", "Proveedor", "Categoría", "Concepto", "Monto", "Comprobante"]]
+        data = [[
+            self._table_p("Fecha", 7.2, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Proveedor", 7.2, bold=True, color="#ffffff"),
+            self._table_p("Categoría", 7.2, bold=True, color="#ffffff"),
+            self._table_p("Concepto", 7.2, bold=True, color="#ffffff"),
+            self._table_p("Monto", 7.2, bold=True, color="#ffffff", align="RIGHT"),
+            self._table_p("Comprobante", 7.2, bold=True, color="#ffffff"),
+        ]]
         for e in expenses:
             comp_str = e.get("receipt_file_name") or "Sin comprobante"
-            if len(comp_str) > 22:
-                comp_str = comp_str[:22] + "..."
             
             dt = e.get("date")
             date_str = dt.strftime("%Y-%m-%d") if hasattr(dt, "strftime") else str(dt or "")
             
             data.append([
-                self._p(date_str, 7, align="CENTER"),
-                self._p(e.get("provider") or "", 7),
-                self._p(e.get("category") or "Sin categoría", 7),
-                self._p(e.get("concept") or "", 7),
-                self._money(e.get("amount", 0)),
-                self._p(comp_str, 7)
+                self._table_p(date_str, 7, align="CENTER"),
+                self._table_p(e.get("provider") or "", 7),
+                self._table_p(e.get("category") or "Sin categoría", 7),
+                self._table_p(e.get("concept") or "", 7),
+                self._table_p(self._money(e.get("amount", 0)), 7, align="RIGHT"),
+                self._table_p(comp_str, 7),
             ])
         if len(data) == 1:
-            data.append(["-", "-", "-", "Sin gastos registrados", self._money(0), "-"])
+            data.append([
+                self._table_p("-", 7, align="CENTER"),
+                self._table_p("-", 7),
+                self._table_p("-", 7),
+                self._table_p("Sin gastos registrados", 7),
+                self._table_p(self._money(0), 7, align="RIGHT"),
+                self._table_p("-", 7),
+            ])
             
         table_style_commands = [
             ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ALIGN", (0, 0), (0, -1), "CENTER"),
             ("ALIGN", (1, 0), (2, -1), "LEFT"),
@@ -2349,15 +2425,23 @@ class ReportService:
             ("ALIGN", (4, 0), (4, -1), "RIGHT"),
             ("ALIGN", (5, 0), (5, -1), "LEFT"),
             ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("WORDWRAP", (0, 0), (-1, -1), "CJK"),
             ("TOPPADDING", (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ("LEFTPADDING", (0, 0), (-1, -1), 5),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
         ]
         
-        detail_col_widths = [width * 0.14, width * 0.22, width * 0.18, width * 0.26, width * 0.10, width * 0.10]
-        story.append(Table(data, colWidths=detail_col_widths, style=TableStyle(table_style_commands)))
+        detail_col_widths = [
+            width * 0.13,
+            width * 0.21,
+            width * 0.16,
+            width * 0.28,
+            width * 0.09,
+            width * 0.13,
+        ]
+        story.append(Table(data, colWidths=detail_col_widths, repeatRows=1, style=TableStyle(table_style_commands)))
         story.append(Spacer(1, 0.18 * cm))
         
         # 4. Total bar
@@ -2458,51 +2542,79 @@ class ReportService:
 
     async def delinquency_pdf(self) -> bytes:
         owners = await self._delinquency.list_owners()
-        
+        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+
         output = io.BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        doc = SimpleDocTemplate(
+            output,
+            pagesize=letter,
+            leftMargin=0.45 * inch,
+            rightMargin=0.45 * inch,
+            topMargin=0.45 * inch,
+            bottomMargin=0.75 * inch,
+        )
         story = []
-        
-        styles = getSampleStyleSheet()
         story.extend(
-            await self._pdf_header(
+            await self._three_column_report_header(
                 "Reporte de Morosidad",
                 f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
                 width=doc.width,
+                building=building,
+                right_text=f"Propietarios: {len(owners)}",
             )
         )
-        
-        # Table
-        data = [["Propietario", "Email", "Documento", "Deuda Total", "Períodos Vencidos", "Estado"]]
+
+        data = [[
+            self._table_p("Propietario", 7, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Email", 7, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Documento", 7, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Deuda Total", 7, bold=True, color="#ffffff", align="RIGHT"),
+            self._table_p("Períodos Vencidos", 7, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Estado", 7, bold=True, color="#ffffff", align="CENTER"),
+        ]]
         for o in owners:
             data.append([
-                o["owner_name"],
-                o.get("email") or "",
-                o["document_id"],
-                f"${float(o['deuda_total']):.2f}",
-                str(o["periodos_vencidos"]),
-                o["status"],
+                self._table_p(o["owner_name"], 6.4, color="#1e293b"),
+                self._table_p(o.get("email") or "", 6.2, color="#1e293b"),
+                self._table_p(o["document_id"], 6.4, color="#1e293b", align="CENTER"),
+                self._table_p(self._money(o["deuda_total"]), 6.4, bold=True, color="#1e293b", align="RIGHT"),
+                self._table_p(str(o["periodos_vencidos"]), 6.4, color="#1e293b", align="CENTER"),
+                self._table_p(self._delinquency_status_label(o["status"]), 6.4, bold=True, color="#1e293b", align="CENTER"),
             ])
-        
-        table = Table(data, colWidths=[1.2*inch, 1.3*inch, 1*inch, 1*inch, 1*inch, 0.8*inch])
+
+        table = Table(
+            data,
+            colWidths=[
+                doc.width * 0.24,
+                doc.width * 0.27,
+                doc.width * 0.13,
+                doc.width * 0.12,
+                doc.width * 0.13,
+                doc.width * 0.11,
+            ],
+            repeatRows=1,
+        )
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#123c7a')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("ALIGN", (0, 1), (1, -1), "LEFT"),
+            ("ALIGN", (2, 1), (-1, -1), "CENTER"),
+            ("ALIGN", (3, 1), (3, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.45, _PDF_BORDER),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
         ]))
         story.append(table)
-        story.append(Spacer(1, 0.3*inch))
-        story.append(Paragraph("Reporte generado automáticamente", styles['Normal']))
-        building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
+        story.append(Spacer(1, 0.22 * inch))
+        story.append(self._p("Reporte generado automáticamente", 8, color="#334155"))
         self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MOROSIDAD", signer_name="Administración", signer_role="Administrador del edificio")
         footer = self._footer_callback(building, doc.width)
-        
+
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
@@ -3277,7 +3389,7 @@ class ReportService:
             ws.cell(row=row, column=3).value = o["document_id"]
             ws.cell(row=row, column=4).value = float(o["deuda_total"])
             ws.cell(row=row, column=5).value = o["periodos_vencidos"]
-            ws.cell(row=row, column=6).value = o["status"]
+            ws.cell(row=row, column=6).value = self._delinquency_status_label(o["status"])
         
         # Adjust column widths
         ws.column_dimensions['A'].width = 15

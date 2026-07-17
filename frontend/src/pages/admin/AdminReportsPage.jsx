@@ -35,6 +35,8 @@ const REPORT_OPTIONS = [
   { value: 'delinquency', label: 'Morosidad' },
 ];
 
+const MONTH_PERIOD_PATTERN = /^\d{4}-\d{2}$/;
+
 function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -90,8 +92,34 @@ function formatChange(value) {
 
 function getPeriodLabel(period) {
   if (!period) return 'Resumen';
+  if (typeof period === 'string' && period.endsWith('-Sem1')) {
+    const year = period.split('-')[0];
+    return `1er semestre ${year}`;
+  }
+  if (typeof period === 'string' && period.endsWith('-Sem2')) {
+    const year = period.split('-')[0];
+    return `2do semestre ${year}`;
+  }
+  if (typeof period === 'string' && period.endsWith('-Anual')) {
+    const year = period.split('-')[0];
+    return `Año ${year}`;
+  }
+  if (!MONTH_PERIOD_PATTERN.test(String(period))) {
+    return String(period);
+  }
   const date = new Date(`${period}-01T00:00:00`);
+  if (Number.isNaN(date.getTime())) return String(period);
   return new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(date);
+}
+
+function getCurrentPeriodCode(frequency, period, selectedYear, selectedSemester) {
+  if (frequency === 'semestral') {
+    return `${selectedYear}-${selectedSemester === 'sem1' ? 'Sem1' : 'Sem2'}`;
+  }
+  if (frequency === 'anual') {
+    return `${selectedYear}-Anual`;
+  }
+  return period;
 }
 
 function getChangePercent(current, previous) {
@@ -178,6 +206,10 @@ export default function AdminReportsPage() {
   const [frequency, setFrequency] = useState('mensual');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedSemester, setSelectedSemester] = useState('sem1');
+  const currentPeriodCode = useMemo(
+    () => getCurrentPeriodCode(frequency, period, selectedYear, selectedSemester),
+    [frequency, period, selectedYear, selectedSemester],
+  );
 
   useEffect(() => {
     if (frequency === 'mensual') {
@@ -285,12 +317,21 @@ export default function AdminReportsPage() {
   const monthly = stats?.monthly || [];
   const comparisonMonthly = comparisonStats?.monthly || [];
   const feeDetails = stats?.fee_details || [];
+  const comparisonFeeDetails = comparisonStats?.fee_details || [];
   const expenseDetails = stats?.expense_details || [];
 
-  const currentExpected = monthly.at(-1)?.expected || 0;
-  const currentCollected = monthly.at(-1)?.collected || summary.total_revenue || 0;
-  const comparisonExpected = comparisonMonthly.at(-1)?.expected || 0;
-  const comparisonCollected = comparisonMonthly.at(-1)?.collected || comparisonSummary.total_revenue || 0;
+  const currentExpected = feeDetails.length
+    ? feeDetails.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    : (monthly.at(-1)?.expected || 0);
+  const currentCollected = feeDetails.length
+    ? feeDetails.reduce((sum, row) => sum + Number(row.paid_amount || 0), 0)
+    : (monthly.at(-1)?.collected || summary.total_revenue || 0);
+  const comparisonExpected = comparisonFeeDetails.length
+    ? comparisonFeeDetails.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    : (comparisonMonthly.at(-1)?.expected || 0);
+  const comparisonCollected = comparisonFeeDetails.length
+    ? comparisonFeeDetails.reduce((sum, row) => sum + Number(row.paid_amount || 0), 0)
+    : (comparisonMonthly.at(-1)?.collected || comparisonSummary.total_revenue || 0);
   const recoverable = Math.max(currentExpected - currentCollected, 0);
   const comparisonRecoverable = Math.max(comparisonExpected - comparisonCollected, 0);
   const efficiency = currentExpected ? (currentCollected / currentExpected) * 100 : 0;
@@ -346,7 +387,7 @@ export default function AdminReportsPage() {
 
   const emittedVsCollected = [
     { period: getPeriodLabel(comparePeriod), expected: comparisonExpected, collected: comparisonCollected },
-    { period: getPeriodLabel(period), expected: currentExpected, collected: currentCollected },
+    { period: getPeriodLabel(currentPeriodCode), expected: currentExpected, collected: currentCollected },
   ];
 
   const periodLabel = frequency === 'semestral' ? 'del semestre' : frequency === 'anual' ? 'del año' : 'del mes';
@@ -455,7 +496,7 @@ export default function AdminReportsPage() {
               <Tooltip formatter={(value, name, item) => (item?.payload?.percent ? `${Number(value).toFixed(2)}%` : formatMoney(value))} />
               <Legend verticalAlign="top" align="center" height={28} iconType="square" />
               <Bar dataKey="comparativo" name={getPeriodLabel(comparePeriod)} fill="#b9cdfb" radius={[5, 5, 0, 0]} maxBarSize={38} />
-              <Bar dataKey="actual" name={getPeriodLabel(period)} fill="#1155d9" radius={[5, 5, 0, 0]} maxBarSize={38} />
+              <Bar dataKey="actual" name={getPeriodLabel(currentPeriodCode)} fill="#1155d9" radius={[5, 5, 0, 0]} maxBarSize={38} />
             </BarChart>
           </ResponsiveContainer>
         </article>

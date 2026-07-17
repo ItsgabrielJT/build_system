@@ -8,6 +8,26 @@ import asyncpg
 
 from app.models.schemas import ApartmentCreate, ApartmentUpdate
 
+APARTMENT_STATUS_SQL = """
+CASE
+    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
+    WHEN a.status = 'VACANTE' THEN 'VACANTE'
+    WHEN a.status = 'OCUPADO' THEN 'OCUPADO'
+    WHEN oa.owner_id IS NULL THEN 'VACANTE'
+    ELSE 'OCUPADO'
+END
+"""
+
+APARTMENT_STATUS_FILTER_SQL = """
+CASE
+    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
+    WHEN a.status = 'VACANTE' THEN 'VACANTE'
+    WHEN a.status = 'OCUPADO' THEN 'OCUPADO'
+    WHEN NOT EXISTS (SELECT 1 FROM owner_apartments oa_f WHERE oa_f.apartment_id = a.id) THEN 'VACANTE'
+    ELSE 'OCUPADO'
+END
+"""
+
 
 class ApartmentRepository:
     def __init__(self, conn: asyncpg.Connection) -> None:
@@ -15,17 +35,13 @@ class ApartmentRepository:
 
     async def get_all(self) -> list[dict]:
         rows = await self._conn.fetch(
-            """
+            f"""
             SELECT
                 a.id,
                 a.code,
                 a.floor,
                 a.tower,
-                CASE
-                    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
-                    WHEN oa.owner_id IS NULL THEN 'VACANTE'
-                    ELSE 'OCUPADO'
-                END AS status,
+                {APARTMENT_STATUS_SQL} AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,
                 a.created_at,
@@ -48,17 +64,13 @@ class ApartmentRepository:
 
     async def get_by_id(self, apartment_id: UUID) -> dict | None:
         row = await self._conn.fetchrow(
-            """
+            f"""
             SELECT
                 a.id,
                 a.code,
                 a.floor,
                 a.tower,
-                CASE
-                    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
-                    WHEN oa.owner_id IS NULL THEN 'VACANTE'
-                    ELSE 'OCUPADO'
-                END AS status,
+                {APARTMENT_STATUS_SQL} AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,
                 a.created_at,
@@ -176,11 +188,11 @@ class ApartmentRepository:
             f"""
             SELECT
                 COUNT(*) as total,
-                COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND EXISTS (SELECT 1 FROM owner_apartments oa WHERE oa.apartment_id = a.id) THEN 1 END) as occupied,
-                COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND NOT EXISTS (SELECT 1 FROM owner_apartments oa WHERE oa.apartment_id = a.id) THEN 1 END) as vacant,
-                COUNT(CASE WHEN a.status = 'MANTENIMIENTO' THEN 1 END) as maintenance,
+                COUNT(CASE WHEN ({APARTMENT_STATUS_FILTER_SQL}) = 'OCUPADO' THEN 1 END) as occupied,
+                COUNT(CASE WHEN ({APARTMENT_STATUS_FILTER_SQL}) = 'VACANTE' THEN 1 END) as vacant,
+                COUNT(CASE WHEN ({APARTMENT_STATUS_FILTER_SQL}) = 'MANTENIMIENTO' THEN 1 END) as maintenance,
                 CASE WHEN COUNT(*) > 0 THEN
-                    (COUNT(CASE WHEN a.status IN ('ACTIVA', 'ACTIVO') AND EXISTS (SELECT 1 FROM owner_apartments oa WHERE oa.apartment_id = a.id) THEN 1 END)::float / COUNT(*)::float * 100)
+                    (COUNT(CASE WHEN ({APARTMENT_STATUS_FILTER_SQL}) = 'OCUPADO' THEN 1 END)::float / COUNT(*)::float * 100)
                 ELSE 0 END as occupancy_rate_percent,
                 100.0 as allocated_quota_percent
             FROM apartments a
@@ -212,17 +224,10 @@ class ApartmentRepository:
         params = []
         idx = 1
 
-        conditions.append("a.status IN ('ACTIVA', 'ACTIVO', 'MANTENIMIENTO')")
+        conditions.append("a.status IN ('ACTIVA', 'ACTIVO', 'OCUPADO', 'VACANTE', 'MANTENIMIENTO')")
 
         if status and status.upper() in ["OCUPADO", "VACANTE", "MANTENIMIENTO"]:
-            if status.upper() == "OCUPADO":
-                conditions.append("a.status IN ('ACTIVA', 'ACTIVO')")
-                conditions.append("EXISTS (SELECT 1 FROM owner_apartments oa_f WHERE oa_f.apartment_id = a.id)")
-            elif status.upper() == "VACANTE":
-                conditions.append("a.status IN ('ACTIVA', 'ACTIVO')")
-                conditions.append("NOT EXISTS (SELECT 1 FROM owner_apartments oa_f WHERE oa_f.apartment_id = a.id)")
-            elif status.upper() == "MANTENIMIENTO":
-                conditions.append("a.status = 'MANTENIMIENTO'")
+            conditions.append(f"({APARTMENT_STATUS_FILTER_SQL}) = '{status.upper()}'")
 
         if building_id:
             conditions.append(f"a.building_id = ${idx}")
@@ -247,11 +252,7 @@ class ApartmentRepository:
                 a.code,
                 a.floor,
                 a.tower,
-                CASE
-                    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
-                    WHEN oa.owner_id IS NULL THEN 'VACANTE'
-                    ELSE 'OCUPADO'
-                END AS status,
+                {APARTMENT_STATUS_SQL} AS status,
                 a.building_id,
                 oa.owner_id,
                 a.created_at,
@@ -287,17 +288,13 @@ class ApartmentRepository:
 
     async def get_by_owner_id(self, owner_id: UUID) -> list[dict]:
         rows = await self._conn.fetch(
-            """
+            f"""
             SELECT
                 a.id,
                 a.code,
                 a.floor,
                 a.tower,
-                CASE
-                    WHEN a.status = 'MANTENIMIENTO' THEN 'MANTENIMIENTO'
-                    WHEN oa.owner_id IS NULL THEN 'VACANTE'
-                    ELSE 'OCUPADO'
-                END AS status,
+                {APARTMENT_STATUS_SQL} AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,
                 a.created_at,

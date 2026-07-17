@@ -43,7 +43,9 @@ class ApartmentService:
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="Estado inválido. Use Vacante, Ocupado o En mantenimiento",
                 )
-            data.status = "MANTENIMIENTO" if normalized == "MANTENIMIENTO" else "ACTIVO"
+            if normalized in {"ACTIVO", "ACTIVA"}:
+                normalized = "OCUPADO"
+            data.status = normalized
         return await self._repo.update(apartment_id, data)
 
     async def assign_owner(

@@ -136,6 +136,15 @@ const IconCalendar = () => (
   </svg>
 );
 
+const IconIncomes = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9.5 3h5a1.5 1.5 0 0 1 1.5 1.5a3.5 3.5 0 0 1 -3.5 3.5h-1a3.5 3.5 0 0 1 -3.5 -3.5a1.5 1.5 0 0 1 1.5 -1.5z" />
+    <path d="M4 17v-1a8 8 0 1 1 16 0v1a4 4 0 0 1 -4 4h-8a4 4 0 0 1 -4 -4z" />
+    <line x1="12" y1="10" x2="12" y2="19" />
+    <path d="M14.5 11.5H10.75a1.75 1.75 0 0 0 0 3.5h2.5a1.75 1.75 0 0 1 0 3.5H9" />
+  </svg>
+);
+
 const ADMIN_LINKS = [
   { to: '/admin/reports', label: 'Reportes', Icon: IconReports },
   { to: '/admin/users', label: 'Usuarios', Icon: IconProfile },
@@ -143,7 +152,7 @@ const ADMIN_LINKS = [
   { to: '/admin/apartments', label: 'Departamentos', Icon: IconApartments },
   { to: '/admin/fees', label: 'Cuotas', Icon: IconFees },
   { to: '/admin/payments', label: 'Pagos', Icon: IconPayments },
-  { to: '/admin/incomes', label: 'Ingresos', Icon: IconPayments },
+  { to: '/admin/incomes', label: 'Ingresos', Icon: IconIncomes },
   { to: '/admin/fines', label: 'Multas', Icon: IconFines },
   { to: '/admin/expenses', label: 'Gastos', Icon: IconExpenses },
   { to: '/admin/announcements', label: 'Avisos', Icon: IconAnnouncements },

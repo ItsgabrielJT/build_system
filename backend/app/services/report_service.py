@@ -7,6 +7,7 @@ import math
 import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Optional
 from uuid import UUID
 from xml.sax.saxutils import escape
@@ -16,7 +17,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm, inch
-from reportlab.platypus import HRFlowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import HRFlowable, Image, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.graphics.shapes import Drawing, Rect, String, Line, Circle
 
@@ -3785,43 +3786,18 @@ class ReportService:
         )
         story = []
         
-        # Emission date and sheet number block
+        # Emission metadata in standardized system header
         emission_date = datetime.now().strftime("%d/%m/%Y")
         sheet_number = f"FTN-{datetime.now().year}-{str(owner['document_id'])[-6:].zfill(6)}"
         story.extend(
-            build_pdf_brand_header(
+            await self._three_column_report_header(
                 "FICHA DEL COPROPIETARIO",
-                f"Ficha N.°: {sheet_number}",
-                building,
+                f"Fecha de emisión: {emission_date} | Ficha N.°: {sheet_number}",
                 width=width,
+                building=building,
+                right_text=f"Ficha N.°: {sheet_number}",
             )
         )
-
-        header_info = Table(
-            [
-                [
-                    Paragraph(
-                        "<font size='8' color='#123c7a'><b>DATOS DE EMISION</b></font><br/>"
-                        f"<font size='8' color='#4b5563'>Fecha de emisión: {emission_date}</font><br/>"
-                        f"<font size='8' color='#4b5563'><b>Ficha N.°: {sheet_number}</b></font>",
-                        ParagraphStyle("FichaHeaderInfo", fontName="Helvetica", leading=11),
-                    ),
-                ]
-            ],
-            colWidths=[width],
-        )
-        header_info.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#123c7a")),
-            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#d4dfef")),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ]))
-        story.append(header_info)
-        story.append(Spacer(1, 0.08 * cm))
         
         # Helper for sections titles
         def make_section_title(title_text: str):
@@ -3842,7 +3818,36 @@ class ReportService:
         story.append(Spacer(1, 0.15 * cm))
         
         # Left side: owner info
-        avatar_placeholder = Paragraph("<font size='28' color='#9ca3af'><b>👤</b></font>", ParagraphStyle("Avatar", fontName="Helvetica", alignment=1))
+        avatar_size = 1.45 * cm
+        owner_photo = owner.get("photo_storage_path")
+        avatar_placeholder = ""
+        if owner_photo:
+            photo_path = Path(str(owner_photo))
+            if photo_path.exists():
+                owner_image = Image(str(photo_path))
+                ratio = min(avatar_size / owner_image.imageWidth, avatar_size / owner_image.imageHeight)
+                owner_image.drawWidth = owner_image.imageWidth * ratio
+                owner_image.drawHeight = owner_image.imageHeight * ratio
+                owner_image.hAlign = "CENTER"
+                avatar_placeholder = owner_image
+
+        if not avatar_placeholder:
+            avatar_placeholder = Paragraph(
+                "<font size='8' color='#6b7280'><b>Sin foto</b></font>",
+                ParagraphStyle("AvatarFallback", fontName="Helvetica", alignment=1),
+            )
+
+        avatar_cell = Table([[avatar_placeholder]], colWidths=[1.8 * cm], rowHeights=[1.8 * cm])
+        avatar_cell.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#d1dae8")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
         
         reg_date_str = self._spanish_date(owner.get("created_at").date()) if owner.get("created_at") else "--"
         birth_date_str = self._spanish_date(owner.get("birth_date")) if owner.get("birth_date") else "--"
@@ -3887,7 +3892,7 @@ class ReportService:
         
         # Combine Left & Right
         sec1_table = Table(
-            [[avatar_placeholder, owner_info_p, unit_summary_table]],
+            [[avatar_cell, owner_info_p, unit_summary_table]],
             colWidths=[1.8 * cm, width * 0.48, width * 0.44]
         )
         sec1_table.setStyle(TableStyle([
@@ -3907,12 +3912,13 @@ class ReportService:
         story.append(Spacer(1, 0.15 * cm))
         
         # Replicating department details table (two-column key-value format without image)
-        apt_bedrooms = str(apt.get("bedrooms") or "3")
-        apt_bathrooms = f"{float(apt.get('bathrooms') or 2.5):g}"
-        apt_parking = apt.get("parking") or "1 (P-28)"
-        apt_storage = apt.get("storage") or "B-12"
-        apt_acquisition = self._spanish_date(apt.get("acquisition_date")) if apt.get("acquisition_date") else "15 de junio de 2022"
-        apt_use = apt.get("use_type") or "Departamento residencial"
+        apt_bedrooms = str(apt.get("bedrooms")) if apt.get("bedrooms") is not None else "--"
+        apt_bathrooms = f"{float(apt.get('bathrooms')):g}" if apt.get("bathrooms") is not None else "--"
+        apt_parking = apt.get("parking") or "--"
+        apt_storage = apt.get("storage") or "--"
+        apt_acquisition = self._spanish_date(apt.get("acquisition_date")) if apt.get("acquisition_date") else "--"
+        apt_unit_type = apt.get("unit_type") or apt.get("use_type") or "--"
+        apt_use = apt.get("use_type") or apt.get("unit_type") or "--"
         
         sec2_data = [
             [
@@ -3923,7 +3929,7 @@ class ReportService:
             ],
             [
                 Paragraph("<font size='7.5' color='#4b5563'>Tipo de unidad:</font>", ParagraphStyle("K2")),
-                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_use}</font>", ParagraphStyle("V2")),
+                Paragraph(f"<font size='7.5' color='#1f2937'>{apt_unit_type}</font>", ParagraphStyle("V2")),
                 Paragraph("<font size='7.5' color='#4b5563'>Fecha de adquisición:</font>", ParagraphStyle("K5")),
                 Paragraph(f"<font size='7.5' color='#1f2937'>{apt_acquisition}</font>", ParagraphStyle("V5"))
             ],
@@ -3960,13 +3966,14 @@ class ReportService:
         # SECTION 3: INFORMACIÓN FINANCIERA
         story.append(make_section_title("3. INFORMACIÓN FINANCIERA"))
         story.append(Spacer(1, 0.15 * cm))
+        header_font_size = 7
         
         # Column 1: Resumen de pagos
         last_pay_str = self._spanish_date(last_payment_date) if last_payment_date else "--"
         next_due_str = self._spanish_date(next_due)
         
         resumen_data = [
-            [Paragraph("<font size='8' color='#123c7a'><b>Resumen de pagos</b></font>", ParagraphStyle("ResT"))],
+            [Paragraph(f"<font size='{header_font_size}' color='#ffffff'><b>Resumen de pagos</b></font>", ParagraphStyle("ResT", alignment=1))],
             [Paragraph(f"<font size='7' color='#4b5563'>Estado actual:</font><br/><font size='8.5' color='{apt_status_color}'><b>{apt_status_label}</b></font>", ParagraphStyle("Item1"))],
             [Paragraph(f"<font size='7' color='#4b5563'>Último pago:</font><br/><font size='7.5' color='#1f2937'>{last_pay_str}</font>", ParagraphStyle("Item2"))],
             [Paragraph(f"<font size='7' color='#4b5563'>Próximo vencimiento:</font><br/><font size='7.5' color='#1f2937'>{next_due_str}</font>", ParagraphStyle("Item3"))],
@@ -3978,6 +3985,7 @@ class ReportService:
         resumen_table.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#123c7a")),
             ("TOPPADDING", (0, 0), (-1, -1), 1),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
             ("LEFTPADDING", (0, 0), (-1, -1), 3),
@@ -3989,9 +3997,9 @@ class ReportService:
         
         # Column 2: Últimos 3 pagos registrados
         pagos_headers = [
-            Paragraph("<b>Fecha</b>", ParagraphStyle("PH1", fontName="Helvetica-Bold", size=7, color="#ffffff")),
-            Paragraph("<b>Concepto</b>", ParagraphStyle("PH2", fontName="Helvetica-Bold", size=7, color="#ffffff")),
-            Paragraph("<b>Valor (USD)</b>", ParagraphStyle("PH3", fontName="Helvetica-Bold", size=7, color="#ffffff", align="RIGHT")),
+            Paragraph("<b>Fecha</b>", ParagraphStyle("PH1", fontName="Helvetica-Bold", fontSize=header_font_size, textColor=colors.white)),
+            Paragraph("<b>Concepto</b>", ParagraphStyle("PH2", fontName="Helvetica-Bold", fontSize=header_font_size, textColor=colors.white)),
+            Paragraph("<b>Valor (USD)</b>", ParagraphStyle("PH3", fontName="Helvetica-Bold", fontSize=header_font_size, textColor=colors.white, alignment=2)),
         ]
         pagos_rows = [pagos_headers]
         
@@ -4026,6 +4034,7 @@ class ReportService:
         pagos_table = Table(pagos_rows, colWidths=[width * 0.095, width * 0.135, width * 0.10])
         pagos_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123c7a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("ALIGN", (0, 0), (-1, -1), "LEFT"),
             ("ALIGN", (2, 0), (2, -1), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -4041,7 +4050,7 @@ class ReportService:
         
         # Column 3: Estado de cuenta actual
         fin_rows = [
-            [Paragraph("<b>Concepto</b>", ParagraphStyle("FH1", fontName="Helvetica-Bold", size=7, color="#ffffff")), Paragraph("<b>Monto (USD)</b>", ParagraphStyle("FH2", fontName="Helvetica-Bold", size=7, color="#ffffff", align="RIGHT"))],
+            [Paragraph("<b>Concepto</b>", ParagraphStyle("FH1", fontName="Helvetica-Bold", fontSize=header_font_size, textColor=colors.white)), Paragraph("<b>Monto (USD)</b>", ParagraphStyle("FH2", fontName="Helvetica-Bold", fontSize=header_font_size, textColor=colors.white, alignment=2))],
             [Paragraph("<font size='7' color='#4b5563'>Saldo anterior:</font>", ParagraphStyle("FL1")), Paragraph(f"<font size='7' color='#1f2937'>{self._money(saldo_anterior)}</font>", ParagraphStyle("FV1", align="RIGHT"))],
             [Paragraph("<font size='7' color='#4b5563'>Cargos del mes:</font>", ParagraphStyle("FL2")), Paragraph(f"<font size='7' color='#1f2937'>{self._money(cargos_mes)}</font>", ParagraphStyle("FV2", align="RIGHT"))],
             [Paragraph("<font size='7' color='#4b5563'>Pagos del mes:</font>", ParagraphStyle("FL3")), Paragraph(f"<font size='7' color='#c74444'>-{self._money(pagos_mes)}</font>", ParagraphStyle("FV3", align="RIGHT"))],
@@ -4050,6 +4059,7 @@ class ReportService:
         fin_table = Table(fin_rows, colWidths=[width * 0.18, width * 0.15])
         fin_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123c7a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("ALIGN", (0, 0), (-1, -1), "LEFT"),
             ("ALIGN", (1, 0), (1, -1), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),

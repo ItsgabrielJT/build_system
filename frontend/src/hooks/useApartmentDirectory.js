@@ -105,6 +105,13 @@ export function useApartmentDirectory() {
           floor: formData.floor ? parseInt(formData.floor, 10) : undefined,
           tower: formData.tower || undefined,
           building_id: formData.building_id || undefined,
+          parking: formData.parking || undefined,
+          bathrooms: formData.bathrooms !== '' ? parseFloat(formData.bathrooms) : undefined,
+          bedrooms: formData.bedrooms !== '' ? parseInt(formData.bedrooms, 10) : undefined,
+          unit_type: formData.unit_type || undefined,
+          storage: formData.storage || undefined,
+          acquisition_date: formData.acquisition_date || undefined,
+          use_type: formData.use_type || undefined,
         };
         await apartmentService.createApartment(payload, token);
         success('Apartamento creado con éxito');

@@ -147,6 +147,13 @@ class ApartmentCreate(BaseModel):
     floor: Optional[int] = None
     tower: Optional[str] = None
     building_id: Optional[UUID] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[float] = None
+    parking: Optional[str] = None
+    storage: Optional[str] = None
+    acquisition_date: Optional[date] = None
+    unit_type: Optional[str] = None
+    use_type: Optional[str] = None
 
 
 class ApartmentUpdate(BaseModel):
@@ -154,6 +161,13 @@ class ApartmentUpdate(BaseModel):
     floor: Optional[int] = None
     tower: Optional[str] = None
     status: Optional[str] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[float] = None
+    parking: Optional[str] = None
+    storage: Optional[str] = None
+    acquisition_date: Optional[date] = None
+    unit_type: Optional[str] = None
+    use_type: Optional[str] = None
 
 
 class ApartmentResponse(BaseModel):
@@ -163,6 +177,13 @@ class ApartmentResponse(BaseModel):
     tower: Optional[str] = None
     status: str
     building_id: Optional[UUID] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[float] = None
+    parking: Optional[str] = None
+    storage: Optional[str] = None
+    acquisition_date: Optional[date] = None
+    unit_type: Optional[str] = None
+    use_type: Optional[str] = None
     owner_id: Optional[UUID] = None
     owner_name: Optional[str] = None
     owner_email: Optional[str] = None

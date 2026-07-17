@@ -87,6 +87,13 @@ export default function DepartmentsPage() {
     { name: 'code', label: 'Código de apartamento', required: true, placeholder: 'Ej: 101, A-202' },
     { name: 'floor', label: 'Piso', type: 'number', placeholder: 'Ej: 1', min: 1 },
     { name: 'tower', label: 'Torre', placeholder: 'Ej: A, Norte' },
+    { name: 'parking', label: 'Parqueadero', placeholder: 'Ej: 1 (P-28)' },
+    { name: 'bathrooms', label: 'Baños', type: 'number', min: 0, step: '0.5', placeholder: 'Ej: 2.5' },
+    { name: 'bedrooms', label: 'Habitaciones', type: 'number', min: 0, step: '1', placeholder: 'Ej: 3' },
+    { name: 'unit_type', label: 'Tipo de unidad', placeholder: 'Ej: Residencial' },
+    { name: 'storage', label: 'Bodega', placeholder: 'Ej: B-12' },
+    { name: 'acquisition_date', label: 'Fecha de adquisición', type: 'date' },
+    { name: 'use_type', label: 'Uso del departamento', placeholder: 'Ej: Residencial' },
     ...(buildingOptions.length > 0
       ? [{ name: 'building_id', label: 'Edificio', type: 'select', options: buildingOptions }]
       : []),

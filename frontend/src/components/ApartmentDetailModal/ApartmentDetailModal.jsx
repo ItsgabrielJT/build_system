@@ -15,6 +15,13 @@ const EDIT_FIELDS = [
   { name: 'code', label: 'Código', required: true },
   { name: 'floor', label: 'Piso', type: 'number', min: 1 },
   { name: 'tower', label: 'Torre' },
+  { name: 'parking', label: 'Parqueadero' },
+  { name: 'bathrooms', label: 'Baños', type: 'number', min: 0, step: '0.5' },
+  { name: 'bedrooms', label: 'Habitaciones', type: 'number', min: 0, step: '1' },
+  { name: 'unit_type', label: 'Tipo de unidad' },
+  { name: 'storage', label: 'Bodega' },
+  { name: 'acquisition_date', label: 'Fecha de adquisición', type: 'date' },
+  { name: 'use_type', label: 'Uso del departamento' },
   { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
 ];
 
@@ -57,6 +64,13 @@ export default function ApartmentDetailModal({ apartment, onClose, onRefresh }) 
         code: formData.code,
         floor: formData.floor ? parseInt(formData.floor, 10) : undefined,
         tower: formData.tower || undefined,
+        parking: formData.parking || undefined,
+        bathrooms: formData.bathrooms !== '' ? parseFloat(formData.bathrooms) : undefined,
+        bedrooms: formData.bedrooms !== '' ? parseInt(formData.bedrooms, 10) : undefined,
+        unit_type: formData.unit_type || undefined,
+        storage: formData.storage || undefined,
+        acquisition_date: formData.acquisition_date || undefined,
+        use_type: formData.use_type || undefined,
         status: formData.status || undefined,
       };
       await apartmentService.updateApartment(apartment.id, payload, token);
@@ -162,6 +176,34 @@ export default function ApartmentDetailModal({ apartment, onClose, onRefresh }) 
                   <div className={styles.infoItem}>
                     <span className={styles.infoLabel}>Torre</span>
                     <span className={styles.infoValue}>{apartment.tower || '—'}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Parqueadero</span>
+                    <span className={styles.infoValue}>{fullData?.parking || '—'}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Baños</span>
+                    <span className={styles.infoValue}>{fullData?.bathrooms ?? '—'}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Habitaciones</span>
+                    <span className={styles.infoValue}>{fullData?.bedrooms ?? '—'}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Tipo de unidad</span>
+                    <span className={styles.infoValue}>{fullData?.unit_type || '—'}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Bodega</span>
+                    <span className={styles.infoValue}>{fullData?.storage || '—'}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Fecha de adquisición</span>
+                    <span className={styles.infoValue}>{fullData?.acquisition_date || '—'}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Uso del departamento</span>
+                    <span className={styles.infoValue}>{fullData?.use_type || '—'}</span>
                   </div>
                   {apartment.area_sqm != null && (
                     <div className={styles.infoItem}>

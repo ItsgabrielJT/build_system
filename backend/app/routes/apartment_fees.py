@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.auth.dependencies import require_admin
 from app.config.database import get_db
-from app.models.schemas import ApartmentFeeCreate, ApartmentFeeUpdate, BulkFeeCreate
+from app.models.schemas import ApartmentFeeCreate, ApartmentFeeUpdate, BulkFeeCreate, BulkFeeDeleteRequest
 from app.repositories.apartment_fee_repository import ApartmentFeeRepository
 from app.services.apartment_fee_service import ApartmentFeeService
 
@@ -78,3 +78,23 @@ async def bulk_upload_fees(
 ):
     service = ApartmentFeeService(ApartmentFeeRepository(db))
     return await service.bulk_upsert(body)
+
+
+@router.delete("/apartment-fees/{fee_id}", status_code=status.HTTP_200_OK)
+async def delete_fee(
+    fee_id: UUID,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = ApartmentFeeService(ApartmentFeeRepository(db))
+    return await service.delete(fee_id)
+
+
+@router.post("/apartment-fees/bulk-delete", status_code=status.HTTP_200_OK)
+async def bulk_delete_fees(
+    body: BulkFeeDeleteRequest,
+    _user: dict = Depends(require_admin),
+    db=Depends(get_db),
+):
+    service = ApartmentFeeService(ApartmentFeeRepository(db))
+    return await service.bulk_delete(body.fee_ids)

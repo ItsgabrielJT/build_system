@@ -103,6 +103,38 @@ export default function AdminFeesPage() {
   const [editingFeeAmount, setEditingFeeAmount] = useState('');
   const [savingFeeId, setSavingFeeId] = useState(null);
 
+  // Selección para eliminación masiva e ingreso de cuota individual
+  const [selectedFeeIds, setSelectedFeeIds] = useState([]);
+  const [newFeeApartmentId, setNewFeeApartmentId] = useState('');
+  const [newFeeAmount, setNewFeeAmount] = useState('');
+  const [isCreatingFee, setIsCreatingFee] = useState(false);
+
+  // Modal de confirmación personalizado para eliminación
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  });
+
+  const showConfirmDelete = (title, message, onConfirm) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+    });
+  };
+
+  const closeConfirmModal = () => {
+    setConfirmModal({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: null,
+    });
+  };
+
   // Modal "Ver estadísticas"
   const [chartPeriod, setChartPeriod] = useState(null);
   const [chartStats, setChartStats] = useState(null);
@@ -110,7 +142,7 @@ export default function AdminFeesPage() {
 
   const { stats, fetchStats } = useApartmentFeeStats();
   const { periods, loading: periodsLoading, fetchPeriods } = usePeriodsSummary();
-  const { fees, fetchFees, bulkUpload } = useApartmentFees();
+  const { fees, fetchFees, createFee, bulkUpload, deleteFee, bulkDelete } = useApartmentFees();
   const { apartments, fetchApartments } = useApartments();
 
   useEffect(() => {
@@ -196,6 +228,9 @@ export default function AdminFeesPage() {
     setDetailLoading(true);
     setEditingFeeId(null);
     setEditingFeeAmount('');
+    setSelectedFeeIds([]);
+    setNewFeeApartmentId('');
+    setNewFeeAmount('');
     try {
       const data = await getFeesByPeriod(token, row.period);
       setDetailFees(Array.isArray(data) ? data : []);
@@ -257,6 +292,102 @@ export default function AdminFeesPage() {
     } finally {
       setSavingFeeId(null);
     }
+  };
+
+  const handleDeleteFee = (fee) => {
+    const title = '¿Eliminar esta cuota?';
+    const message = `Se eliminará la cuota de este departamento en el período ${fee.period} y se borrarán de forma permanente todos los pagos asociados a ella.`;
+    showConfirmDelete(title, message, async () => {
+      try {
+        await deleteFee(fee.id);
+        success('Cuota y sus pagos asociados eliminados con éxito');
+        setSelectedFeeIds((prev) => prev.filter((id) => id !== fee.id));
+        const data = await getFeesByPeriod(token, fee.period);
+        setDetailFees(Array.isArray(data) ? data : []);
+        await Promise.all([
+          fetchFees(fee.period),
+          fetchStats(fee.period),
+          fetchPeriods(1, 100),
+        ]);
+      } catch (err) {
+        toastError(err.response?.data?.detail || 'Error al eliminar la cuota');
+      } finally {
+        closeConfirmModal();
+      }
+    });
+  };
+
+  const handleBulkDeleteFees = () => {
+    if (selectedFeeIds.length === 0) return;
+    const title = `¿Eliminar ${selectedFeeIds.length} cuotas?`;
+    const message = `Se eliminarán las cuotas seleccionadas del período ${detailPeriod.period} y se borrarán permanentemente todos los pagos relacionados a las mismas.`;
+    showConfirmDelete(title, message, async () => {
+      try {
+        await bulkDelete(selectedFeeIds);
+        success('Cuotas y pagos asociados eliminados con éxito');
+        setSelectedFeeIds([]);
+        const data = await getFeesByPeriod(token, detailPeriod.period);
+        setDetailFees(Array.isArray(data) ? data : []);
+        await Promise.all([
+          fetchFees(detailPeriod.period),
+          fetchStats(detailPeriod.period),
+          fetchPeriods(1, 100),
+        ]);
+      } catch (err) {
+        toastError(err.response?.data?.detail || 'Error al eliminar las cuotas');
+      } finally {
+        closeConfirmModal();
+      }
+    });
+  };
+
+  const handleCreateIndividualFee = async () => {
+    const amountVal = parseFloat(newFeeAmount);
+    if (!newFeeApartmentId) {
+      toastError('Por favor seleccione un departamento');
+      return;
+    }
+    if (isNaN(amountVal) || amountVal < 0) {
+      toastError('Ingrese un monto válido para la cuota');
+      return;
+    }
+
+    setIsCreatingFee(true);
+    try {
+      await createFee({
+        apartment_id: newFeeApartmentId,
+        period: detailPeriod.period,
+        amount: amountVal,
+      });
+      success('Cuota creada con éxito');
+      setNewFeeApartmentId('');
+      setNewFeeAmount('');
+      const data = await getFeesByPeriod(token, detailPeriod.period);
+      setDetailFees(Array.isArray(data) ? data : []);
+      await Promise.all([
+        fetchFees(detailPeriod.period),
+        fetchStats(detailPeriod.period),
+        fetchPeriods(1, 100),
+      ]);
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'Error al crear la cuota');
+    } finally {
+      setIsCreatingFee(false);
+    }
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedFeeIds.length === detailFees.length) {
+      setSelectedFeeIds([]);
+    } else {
+      setSelectedFeeIds(detailFees.map((f) => f.id));
+    }
+  };
+
+  const handleToggleSelectFee = (feeId) => {
+    setSelectedFeeIds((prev) =>
+      prev.includes(feeId) ? prev.filter((id) => id !== feeId) : [...prev, feeId]
+    );
   };
 
   const handleViewChart = async (row) => {
@@ -462,86 +593,169 @@ export default function AdminFeesPage() {
             {detailLoading ? (
               <p className={styles.loading}>Cargando...</p>
             ) : (
-              <div className={styles.tableWrapper}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th className={styles.th}>Departamento</th>
-                      <th className={styles.th}>Piso</th>
-                      <th className={styles.th}>Torre</th>
-                      <th className={styles.th}>Saldo anterior</th>
-                      <th className={styles.th}>Cuota</th>
-                      <th className={styles.th}>Pagado mes</th>
-                      <th className={styles.th}>Estado</th>
-                      <th className={styles.th}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detailFees.length === 0 ? (
+              <>
+                {selectedFeeIds.length > 0 && (
+                  <div className={styles.bulkHeaderActions}>
+                    <span className={styles.selectedCountText}>
+                      {selectedFeeIds.length} seleccionado(s)
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.btnDanger}
+                      onClick={handleBulkDeleteFees}
+                    >
+                      Eliminar seleccionados
+                    </button>
+                  </div>
+                )}
+                <div className={styles.tableWrapper}>
+                  <table className={styles.table}>
+                    <thead>
                       <tr>
-                        <td colSpan={8} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
-                          Sin cuotas registradas en este período
-                        </td>
+                        <th className={`${styles.th} ${styles.checkboxTh}`}>
+                          <input
+                            type="checkbox"
+                            className={styles.checkboxInput}
+                            checked={detailFees.length > 0 && selectedFeeIds.length === detailFees.length}
+                            onChange={handleToggleSelectAll}
+                          />
+                        </th>
+                        <th className={styles.th}>Departamento</th>
+                        <th className={styles.th}>Piso</th>
+                        <th className={styles.th}>Torre</th>
+                        <th className={styles.th}>Saldo anterior</th>
+                        <th className={styles.th}>Cuota</th>
+                        <th className={styles.th}>Pagado mes</th>
+                        <th className={styles.th}>Estado</th>
+                        <th className={styles.th}>Acciones</th>
                       </tr>
-                    ) : (
-                      detailFees.map((fee) => {
-                        const apt = aptMap[fee.apartment_id] || {};
-                        const status = getFeeStatus(fee);
-                        const isEditing = editingFeeId === fee.id;
-                        return (
-                          <tr key={fee.id} className={styles.tr}>
-                            <td className={styles.td}>{apt.code || '—'}</td>
-                            <td className={styles.td}>{apt.floor ?? '—'}</td>
-                            <td className={styles.td}>{apt.tower ?? '—'}</td>
-                            <td className={styles.td}>{formatPriorBalance(fee)}</td>
-                            <td className={styles.td}>
-                              {isEditing ? (
+                    </thead>
+                    <tbody>
+                      {detailFees.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
+                            Sin cuotas registradas en este período
+                          </td>
+                        </tr>
+                      ) : (
+                        detailFees.map((fee) => {
+                          const apt = aptMap[fee.apartment_id] || {};
+                          const status = getFeeStatus(fee);
+                          const isEditing = editingFeeId === fee.id;
+                          return (
+                            <tr key={fee.id} className={styles.tr}>
+                              <td className={styles.checkboxTd}>
                                 <input
-                                  className={styles.inlineInput}
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={editingFeeAmount}
-                                  onChange={(event) => setEditingFeeAmount(event.target.value)}
+                                  type="checkbox"
+                                  className={styles.checkboxInput}
+                                  checked={selectedFeeIds.includes(fee.id)}
+                                  onChange={() => handleToggleSelectFee(fee.id)}
                                 />
-                              ) : (
-                                formatMoney(fee.amount)
-                              )}
-                            </td>
-                            <td className={styles.td}>{formatMoney(fee.paid_amount || 0)}</td>
-                            <td className={styles.td}>
-                              <span className={`${styles.inlineBadge} ${status.className}`}>
-                                {status.label}
-                              </span>
-                            </td>
-                            <td className={styles.td}>
-                              {isEditing ? (
-                                <div className={styles.inlineActions}>
-                                  <button
-                                    type="button"
-                                    className={styles.btnInlinePrimary}
-                                    onClick={() => handleSaveFee(fee)}
-                                    disabled={savingFeeId === fee.id}
-                                  >
-                                    {savingFeeId === fee.id ? 'Guardando...' : 'Guardar'}
-                                  </button>
-                                  <button type="button" className={styles.btnInline} onClick={handleCancelEditFee}>
-                                    Cancelar
-                                  </button>
-                                </div>
-                              ) : (
-                                <button type="button" className={styles.btnInline} onClick={() => handleStartEditFee(fee)}>
-                                  Editar
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                              </td>
+                              <td className={styles.td}>{apt.code || '—'}</td>
+                              <td className={styles.td}>{apt.floor ?? '—'}</td>
+                              <td className={styles.td}>{apt.tower ?? '—'}</td>
+                              <td className={styles.td}>{formatPriorBalance(fee)}</td>
+                              <td className={styles.td}>
+                                {isEditing ? (
+                                  <input
+                                    className={styles.inlineInput}
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={editingFeeAmount}
+                                    onChange={(event) => setEditingFeeAmount(event.target.value)}
+                                  />
+                                ) : (
+                                  formatMoney(fee.amount)
+                                )}
+                              </td>
+                              <td className={styles.td}>{formatMoney(fee.paid_amount || 0)}</td>
+                              <td className={styles.td}>
+                                <span className={`${styles.inlineBadge} ${status.className}`}>
+                                  {status.label}
+                                </span>
+                              </td>
+                              <td className={styles.td}>
+                                {isEditing ? (
+                                  <div className={styles.inlineActions}>
+                                    <button
+                                      type="button"
+                                      className={styles.btnInlinePrimary}
+                                      onClick={() => handleSaveFee(fee)}
+                                      disabled={savingFeeId === fee.id}
+                                    >
+                                      {savingFeeId === fee.id ? 'Guardando...' : 'Guardar'}
+                                    </button>
+                                    <button type="button" className={styles.btnInline} onClick={handleCancelEditFee}>
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className={styles.inlineActions}>
+                                    <button type="button" className={styles.btnInline} onClick={() => handleStartEditFee(fee)}>
+                                      Editar
+                                    </button>
+                                    <button type="button" className={styles.btnInlineDanger} onClick={() => handleDeleteFee(fee)}>
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Formulario de asignación individual */}
+                {(() => {
+                  const apartmentsWithoutFee = apartments.filter(
+                    (apt) => !detailFees.some((fee) => fee.apartment_id === apt.id)
+                  );
+                  if (apartmentsWithoutFee.length === 0) return null;
+
+                  return (
+                    <div className={styles.addFeePanel}>
+                      <h3 className={styles.addFeeTitle}>Asignar cuota a departamento sin cuota</h3>
+                      <div className={styles.addFeeForm}>
+                        <select
+                          value={newFeeApartmentId}
+                          onChange={(e) => setNewFeeApartmentId(e.target.value)}
+                          className={styles.addFeeSelect}
+                        >
+                          <option value="">Seleccione departamento...</option>
+                          {apartmentsWithoutFee.map((apt) => (
+                            <option key={apt.id} value={apt.id}>
+                              Depto {apt.code} ({apt.owner_name || 'Sin propietario'})
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newFeeAmount}
+                          onChange={(e) => setNewFeeAmount(e.target.value)}
+                          placeholder="Monto de la cuota"
+                          className={styles.addFeeInput}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateIndividualFee}
+                          className={styles.btnInlinePrimary}
+                          disabled={!newFeeApartmentId || !newFeeAmount || isCreatingFee}
+                          style={{ height: '40px' }}
+                        >
+                          {isCreatingFee ? 'Creando...' : 'Crear cuota'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
             )}
           </div>
         </div>
@@ -687,6 +901,34 @@ export default function AdminFeesPage() {
             ) : (
               <p className={styles.loading}>No hay datos disponibles para este período</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {confirmModal.isOpen && (
+        <div className={styles.confirmOverlay} onClick={closeConfirmModal}>
+          <div className={styles.confirmModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.confirmIconContainer}>
+              <svg className={styles.confirmIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h3 className={styles.confirmTitle}>{confirmModal.title}</h3>
+            <p className={styles.confirmMessage}>{confirmModal.message}</p>
+            <div className={styles.confirmActions}>
+              <button type="button" className={styles.btnConfirmCancel} onClick={closeConfirmModal}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={styles.btnConfirmDelete}
+                onClick={confirmModal.onConfirm}
+              >
+                Eliminar de todos modos
+              </button>
+            </div>
           </div>
         </div>
       )}

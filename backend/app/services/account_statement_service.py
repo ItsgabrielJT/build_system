@@ -395,8 +395,16 @@ class AccountStatementService:
             "saldo": sum(Decimal(str(r.get("saldo", 0))) for r in rows),
         }
         story.append(Spacer(1, 0.32 * cm))
+        saldo_val = totals["saldo"]
+        if saldo_val < 0:
+            saldo_text = f"Saldo actual (A favor)<br/><font size='14'><b>{self._money(abs(saldo_val))}</b></font>"
+            saldo_color = "#159447"
+        else:
+            saldo_text = f"Saldo actual<br/><font size='14'><b>{self._money(saldo_val)}</b></font>"
+            saldo_color = "#c91f1f" if saldo_val > 0 else "#159447"
+
         summary = Table([[
-            self._p(f"Saldo actual<br/><font size='14'><b>{self._money(totals['saldo'])}</b></font>", 8, color="#159447", raw=True),
+            self._p(saldo_text, 8, color=saldo_color, raw=True),
             self._p(f"Total ingresos<br/><font size='14'><b>{self._money(totals['pagado'])}</b></font>", 8, color="#159447", raw=True),
             self._p(f"Total egresos<br/><font size='14'><b>-{self._money(totals['esperado'] + totals['multas'])}</b></font>", 8, color="#c91f1f", raw=True),
             self._p(f"Total pagos realizados<br/><font size='14'><b>{self._money(totals['pagado'])}</b></font>", 8, color="#1f5bd8", raw=True),
@@ -407,8 +415,13 @@ class AccountStatementService:
         story.append(self._p("DETALLE DE MOVIMIENTOS", 10, bold=True, color="#0c42a0"))
         data = [["PERIODO", "DEPARTAMENTO", "ESPERADO", "MULTAS", "PAGADO", "SALDO", "ESTADO"]]
         for row in rows:
-            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["multas"]), self._money(row["pagado"]), self._money(row["saldo"]), self._status_label(row["status"])])
-        data.append(["TOTALES DEL PERIODO", "", self._money(totals["esperado"]), self._money(totals["multas"]), self._money(totals["pagado"]), self._money(totals["saldo"]), ""])
+            s_val = Decimal(str(row["saldo"]))
+            s_str = f"{self._money(abs(s_val))} A favor" if s_val < 0 else self._money(s_val)
+            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["multas"]), self._money(row["pagado"]), s_str, self._status_label(row["status"])])
+        
+        total_s_val = totals["saldo"]
+        total_s_str = f"{self._money(abs(total_s_val))} A favor" if total_s_val < 0 else self._money(total_s_val)
+        data.append(["TOTALES DEL PERIODO", "", self._money(totals["esperado"]), self._money(totals["multas"]), self._money(totals["pagado"]), total_s_str, ""])
         story.append(self._blue_table(data, [2.4 * cm, 3 * cm, 2.4 * cm, 2.2 * cm, 2.4 * cm, 2.4 * cm, 3.2 * cm], font_size=7, total_rows=[len(data) - 1]))
         story.append(Spacer(1, 0.35 * cm))
         important = Table([[self._p("INFORMACIÓN IMPORTANTE<br/><br/>El vencimiento de la alícuota es el día 5 de cada mes.<br/>Realiza tus pagos a tiempo para evitar recargos.<br/>Si tienes alguna duda, contáctanos a través del sistema.", 8, raw=True)]], colWidths=[width])

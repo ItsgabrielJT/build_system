@@ -301,3 +301,47 @@ class ApartmentFeeRepository:
             "page": page,
             "page_size": page_size,
         }
+
+    async def bulk_delete(self, fee_ids: list[UUID]) -> dict:
+        if not fee_ids:
+            return {"deleted_fees": 0, "deleted_payments": 0}
+
+        async with self._conn.transaction():
+            # Get matching (apartment_id, period) for the fees we are about to delete
+            fees = await self._conn.fetch(
+                "SELECT apartment_id, period FROM apartment_fees WHERE id = ANY($1)",
+                fee_ids,
+            )
+
+            if not fees:
+                return {"deleted_fees": 0, "deleted_payments": 0}
+
+            # Delete payments matching those combinations
+            payment_delete_result = await self._conn.execute(
+                """
+                DELETE FROM payments
+                WHERE (apartment_id, period) IN (
+                    SELECT apartment_id, period
+                    FROM apartment_fees
+                    WHERE id = ANY($1)
+                )
+                """,
+                fee_ids,
+            )
+            deleted_payments = 0
+            if payment_delete_result.startswith("DELETE"):
+                deleted_payments = int(payment_delete_result.split()[1])
+
+            # Delete the fees
+            fee_delete_result = await self._conn.execute(
+                "DELETE FROM apartment_fees WHERE id = ANY($1)",
+                fee_ids,
+            )
+            deleted_fees = 0
+            if fee_delete_result.startswith("DELETE"):
+                deleted_fees = int(fee_delete_result.split()[1])
+
+            return {"deleted_fees": deleted_fees, "deleted_payments": deleted_payments}
+
+    async def delete(self, fee_id: UUID) -> dict:
+        return await self.bulk_delete([fee_id])

@@ -40,5 +40,33 @@ export function useApartmentFees() {
     [token]
   );
 
-  return { fees, loading, error, fetchFees, createFee, bulkUpload };
+  const deleteFee = useCallback(
+    async (feeId) => {
+      setError(null);
+      try {
+        await feeService.deleteFee(feeId, token);
+        setFees((prev) => prev.filter((f) => f.id !== feeId));
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Error al eliminar cuota');
+        throw err;
+      }
+    },
+    [token]
+  );
+
+  const bulkDelete = useCallback(
+    async (feeIds) => {
+      setError(null);
+      try {
+        await feeService.bulkDeleteFees(feeIds, token);
+        setFees((prev) => prev.filter((f) => !feeIds.includes(f.id)));
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Error al eliminar cuotas');
+        throw err;
+      }
+    },
+    [token]
+  );
+
+  return { fees, loading, error, fetchFees, createFee, bulkUpload, deleteFee, bulkDelete };
 }

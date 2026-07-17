@@ -70,3 +70,17 @@ class ApartmentFeeService:
                 detail="page_size no puede ser mayor a 100",
             )
         return await self._repo.get_periods_summary(page, page_size, year)
+
+    async def delete(self, fee_id: UUID) -> dict:
+        existing = await self._repo.get_by_id(fee_id)
+        if not existing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cuota no encontrada",
+            )
+        return await self._repo.delete(fee_id)
+
+    async def bulk_delete(self, fee_ids: list[UUID]) -> dict:
+        if not fee_ids:
+            return {"deleted_fees": 0, "deleted_payments": 0}
+        return await self._repo.bulk_delete(fee_ids)

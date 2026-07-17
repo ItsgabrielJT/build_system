@@ -49,3 +49,17 @@ export async function getPeriodsSummary(page = 1, pageSize = 10, year = null, to
   });
   return res.data;
 }
+
+export async function deleteFee(feeId, token) {
+  const res = await axios.delete(`${API_BASE}/api/v1/apartment-fees/${feeId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export async function bulkDeleteFees(feeIds, token) {
+  const res = await axios.post(`${API_BASE}/api/v1/apartment-fees/bulk-delete`, { fee_ids: feeIds }, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}

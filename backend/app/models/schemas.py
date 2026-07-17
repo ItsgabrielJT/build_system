@@ -232,6 +232,10 @@ class BulkFeeResponse(BaseModel):
     updated: int
 
 
+class BulkFeeDeleteRequest(BaseModel):
+    fee_ids: List[UUID]
+
+
 class ApartmentFeeResponse(BaseModel):
     id: UUID
     apartment_id: UUID

@@ -190,3 +190,29 @@ async def test_monthly_balance_includes_manual_incomes():
         {"label": "Alícuotas y pagos", "amount": Decimal("1000.00")},
         {"label": "Arriendos", "amount": Decimal("250.00")},
     ]
+
+
+@pytest.mark.asyncio
+async def test_balance_pdf_excludes_zero_expenses():
+    payment_repo = MagicMock()
+    expense_repo = MagicMock()
+    income_repo = MagicMock()
+    payment_repo._conn = MagicMock()
+    service = ReportService(MagicMock(), payment_repo, expense_repo, income_repo)
+    
+    service._income_entries = AsyncMock(return_value=[])
+    service._expenses = AsyncMock(side_effect=[
+        # current_expenses
+        [
+            {"amount": Decimal("200.00"), "category": "Mantenimiento"},
+            {"amount": Decimal("0.00"), "category": "Servicios"},
+        ],
+        # compare_expenses
+        []
+    ])
+    service._fees_report_rows = AsyncMock(return_value=[])
+    
+    pdf_bytes = await service.balance_pdf(period="2026-07")
+    
+    assert isinstance(pdf_bytes, bytes)
+    assert pdf_bytes.startswith(b"%PDF")

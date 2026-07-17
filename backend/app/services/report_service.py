@@ -1688,16 +1688,13 @@ class ReportService:
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ]))
         
-        expense_by_category = self._build_breakdown(current_expenses, "category", "Otros")
+        expense_by_category = [item for item in self._build_breakdown(current_expenses, "category", "Otros") if item["amount"] != 0]
         expense_rows = [
             [self._p("RESUMEN DE EGRESOS (POR CATEGORÍA)", 7.5, bold=True, color="#ffffff"), self._p("↓", 8, bold=True, color="#ffffff", align="RIGHT")],
             [self._p("Categoría", 7, bold=True, color="#ffffff"), self._p("Monto (USD)", 7, bold=True, color="#ffffff", align="RIGHT")]
         ]
-        for item in expense_by_category[:3]:
+        for item in expense_by_category:
             expense_rows.append([self._p(item["label"], 7, color="#1e293b"), money_cell(item["amount"])])
-            
-        while len(expense_rows) < 5:
-            expense_rows.append([self._p("-", 7, color="#64748b"), money_cell(0, color="#64748b")])
             
         expense_rows.append([self._p("TOTAL EGRESOS", 7, bold=True, color="#123c7a"), money_cell(total_expenses_current, bold=True, color="#123c7a")])
         

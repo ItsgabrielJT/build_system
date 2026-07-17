@@ -201,6 +201,11 @@ export default function OwnerInicioPage() {
       return;
     }
 
+    if (!isUpToDate) {
+      toastError('No puede descargar el certificado de expensas hasta estar al día con sus pagos.');
+      return;
+    }
+
     setDownloadingCertificate(true);
     try {
       const blob = await exportExpenseCertificate(token);

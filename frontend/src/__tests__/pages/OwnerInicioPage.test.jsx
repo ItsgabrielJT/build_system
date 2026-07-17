@@ -152,4 +152,26 @@ describe('OwnerInicioPage', () => {
     expect(openMock).toHaveBeenCalledWith(documentsLink, '_blank', 'noopener,noreferrer');
     openMock.mockRestore();
   });
+
+  it('does not allow downloading the expense certificate when owner has pending debt', async () => {
+    getOwnerProfile.mockResolvedValue({
+      full_name: 'Propietario Demo',
+      apartments: [],
+      balance_consolidated: 125.5,
+      recent_transactions: [],
+    });
+    getRecentAnnouncements.mockResolvedValue([]);
+    getMyEvents.mockResolvedValue([]);
+
+    render(<OwnerInicioPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Cargando panel de inicio...')).not.toBeInTheDocument();
+    });
+
+    const btn = screen.getByText('Descargar certificado');
+    btn.click();
+
+    expect(toastError).toHaveBeenCalledWith('No puede descargar el certificado de expensas hasta estar al día con sus pagos.');
+  });
 });

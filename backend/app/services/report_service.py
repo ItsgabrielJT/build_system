@@ -63,9 +63,84 @@ class ReportService:
         return period
 
     def _previous_period(self, period: str) -> str:
+        if isinstance(period, str):
+            if period.endswith("-Sem1"):
+                year = int(period.split("-")[0])
+                return f"{year - 1}-Sem2"
+            if period.endswith("-Sem2"):
+                year = int(period.split("-")[0])
+                return f"{year}-Sem1"
+            if period.endswith("-Anual"):
+                year = int(period.split("-")[0])
+                return f"{year - 1}-Anual"
         month_start = datetime.strptime(f"{period}-01", "%Y-%m-%d").date()
         previous_month_last_day = month_start - timedelta(days=1)
         return previous_month_last_day.strftime("%Y-%m")
+
+    def _comparison_side_labels(self, comp_suffix: str) -> tuple[str, str]:
+        normalized = (comp_suffix or "mes anterior").lower()
+        if "semestre" in normalized:
+            return "Semestre actual", "Semestre anterior"
+        if "año" in normalized or "ano" in normalized:
+            return "Año actual", "Año anterior"
+        return "Mes actual", "Mes anterior"
+
+    def _resolve_period_context(
+        self,
+        period: Optional[str],
+        start_date: Optional[date],
+        end_date: Optional[date],
+        compare_period: Optional[str] = None,
+    ) -> tuple[str, date, date, str, date, date, str]:
+        is_annual = False
+        is_semestral = False
+        if start_date and end_date:
+            is_annual = (
+                start_date.month == 1
+                and start_date.day == 1
+                and end_date.month == 12
+                and end_date.day == 31
+            )
+            is_semestral = (
+                (start_date.month == 1 and start_date.day == 1 and end_date.month == 6 and end_date.day == 30)
+                or (start_date.month == 7 and start_date.day == 1 and end_date.month == 12 and end_date.day == 31)
+            )
+
+        if is_annual:
+            current_period = f"{start_date.year}-Anual"
+            current_start = start_date
+            current_end = end_date
+            default_compare_period = f"{start_date.year - 1}-Anual"
+            comparison_suffix = "año anterior"
+        elif is_semestral:
+            current_start = start_date
+            current_end = end_date
+            if start_date.month == 1:
+                current_period = f"{start_date.year}-Sem1"
+                default_compare_period = f"{start_date.year - 1}-Sem2"
+            else:
+                current_period = f"{start_date.year}-Sem2"
+                default_compare_period = f"{start_date.year}-Sem1"
+            comparison_suffix = "semestre anterior"
+        else:
+            current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
+            current_start, current_end = self._get_period_dates(current_period)
+            current_start = start_date or current_start
+            current_end = end_date or current_end
+            default_compare_period = self._previous_period(current_period)
+            comparison_suffix = "mes anterior"
+
+        resolved_compare_period = compare_period or default_compare_period
+        compare_start, compare_end = self._get_period_dates(resolved_compare_period)
+        return (
+            current_period,
+            current_start,
+            current_end,
+            resolved_compare_period,
+            compare_start,
+            compare_end,
+            comparison_suffix,
+        )
 
     def _is_confirmed_payment(self, payment: dict) -> bool:
         return (payment.get("status") or "").upper() in _CONFIRMED_PAYMENT_STATUSES
@@ -578,10 +653,15 @@ class ReportService:
         conditions: list[str] = []
         params: list = []
         idx = 1
-        if period:
-            conditions.append(f"TO_CHAR(p.paid_at, 'YYYY-MM') = ${idx}")
-            params.append(period)
-            idx += 1
+        if period and not (start_date or end_date):
+            if _MONTH_PERIOD_RE.match(period):
+                conditions.append(f"TO_CHAR(p.paid_at, 'YYYY-MM') = ${idx}")
+                params.append(period)
+                idx += 1
+            else:
+                parsed_start, parsed_end = self._get_period_dates(period)
+                start_date = parsed_start
+                end_date = parsed_end
         if status:
             conditions.append(f"p.status = ${idx}")
             params.append(status)
@@ -1087,15 +1167,16 @@ class ReportService:
         ]))
         return t
 
-    def _build_legend(self, curr_name: str, prev_name: str) -> Table:
+    def _build_legend(self, curr_name: str, prev_name: str, comp_suffix: str = "mes anterior") -> Table:
+        current_label, previous_label = self._comparison_side_labels(comp_suffix)
         box_curr = Drawing(8, 8)
         box_curr.add(Rect(0, 0, 8, 8, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
         box_prev = Drawing(8, 8)
         box_prev.add(Rect(0, 0, 8, 8, fillColor=colors.HexColor("#b9cdfb"), strokeColor=None))
         
         legend_table = Table([
-            [box_curr, self._p(f"Mes actual ({curr_name})", 7.5, bold=True, color="#475569"),
-             box_prev, self._p(f"Mes anterior ({prev_name})", 7.5, bold=True, color="#475569")]
+            [box_curr, self._p(f"{current_label} ({curr_name})", 7.5, bold=True, color="#475569"),
+             box_prev, self._p(f"{previous_label} ({prev_name})", 7.5, bold=True, color="#475569")]
         ], colWidths=[12, 140, 12, 140])
         legend_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -1113,13 +1194,15 @@ class ReportService:
         end_date: Optional[date] = None,
         compare_period: Optional[str] = None,
     ) -> bytes:
-        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
-        current_start, current_end = self._get_period_dates(current_period)
-        current_start = start_date or current_start
-        current_end = end_date or current_end
-        
-        compare_period = compare_period or self._previous_period(current_period)
-        compare_start, compare_end = self._get_period_dates(compare_period)
+        (
+            current_period,
+            current_start,
+            current_end,
+            compare_period,
+            compare_start,
+            compare_end,
+            comp_suffix,
+        ) = self._resolve_period_context(period, start_date, end_date, compare_period)
         
         # Fetch current and comparison data
         payments = await self._income_entries(current_period, current_start, current_end)
@@ -1290,14 +1373,14 @@ class ReportService:
         story.append(val_alicuotas_box)
         story.append(Spacer(1, 0.22 * cm))
         
-        # 5. Section: Comparativo respecto al mes anterior
+        # 5. Section: Comparativo respecto al período anterior
         chart_icon = Drawing(16, 16)
         chart_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
         chart_icon.add(Rect(5, 4.5, 1.5, 4, fillColor=colors.white, strokeColor=None))
         chart_icon.add(Rect(7.25, 4.5, 1.5, 7, fillColor=colors.white, strokeColor=None))
         chart_icon.add(Rect(9.5, 4.5, 1.5, 5, fillColor=colors.white, strokeColor=None))
         
-        comp_title_table = Table([[chart_icon, self._p("Comparativo respecto al mes anterior", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
+        comp_title_table = Table([[chart_icon, self._p(f"Comparativo respecto al {comp_suffix}", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
         comp_title_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
@@ -1312,7 +1395,7 @@ class ReportService:
         # Legend Row
         curr_period_name = self._period_name(current_period)
         prev_period_name = self._period_name(compare_period)
-        legend_bar = self._build_legend(curr_period_name, prev_period_name)
+        legend_bar = self._build_legend(curr_period_name, prev_period_name, comp_suffix=comp_suffix)
         story.append(legend_bar)
         story.append(Spacer(1, 0.1 * cm))
         
@@ -1446,7 +1529,9 @@ class ReportService:
         curr_name: str,
         metrics: list[dict],
         width: float,
+        comp_suffix: str = "MES ANTERIOR",
     ) -> Table:
+        current_label, previous_label = self._comparison_side_labels(comp_suffix)
         max_currency = max(
             [float(m["current"]) for m in metrics if not m["is_percent"]] +
             [float(m["previous"]) for m in metrics if not m["is_percent"]] +
@@ -1456,7 +1541,7 @@ class ReportService:
         
         data = [
             [
-                self._p("COMPARATIVO CON EL MES ANTERIOR", 8, bold=True, color="#ffffff"),
+                self._p(f"COMPARATIVO CON EL {comp_suffix.upper()}", 8, bold=True, color="#ffffff"),
                 "",
                 "",
                 self._p(f"Comparar períodos: {prev_name} - {curr_name}", 8, bold=True, color="#ffffff", align="RIGHT"),
@@ -1464,8 +1549,8 @@ class ReportService:
             ],
             [
                 self._p("Indicador", 7.5, bold=True, color="#ffffff"),
-                self._p(f"Mes Anterior\n({prev_name})", 7.5, bold=True, color="#ffffff", align="CENTER"),
-                self._p(f"Mes Actual\n({curr_name})", 7.5, bold=True, color="#ffffff", align="CENTER"),
+                self._p(f"{previous_label}\n({prev_name})", 7.5, bold=True, color="#ffffff", align="CENTER"),
+                self._p(f"{current_label}\n({curr_name})", 7.5, bold=True, color="#ffffff", align="CENTER"),
                 self._p("Variación (USD)", 7.5, bold=True, color="#ffffff", align="RIGHT"),
                 self._p("Variación (%)", 7.5, bold=True, color="#ffffff", align="RIGHT")
             ]
@@ -1600,41 +1685,17 @@ class ReportService:
         end_date: Optional[date] = None,
         compare_period: Optional[str] = None,
     ) -> bytes:
-        is_annual = False
-        is_semestral = False
-        if start_date and end_date:
-            is_annual = (start_date.month == 1 and start_date.day == 1 and end_date.month == 12 and end_date.day == 31)
-            is_semestral = (start_date.month == 1 and start_date.day == 1 and end_date.month == 6 and end_date.day == 30) or \
-                           (start_date.month == 7 and start_date.day == 1 and end_date.month == 12 and end_date.day == 31)
-
-        if is_annual:
-            current_start = start_date
-            current_end = end_date
-            current_period = f"{start_date.year}-Anual"
-            compare_start = date(start_date.year - 1, 1, 1)
-            compare_end = date(start_date.year - 1, 12, 31)
-            compare_period = f"{start_date.year - 1}-Anual"
-        elif is_semestral:
-            current_start = start_date
-            current_end = end_date
-            if start_date.month == 1:
-                current_period = f"{start_date.year}-Sem1"
-                compare_start = date(start_date.year - 1, 7, 1)
-                compare_end = date(start_date.year - 1, 12, 31)
-                compare_period = f"{start_date.year - 1}-Sem2"
-            else:
-                current_period = f"{start_date.year}-Sem2"
-                compare_start = date(start_date.year, 1, 1)
-                compare_end = date(start_date.year, 6, 30)
-                compare_period = f"{start_date.year}-Sem1"
-        else:
-            current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
-            current_start, current_end = self._get_period_dates(current_period)
-            current_start = start_date or current_start
-            current_end = end_date or current_end
-            
-            compare_period = compare_period or self._previous_period(current_period)
-            compare_start, compare_end = self._get_period_dates(compare_period)
+        (
+            current_period,
+            current_start,
+            current_end,
+            compare_period,
+            compare_start,
+            compare_end,
+            comp_suffix,
+        ) = self._resolve_period_context(period, start_date, end_date, compare_period)
+        is_annual = current_period.endswith("-Anual")
+        is_semestral = current_period.endswith("-Sem1") or current_period.endswith("-Sem2")
         
         # Fetch current period data
         current_payments = await self._income_entries(current_period, current_start, current_end)
@@ -1690,15 +1751,23 @@ class ReportService:
             )
         )
         
+        # Determine dynamic period suffix
+        if is_annual:
+            period_suffix = "del año"
+        elif is_semestral:
+            period_suffix = "del semestre"
+        else:
+            period_suffix = "del mes"
+
         # 1. Metric Cards (6 cards in a row)
         col_w_card = (width / 6) - 5
         cards = [
-            self._build_metric_card("Ingreso proyectado por alícuotas", self._usd(projected_current), "Proyección del mes", "P", col_w_card),
+            self._build_metric_card("Ingreso proyectado por alícuotas", self._usd(projected_current), f"Proyección {period_suffix}", "P", col_w_card),
             self._build_metric_card("Ingreso efectivo por alícuotas", self._usd(total_income_current), "Recaudado al día de hoy", "$", col_w_card),
-            self._build_metric_card("Gastos del mes", self._usd(total_expenses_current), "Total gastos del mes", "▼", col_w_card),
-            self._build_metric_card("Saldo (superávit / déficit)", self._usd(balance_current), "Superávit del mes" if balance_current >= 0 else "Déficit del mes", "S", col_w_card),
+            self._build_metric_card(f"Gastos {period_suffix}", self._usd(total_expenses_current), f"Total gastos {period_suffix}", "▼", col_w_card),
+            self._build_metric_card("Saldo (superávit / déficit)", self._usd(balance_current), f"Superávit {period_suffix}" if balance_current >= 0 else f"Déficit {period_suffix}", "S", col_w_card),
             self._build_metric_card("Saldo con valores por recuperar", self._usd(saldo_con_valores_por_recuperar_current), "Pendiente por cobrar", "R", col_w_card),
-            self._build_metric_card("Eficiencia en recaudación", f"{float(efficiency_current):.2f}%", "Eficiencia este mes", "%", col_w_card),
+            self._build_metric_card("Eficiencia en recaudación", f"{float(efficiency_current):.2f}%", f"Eficiencia {period_suffix}", "%", col_w_card),
         ]
         cards_table = Table([cards], colWidths=[width / 6] * 6)
         cards_table.setStyle(TableStyle([
@@ -1712,10 +1781,12 @@ class ReportService:
         story.append(cards_table)
         story.append(Spacer(1, 0.22 * cm))
         
-        # Section Title: DETALLE DEL MES
+        # Section Title: DETALLE DEL PERÍODO
         curr_period_name = self._period_name(current_period).upper()
+        detail_section_label = "DETALLE DEL AÑO" if is_annual else ("DETALLE DEL SEMESTRE" if is_semestral else "DETALLE DEL MES")
         detail_title = Table(
-            [[self._p(f"DETALLE DEL MES - {curr_period_name}", 14, bold=True, color="#0b3c7d", align="CENTER")]],
+            [[self._p(f"{detail_section_label} - {curr_period_name}", 14, bold=True, color="#0b3c7d", align="CENTER")]],
+
             colWidths=[width],
         )
         detail_title.setStyle(TableStyle([
@@ -1742,7 +1813,7 @@ class ReportService:
             [self._p("Concepto", 7, bold=True, color="#ffffff"), self._p("Monto (USD)", 7, bold=True, color="#ffffff", align="RIGHT")],
             [self._p("Alícuotas y pagos", 7, color="#1e293b"), money_cell(alicuotas_amount)],
             [self._p("Otros ingresos", 7, color="#1e293b"), money_cell(otros_amount)],
-            [self._p("Proyección alícuotas del mes", 7, color="#64748b"), money_cell(projected_current, color="#64748b")],
+            [self._p(f"Proyección alícuotas {period_suffix}", 7, color="#64748b"), money_cell(projected_current, color="#64748b")],
             [self._p("TOTAL INGRESOS EFECTIVOS", 7, bold=True, color="#123c7a"), money_cell(total_income_current, bold=True, color="#123c7a")]
         ]
         
@@ -1808,7 +1879,7 @@ class ReportService:
             [saldo_drawing],
             [self._p("SALDO (SUPERÁVIT / DÉFICIT)", 6.5, bold=True, color="#475569", align="CENTER")],
             [self._p(self._usd(balance_current), 9, bold=True, color="#1e3a8a", align="CENTER")],
-            [self._p("Superávit del mes" if balance_current >= 0 else "Déficit del mes", 6, color="#64748b", align="CENTER")]
+            [self._p(f"Superávit {period_suffix}" if balance_current >= 0 else f"Déficit {period_suffix}", 6, color="#64748b", align="CENTER")]
         ]
         card_saldo = Table(card_saldo_data, colWidths=[width * 0.31])
         card_saldo.setStyle(TableStyle([
@@ -1843,7 +1914,7 @@ class ReportService:
         formula_rows = [
             [self._p("Ingreso proyectado por alícuotas", 7, color="#334155"), money_cell(projected_current, bold=True)],
             [self._p("(-) Ingreso efectivo por alícuotas", 7, color="#334155"), money_cell(total_income_current, bold=True)],
-            [self._p("(-) Gastos del mes", 7, color="#334155"), money_cell(total_expenses_current, bold=True)],
+            [self._p(f"(-) Gastos {period_suffix}", 7, color="#334155"), money_cell(total_expenses_current, bold=True)],
             [self._p("SALDO (SUPERÁVIT / DÉFICIT)", 7.5, bold=True, color="#ffffff"), money_cell(balance_current, bold=True, color="#ffffff")]
         ]
         formula_table = Table(formula_rows, colWidths=[width * 0.32 * 0.60, width * 0.32 * 0.40])
@@ -1971,7 +2042,8 @@ class ReportService:
             gastos_detail_rows.append(["-", "-", "-", money_cell(0, color="#64748b")])
             
         total_gastos_idx = len(gastos_detail_rows)
-        gastos_detail_rows.append([self._p("TOTAL EGRESOS DEL MES", 7, bold=True, color="#123c7a"), "", "", money_cell(total_expenses_current, bold=True, color="#123c7a")])
+        total_egresos_label = "TOTAL EGRESOS DEL AÑO" if is_annual else ("TOTAL EGRESOS DEL SEMESTRE" if is_semestral else "TOTAL EGRESOS DEL MES")
+        gastos_detail_rows.append([self._p(total_egresos_label, 7, bold=True, color="#123c7a"), "", "", money_cell(total_expenses_current, bold=True, color="#123c7a")])
         gastos_style.append(("SPAN", (0, total_gastos_idx), (2, total_gastos_idx)))
         gastos_style.append(("BACKGROUND", (0, total_gastos_idx), (-1, total_gastos_idx), colors.HexColor("#e2e8f0")))
         
@@ -1992,15 +2064,15 @@ class ReportService:
         # 5. Comparison Section (Section 5)
         metrics_list = [
             {"label": "Ingreso efectivo por alícuotas", "current": total_income_current, "previous": total_income_compare, "is_percent": False, "inverse": False},
-            {"label": "Gastos del mes", "current": total_expenses_current, "previous": total_expenses_compare, "is_percent": False, "inverse": True},
-            {"label": "Resultado del mes (Superávit / Déficit)", "current": balance_current, "previous": balance_compare, "is_percent": False, "inverse": False},
+            {"label": f"Gastos {period_suffix}", "current": total_expenses_current, "previous": total_expenses_compare, "is_percent": False, "inverse": True},
+            {"label": f"Resultado {period_suffix} (Superávit / Déficit)", "current": balance_current, "previous": balance_compare, "is_percent": False, "inverse": False},
             {"label": "Valores por recuperar", "current": valores_por_recuperar_current, "previous": valores_por_recuperar_compare, "is_percent": False, "inverse": True},
             {"label": "Eficiencia en recaudación de alícuotas", "current": efficiency_current, "previous": efficiency_compare, "is_percent": True, "inverse": False},
         ]
         
         prev_name_label = self._period_name(compare_period)
         curr_name_label = self._period_name(current_period)
-        comparison_table = self._draw_comparison_table(prev_name_label, curr_name_label, metrics_list, width)
+        comparison_table = self._draw_comparison_table(prev_name_label, curr_name_label, metrics_list, width, comp_suffix=comp_suffix.upper())
         story.append(comparison_table)
         
         # Signature block & Footer callbacks - original formatting preserved
@@ -2017,13 +2089,15 @@ class ReportService:
         compare_period: Optional[str] = None,
         status: Optional[str] = None,
     ) -> bytes:
-        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
-        current_start, current_end = self._get_period_dates(current_period)
-        current_start = start_date or current_start
-        current_end = end_date or current_end
-        
-        compare_period = compare_period or self._previous_period(current_period)
-        compare_start, compare_end = self._get_period_dates(compare_period)
+        (
+            current_period,
+            current_start,
+            current_end,
+            compare_period,
+            compare_start,
+            compare_end,
+            comp_suffix,
+        ) = self._resolve_period_context(period, start_date, end_date, compare_period)
         
         payments = await self._payments_report_rows(current_period, current_start, current_end, status)
         compare_payments = await self._payments_report_rows(compare_period, compare_start, compare_end, status)
@@ -2251,14 +2325,14 @@ class ReportService:
         story.append(val_total_box)
         story.append(Spacer(1, 0.22 * cm))
         
-        # 5. Section: Comparativo respecto al mes anterior
+        # 5. Section: Comparativo respecto al período anterior
         chart_icon = Drawing(16, 16)
         chart_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
         chart_icon.add(Rect(5, 4.5, 1.5, 4, fillColor=colors.white, strokeColor=None))
         chart_icon.add(Rect(7.25, 4.5, 1.5, 7, fillColor=colors.white, strokeColor=None))
         chart_icon.add(Rect(9.5, 4.5, 1.5, 5, fillColor=colors.white, strokeColor=None))
         
-        comp_title_table = Table([[chart_icon, self._p("Comparativo respecto al mes anterior", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
+        comp_title_table = Table([[chart_icon, self._p(f"Comparativo respecto al {comp_suffix}", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
         comp_title_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
@@ -2273,7 +2347,7 @@ class ReportService:
         # Legend Row
         curr_period_name = self._period_name(current_period)
         prev_period_name = self._period_name(compare_period)
-        legend_bar = self._build_legend(curr_period_name, prev_period_name)
+        legend_bar = self._build_legend(curr_period_name, prev_period_name, comp_suffix=comp_suffix)
         story.append(legend_bar)
         story.append(Spacer(1, 0.1 * cm))
         
@@ -2331,13 +2405,15 @@ class ReportService:
         end_date: Optional[date] = None,
         compare_period: Optional[str] = None,
     ) -> bytes:
-        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
-        current_start, current_end = self._get_period_dates(current_period)
-        current_start = start_date or current_start
-        current_end = end_date or current_end
-        
-        compare_period = compare_period or self._previous_period(current_period)
-        compare_start, compare_end = self._get_period_dates(compare_period)
+        (
+            current_period,
+            current_start,
+            current_end,
+            compare_period,
+            compare_start,
+            compare_end,
+            comp_suffix,
+        ) = self._resolve_period_context(period, start_date, end_date, compare_period)
         
         expenses = await self._expenses(current_period, current_start, current_end)
         previous_expenses = await self._expenses(compare_period, compare_start, compare_end)
@@ -2547,14 +2623,14 @@ class ReportService:
         story.append(val_total_box)
         story.append(Spacer(1, 0.22 * cm))
         
-        # 5. Section: Comparativo respecto al mes anterior
+        # 5. Section: Comparativo respecto al período anterior
         chart_icon = Drawing(16, 16)
         chart_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
         chart_icon.add(Rect(5, 4.5, 1.5, 4, fillColor=colors.white, strokeColor=None))
         chart_icon.add(Rect(7.25, 4.5, 1.5, 7, fillColor=colors.white, strokeColor=None))
         chart_icon.add(Rect(9.5, 4.5, 1.5, 5, fillColor=colors.white, strokeColor=None))
         
-        comp_title_table = Table([[chart_icon, self._p("Comparativo respecto al mes anterior", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
+        comp_title_table = Table([[chart_icon, self._p(f"Comparativo respecto al {comp_suffix}", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
         comp_title_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
@@ -2569,7 +2645,7 @@ class ReportService:
         # Legend Row
         curr_period_name = self._period_name(current_period)
         prev_period_name = self._period_name(compare_period)
-        legend_bar = self._build_legend(curr_period_name, prev_period_name)
+        legend_bar = self._build_legend(curr_period_name, prev_period_name, comp_suffix=comp_suffix)
         story.append(legend_bar)
         story.append(Spacer(1, 0.1 * cm))
         
@@ -3044,13 +3120,15 @@ class ReportService:
         end_date: Optional[date] = None,
         compare_period: Optional[str] = None,
     ) -> bytes:
-        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
-        current_start, current_end = self._get_period_dates(current_period)
-        current_start = start_date or current_start
-        current_end = end_date or current_end
-        
-        compare_period = compare_period or self._previous_period(current_period)
-        compare_start, compare_end = self._get_period_dates(compare_period)
+        (
+            current_period,
+            current_start,
+            current_end,
+            compare_period,
+            compare_start,
+            compare_end,
+            comp_suffix,
+        ) = self._resolve_period_context(period, start_date, end_date, compare_period)
         
         rows = await self._fees_report_rows(current_start, current_end)
         compare_rows = await self._fees_report_rows(compare_start, compare_end)
@@ -3256,14 +3334,14 @@ class ReportService:
         story.append(val_total_box)
         story.append(Spacer(1, 0.22 * cm))
         
-        # 5. Section: Comparativo respecto al mes anterior
+        # 5. Section: Comparativo respecto al período anterior
         chart_icon = Drawing(16, 16)
         chart_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
         chart_icon.add(Rect(5, 4.5, 1.5, 4, fillColor=colors.white, strokeColor=None))
         chart_icon.add(Rect(7.25, 4.5, 1.5, 7, fillColor=colors.white, strokeColor=None))
         chart_icon.add(Rect(9.5, 4.5, 1.5, 5, fillColor=colors.white, strokeColor=None))
         
-        comp_title_table = Table([[chart_icon, self._p("Comparativo respecto al mes anterior", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
+        comp_title_table = Table([[chart_icon, self._p(f"Comparativo respecto al {comp_suffix}", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 240, width - 260])
         comp_title_table.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
@@ -3278,7 +3356,7 @@ class ReportService:
         # Legend Row
         curr_period_name = self._period_name(current_period)
         prev_period_name = self._period_name(compare_period)
-        legend_bar = self._build_legend(curr_period_name, prev_period_name)
+        legend_bar = self._build_legend(curr_period_name, prev_period_name, comp_suffix=comp_suffix)
         story.append(legend_bar)
         story.append(Spacer(1, 0.1 * cm))
         

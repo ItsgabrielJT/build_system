@@ -40,6 +40,19 @@ export default function FormModal({ isOpen, title, fields = [], initialData, def
     }));
   };
 
+  const handleMultiSelectChange = (field, value, checked) => {
+    const current = formData[field.name] || [];
+    const next = checked
+      ? [...current, value]
+      : current.filter((item) => item !== value);
+    const extraUpdates = field.onChange ? field.onChange(next) : null;
+    setFormData((prev) => ({
+      ...prev,
+      [field.name]: next,
+      ...(extraUpdates || {}),
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -121,19 +134,33 @@ export default function FormModal({ isOpen, title, fields = [], initialData, def
                 ) : field.type === 'multiselect' ? (
                   <div id={fieldId} className={styles.checkList} role="group" aria-labelledby={`${fieldId}-label`}>
                     {(field.options || []).map((opt) => {
+                      if (opt.options) {
+                        return (
+                          <div key={opt.label} className={styles.checkGroup}>
+                            <span className={styles.checkGroupLabel}>{opt.label}</span>
+                            {opt.options.map((subOpt) => {
+                              const checked = (formData[field.name] || []).includes(subOpt.value);
+                              return (
+                                <label key={subOpt.value} className={styles.checkItem}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(e) => handleMultiSelectChange(field, subOpt.value, e.target.checked)}
+                                  />
+                                  <span>{subOpt.label}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        );
+                      }
                       const checked = (formData[field.name] || []).includes(opt.value);
                       return (
                         <label key={opt.value} className={styles.checkItem}>
                           <input
                             type="checkbox"
                             checked={checked}
-                            onChange={(e) => {
-                              const current = formData[field.name] || [];
-                              const next = e.target.checked
-                                ? [...current, opt.value]
-                                : current.filter((value) => value !== opt.value);
-                              handleChange(field.name, next);
-                            }}
+                            onChange={(e) => handleMultiSelectChange(field, opt.value, e.target.checked)}
                           />
                           <span>{opt.label}</span>
                         </label>

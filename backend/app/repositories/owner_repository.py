@@ -193,42 +193,38 @@ class OwnerRepository:
             FROM owners o
             LEFT JOIN (
                 SELECT
-                    owner_id,
-                    SUM(fees_amount - payments_amount + fines_amount) as total_balance
-                FROM (
-                    SELECT
-                        p.owner_id,
-                        COALESCE(af.amount, 0.0) as fees_amount,
-                        COALESCE(p.amount, 0.0) as payments_amount,
-                        COALESCE(f.amount, 0.0) as fines_amount
-                    FROM payments p
-                    FULL OUTER JOIN apartment_fees af ON p.apartment_id = af.apartment_id AND p.period = af.period
-                    FULL OUTER JOIN fines f ON p.apartment_id = f.apartment_id AND p.period = f.period
-                    WHERE p.owner_id IS NOT NULL
-                    
-                    UNION ALL
-                    
-                    SELECT
-                        oa.owner_id,
-                        af.amount as fees_amount,
-                        0.0 as payments_amount,
-                        0.0 as fines_amount
+                    current_owner.id AS owner_id,
+                    COALESCE(fees.total, 0.0)
+                    - COALESCE(payments.total, 0.0)
+                    + COALESCE(fines.total, 0.0) AS total_balance
+                FROM owners current_owner
+                LEFT JOIN LATERAL (
+                    SELECT SUM(af.amount) AS total
                     FROM apartment_fees af
-                    JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
-                    WHERE NOT EXISTS (SELECT 1 FROM payments p WHERE p.apartment_id = af.apartment_id AND p.period = af.period)
-                    
-                    UNION ALL
-                    
-                    SELECT
-                        oa.owner_id,
-                        0.0 as fees_amount,
-                        0.0 as payments_amount,
-                        f.amount as fines_amount
+                    JOIN owner_apartments oa ON oa.apartment_id = af.apartment_id
+                    WHERE oa.owner_id = current_owner.id
+                ) fees ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT SUM(amount) AS total
+                    FROM (
+                        SELECT p.amount
+                        FROM payments p
+                        WHERE p.owner_id = current_owner.id
+                          AND p.status = 'REGISTRADO'
+                          AND p.fine_id IS NULL
+                        UNION ALL
+                        SELECT i.amount
+                        FROM incomes i
+                        WHERE i.owner_id = current_owner.id
+                          AND i.status = 'REGISTRADO'
+                    ) paid_sources
+                ) payments ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT SUM(f.amount) AS total
                     FROM fines f
-                    JOIN owner_apartments oa ON f.apartment_id = oa.apartment_id
-                    WHERE NOT EXISTS (SELECT 1 FROM payments p WHERE p.apartment_id = f.apartment_id AND p.period = f.period)
-                ) balance_calc
-                GROUP BY owner_id
+                    WHERE f.owner_id = current_owner.id
+                      AND f.status = 'ACTIVA'
+                ) fines ON TRUE
             ) balance ON o.id = balance.owner_id
             {where}
             ORDER BY o.full_name
@@ -313,6 +309,7 @@ class OwnerRepository:
                     FROM payments p
                     WHERE p.owner_id = current_owner.owner_id
                       AND p.status = 'REGISTRADO'
+                      AND p.fine_id IS NULL
                     UNION ALL
                     SELECT i.amount
                     FROM incomes i

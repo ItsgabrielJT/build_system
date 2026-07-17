@@ -93,6 +93,13 @@ class AccountStatementService:
         ]
         return f"{value.day:02d} de {months[value.month - 1]} de {value.year}"
 
+    def _status_label(self, status: str | None) -> str:
+        labels = {
+            "CURRENT": "Al día",
+            "OVERDUE": "Vencido",
+        }
+        return labels.get((status or "").upper(), status or "")
+
     def _p(self, text: str, size: int = 8, *, bold: bool = False, color="#102a56", align: str = "LEFT", raw: bool = False) -> Paragraph:
         safe = str(text or "") if raw else escape(str(text or ""))
         return Paragraph(
@@ -400,7 +407,7 @@ class AccountStatementService:
         story.append(self._p("DETALLE DE MOVIMIENTOS", 10, bold=True, color="#0c42a0"))
         data = [["PERIODO", "DEPARTAMENTO", "ESPERADO", "MULTAS", "PAGADO", "SALDO", "ESTADO"]]
         for row in rows:
-            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["multas"]), self._money(row["pagado"]), self._money(row["saldo"]), row["status"]])
+            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["multas"]), self._money(row["pagado"]), self._money(row["saldo"]), self._status_label(row["status"])])
         data.append(["TOTALES DEL PERIODO", "", self._money(totals["esperado"]), self._money(totals["multas"]), self._money(totals["pagado"]), self._money(totals["saldo"]), ""])
         story.append(self._blue_table(data, [2.4 * cm, 3 * cm, 2.4 * cm, 2.2 * cm, 2.4 * cm, 2.4 * cm, 3.2 * cm], font_size=7, total_rows=[len(data) - 1]))
         story.append(Spacer(1, 0.35 * cm))

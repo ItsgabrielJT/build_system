@@ -319,6 +319,93 @@ describe('AdminPaymentsPage', () => {
     }));
   });
 
+  it('registra varias cuotas seleccionadas como pagos aplicados a cada periodo', async () => {
+    const user = userEvent.setup();
+    const fetchPayments = vi.fn();
+    const fetchPending = vi.fn();
+    const fetchApartments = vi.fn();
+    const fetchOwners = vi.fn();
+    const createPayment = vi.fn().mockResolvedValue({ id: 'pay-created' });
+    getApartmentPendingDebts.mockResolvedValue({
+      cuotas: [
+        { id: 'fee-apr', period: '2026-04', amount: 100, description: 'Cuota - Período 2026-04' },
+        { id: 'fee-may', period: '2026-05', amount: 200, description: 'Cuota - Período 2026-05' },
+      ],
+      multas: [],
+    });
+
+    usePayments.mockReturnValue({
+      payments: [],
+      loading: false,
+      error: null,
+      fetchPayments,
+      createPayment,
+      annulPayment: vi.fn(),
+      deletePayment: vi.fn(),
+      downloadAdminReceipt: vi.fn(),
+    });
+
+    useAdminPaymentReview.mockReturnValue({
+      pendingPayments: [],
+      loading: false,
+      error: null,
+      fetchPending,
+      approvePayment: vi.fn(),
+      rejectPayment: vi.fn(),
+      downloadProof: vi.fn(),
+    });
+
+    useApartments.mockReturnValue({
+      apartments: [
+        { id: 'apt1', code: '101', owner_id: 'owner1', owner_name: 'Juan', owner_email: 'juan@test.com' },
+      ],
+      loading: false,
+      error: null,
+      fetchApartments,
+    });
+
+    useOwners.mockReturnValue({
+      owners: [
+        { id: 'owner1', full_name: 'Juan', document_id: '123' },
+      ],
+      loading: false,
+      error: null,
+      fetchOwners,
+    });
+
+    render(<AdminPaymentsPage />);
+
+    await user.click(screen.getByRole('button', { name: /Registrar pago/i }));
+    await user.selectOptions(screen.getByLabelText(/Departamento/i), 'apt1');
+
+    await user.click(await screen.findByLabelText(/Cuota - Período 2026-04/i));
+    await user.click(screen.getByLabelText(/Cuota - Período 2026-05/i));
+    await waitFor(() => {
+      const periodInput = document.querySelector('input[type="month"]');
+      expect(periodInput).toHaveValue(currentPeriod());
+      expect(screen.getByLabelText(/Monto/i)).toHaveValue(300);
+    });
+
+    await user.type(screen.getByLabelText(/Fecha de pago/i), `${currentPeriod()}-15`);
+    await user.click(screen.getByRole('button', { name: /^Guardar$/i }));
+
+    await waitFor(() => {
+      expect(createPayment).toHaveBeenCalledTimes(2);
+    });
+    expect(createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      apartment_id: 'apt1',
+      owner_id: 'owner1',
+      period: '2026-04',
+      amount: 100,
+    }));
+    expect(createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      apartment_id: 'apt1',
+      owner_id: 'owner1',
+      period: '2026-05',
+      amount: 200,
+    }));
+  });
+
   it('carga y renderiza pagos pendientes en la sección administrativa', async () => {
     const fetchPayments = vi.fn();
     const fetchPending = vi.fn();

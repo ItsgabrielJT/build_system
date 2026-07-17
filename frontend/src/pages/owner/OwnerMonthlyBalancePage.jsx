@@ -9,7 +9,6 @@ import {
   downloadIncomeReport,
   downloadOwnerMonthlyBalancePdf,
 } from '../../services/reportService';
-import { exportAccountStatement } from '../../services/accountStatementService';
 import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './OwnerMonthlyBalancePage.module.css';
 
@@ -22,6 +21,16 @@ const REPORT_OPTIONS = [
 
 function getCurrentMonthPeriod() {
   return new Date().toISOString().slice(0, 7);
+}
+
+function getMonthRange(period) {
+  const [year, month] = period.split('-').map(Number);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+  return {
+    start_date: start.toISOString().slice(0, 10),
+    end_date: end.toISOString().slice(0, 10),
+  };
 }
 
 function triggerDownload(blob, filename) {
@@ -54,6 +63,7 @@ export default function OwnerMonthlyBalancePage() {
     setLoadingExport((prev) => ({ ...prev, [format]: true }));
     try {
       const extension = format === 'excel' ? 'xlsx' : 'pdf';
+      const reportParams = { ...getMonthRange(period), format };
 
       if (selectedReport === 'balance') {
         if (format === 'excel') {
@@ -66,22 +76,19 @@ export default function OwnerMonthlyBalancePage() {
       }
 
       if (selectedReport === 'payments') {
-        const blob = await exportAccountStatement(token, format, {
-          start_period: period,
-          end_period: period,
-        });
-        triggerDownload(blob, `reporte-pagos-${period}.${extension}`);
+        const blob = await downloadExpensesReport(token, reportParams);
+        triggerDownload(blob, `reporte-detalle-gastos-${period}.${extension}`);
         return;
       }
 
       if (selectedReport === 'income') {
-        const blob = await downloadIncomeReport(token, { period, format });
+        const blob = await downloadIncomeReport(token, reportParams);
         triggerDownload(blob, `reporte-${REPORT_LABELS[selectedReport]}-${period}.${extension}`);
         return;
       }
 
       if (selectedReport === 'expenses') {
-        const blob = await downloadExpensesReport(token, { period, format });
+        const blob = await downloadExpensesReport(token, reportParams);
         triggerDownload(blob, `reporte-${REPORT_LABELS[selectedReport]}-${period}.${extension}`);
         return;
       }

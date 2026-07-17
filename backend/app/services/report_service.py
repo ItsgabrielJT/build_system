@@ -78,8 +78,8 @@ class ReportService:
 
     async def _monthly_payments(self, period: str) -> list[dict]:
         period = self._validate_month_period(period)
-        historical = await self._payment_repo.get_all(period=period, status="REGISTRADO")
-        approved = await self._payment_repo.get_all(period=period, status="APROBADO")
+        historical = await self._payment_repo.get_all(payment_month=period, status="REGISTRADO")
+        approved = await self._payment_repo.get_all(payment_month=period, status="APROBADO")
         payments_by_id: dict[str, dict] = {}
         for payment in [*historical, *approved]:
             payment_id = str(payment.get("id") or "")
@@ -572,7 +572,7 @@ class ReportService:
         params: list = []
         idx = 1
         if period:
-            conditions.append(f"p.period = ${idx}")
+            conditions.append(f"TO_CHAR(p.paid_at, 'YYYY-MM') = ${idx}")
             params.append(period)
             idx += 1
         if status:
@@ -621,7 +621,7 @@ class ReportService:
         params: list = []
         idx = 1
         if period:
-            conditions.append(f"p.period = ${idx}")
+            conditions.append(f"TO_CHAR(p.paid_at, 'YYYY-MM') = ${idx}")
             params.append(period)
             idx += 1
         if start_date:
@@ -1181,7 +1181,13 @@ class ReportService:
         if "General" in grouped_entries:
             sorted_groups.append("General")
             
-        data = [["Torre", "Departamento", "Concepto", "Monto", "Observación"]]
+        data = [[
+            self._p("Torre", 7, bold=True, color="#ffffff", align="CENTER"),
+            self._p("Departamento", 7, bold=True, color="#ffffff", align="CENTER"),
+            self._p("Concepto", 7, bold=True, color="#ffffff", align="CENTER"),
+            self._p("Monto", 7, bold=True, color="#ffffff", align="RIGHT"),
+            self._p("Observación", 7, bold=True, color="#ffffff"),
+        ]]
         span_commands = []
         current_row_idx = 1
         
@@ -1205,7 +1211,7 @@ class ReportService:
                     g_name,
                     self._p(apt_code, 7),
                     self._p(concept, 7),
-                    self._usd(p.get("amount", 0)),
+                    self._p(self._usd(p.get("amount", 0)), 7, color="#1e293b", align="RIGHT"),
                     self._p(obs, 7)
                 ])
                 current_row_idx += 1
@@ -1214,10 +1220,17 @@ class ReportService:
                 span_commands.append(("SPAN", (0, start_row), (0, end_row)))
                 
         if len(data) == 1:
-            data.append(["General", "-", "Sin ingresos registrados", self._usd(0), "-"])
+            data.append([
+                self._p("General", 7, align="CENTER"),
+                self._p("-", 7, align="CENTER"),
+                self._p("Sin ingresos registrados", 7),
+                self._p(self._usd(0), 7, color="#1e293b", align="RIGHT"),
+                self._p("-", 7),
+            ])
             
         table_style_commands = [
             ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ALIGN", (0, 0), (0, -1), "CENTER"),
             ("ALIGN", (1, 0), (1, -1), "CENTER"),
@@ -3089,7 +3102,15 @@ class ReportService:
         story.append(Spacer(1, 0.15 * cm))
         
         # 3. Detalle de cuotas table
-        data = [["Período", "Depto", "Propietario", "Emitido", "Pagado", "Pendiente", "Estado"]]
+        data = [[
+            self._table_p("Período", 7.2, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Depto", 7.2, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Propietario", 7.2, bold=True, color="#ffffff"),
+            self._table_p("Emitido", 7.2, bold=True, color="#ffffff", align="RIGHT"),
+            self._table_p("Pagado", 7.2, bold=True, color="#ffffff", align="RIGHT"),
+            self._table_p("Pendiente", 7.2, bold=True, color="#ffffff", align="RIGHT"),
+            self._table_p("Estado", 7.2, bold=True, color="#ffffff", align="CENTER"),
+        ]]
         span_commands = []
         for r in rows:
             row_idx = len(data)
@@ -3102,32 +3123,38 @@ class ReportService:
                 status_p = self._p("Pendiente", 6, bold=True, color="#9a3412", align="CENTER")
                 table_style_commands_bg = ("BACKGROUND", (6, row_idx), (6, row_idx), colors.HexColor("#fef3c7"))
                 
-            owner = r.get("owner_name") or ""
-            if len(owner) > 26:
-                owner = owner[:26] + "..."
-                
             data.append([
-                self._p(r.get("period", ""), 7, align="CENTER"),
-                self._p(r.get("apartment_code", ""), 7, align="CENTER"),
-                self._p(owner, 7),
-                self._money(r.get("amount")),
-                self._money(r.get("paid_amount")),
-                self._money(r.get("pending_amount")),
+                self._table_p(r.get("period", ""), 7, align="CENTER"),
+                self._table_p(r.get("apartment_code", ""), 7, align="CENTER"),
+                self._table_p(r.get("owner_name") or "", 7),
+                self._table_p(self._money(r.get("amount")), 7, align="RIGHT"),
+                self._table_p(self._money(r.get("paid_amount")), 7, align="RIGHT"),
+                self._table_p(self._money(r.get("pending_amount")), 7, align="RIGHT"),
                 status_p
             ])
             span_commands.append(table_style_commands_bg)
             
         if len(data) == 1:
-            data.append(["-", "-", "Sin cuotas emitidas", self._money(0), self._money(0), self._money(0), "-"])
+            data.append([
+                self._table_p("-", 7, align="CENTER"),
+                self._table_p("-", 7, align="CENTER"),
+                self._table_p("Sin cuotas emitidas", 7),
+                self._table_p(self._money(0), 7, align="RIGHT"),
+                self._table_p(self._money(0), 7, align="RIGHT"),
+                self._table_p(self._money(0), 7, align="RIGHT"),
+                self._table_p("-", 7, align="CENTER"),
+            ])
             
         table_style_commands = [
             ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ALIGN", (0, 0), (1, -1), "CENTER"), # Period & Depto centered
             ("ALIGN", (2, 0), (2, -1), "LEFT"),   # Owner left
             ("ALIGN", (3, 0), (5, -1), "RIGHT"),  # Amounts right
             ("ALIGN", (6, 0), (6, -1), "CENTER"), # Estado centered
             ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("WORDWRAP", (0, 0), (-1, -1), "CJK"),
             ("TOPPADDING", (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("LEFTPADDING", (0, 0), (-1, -1), 5),
@@ -3136,7 +3163,7 @@ class ReportService:
         ] + span_commands
         
         detail_col_widths = [width * 0.12, width * 0.10, width * 0.28, width * 0.12, width * 0.12, width * 0.12, width * 0.14]
-        story.append(Table(data, colWidths=detail_col_widths, style=TableStyle(table_style_commands)))
+        story.append(Table(data, colWidths=detail_col_widths, repeatRows=1, style=TableStyle(table_style_commands)))
         story.append(Spacer(1, 0.18 * cm))
         
         # 4. Total bar
@@ -3257,21 +3284,116 @@ class ReportService:
         total = sum(Decimal(str(row.get("amount", 0))) for row in rows)
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         output = io.BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        width = A4[0] - 2.2 * cm
+        doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=1.1 * cm, rightMargin=1.1 * cm, topMargin=0.8 * cm, bottomMargin=0.7 * cm)
         story = []
-        styles = getSampleStyleSheet()
-        story.extend(await self._pdf_header("Reporte Detallado de Multas", f"Rango: {self._date_label(period, start_date, end_date)} | Estado: {status or 'Todos'}", width=doc.width))
-        summary = Table([["Multas", "Monto total"], [str(len(rows)), self._money(total)]], colWidths=[2*inch, 2*inch])
-        summary.setStyle(self._table_style(8))
-        story.extend([summary, Spacer(1, 0.2*inch), Paragraph("Detalle de multas", styles["Heading3"])])
-        data = [["Fecha", "Depto", "Propietario", "Período", "Motivo", "Monto", "Estado"]]
-        data.extend([[str(r.get("issued_at") or ""), r.get("apartment_code", ""), r.get("owner_name", ""), r.get("period", ""), r.get("reason", ""), self._money(r.get("amount")), r.get("status", "")] for r in rows])
-        table = Table(data, colWidths=[0.8*inch, 0.55*inch, 1.1*inch, 0.65*inch, 1.8*inch, 0.75*inch, 0.75*inch], repeatRows=1)
-        table.setStyle(self._table_style(7))
+        story.extend(
+            await self._three_column_report_header(
+                "Reporte Detallado de Multas",
+                f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                width,
+                building=building,
+                right_text=f"Estado: {status or 'Todos'}",
+            )
+        )
+
+        summary = Table(
+            [[
+                self._table_p("Multas", 7.2, bold=True, color="#ffffff", align="CENTER"),
+                self._table_p("Monto total", 7.2, bold=True, color="#ffffff", align="RIGHT"),
+            ], [
+                self._table_p(str(len(rows)), 7, align="CENTER"),
+                self._table_p(self._money(total), 7, align="RIGHT"),
+            ]],
+            colWidths=[width * 0.50, width * 0.50],
+        )
+        summary.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ]))
+        story.extend([summary, Spacer(1, 0.25 * cm)])
+
+        list_icon = Drawing(16, 16)
+        list_icon.add(Circle(8, 8, 7.5, fillColor=colors.HexColor("#0b3c7d"), strokeColor=None))
+        list_icon.add(Line(5, 10, 11, 10, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 8, 11, 8, strokeColor=colors.white, strokeWidth=1))
+        list_icon.add(Line(5, 6, 11, 6, strokeColor=colors.white, strokeWidth=1))
+        title_table = Table([[list_icon, self._p("Detalle de multas", 11, bold=True, color="#07316d", align="LEFT"), ""]], colWidths=[20, 200, width - 220])
+        title_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (2, 0), (2, 0), 1.2, _PDF_BLUE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.extend([title_table, Spacer(1, 0.15 * cm)])
+
+        data = [[
+            self._table_p("Fecha", 7.2, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Depto", 7.2, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Propietario", 7.2, bold=True, color="#ffffff"),
+            self._table_p("Período", 7.2, bold=True, color="#ffffff", align="CENTER"),
+            self._table_p("Motivo", 7.2, bold=True, color="#ffffff"),
+            self._table_p("Monto", 7.2, bold=True, color="#ffffff", align="RIGHT"),
+            self._table_p("Estado", 7.2, bold=True, color="#ffffff", align="CENTER"),
+        ]]
+        for r in rows:
+            issued_at = r.get("issued_at")
+            date_str = issued_at.strftime("%Y-%m-%d") if hasattr(issued_at, "strftime") else str(issued_at or "")
+            data.append([
+                self._table_p(date_str, 7, align="CENTER"),
+                self._table_p(r.get("apartment_code", ""), 7, align="CENTER"),
+                self._table_p(r.get("owner_name", ""), 7),
+                self._table_p(r.get("period", ""), 7, align="CENTER"),
+                self._table_p(r.get("reason", ""), 7),
+                self._table_p(self._money(r.get("amount")), 7, align="RIGHT"),
+                self._table_p(r.get("status", ""), 7, align="CENTER"),
+            ])
+        if len(data) == 1:
+            data.append([
+                self._table_p("-", 7, align="CENTER"),
+                self._table_p("-", 7, align="CENTER"),
+                self._table_p("Sin multas registradas", 7),
+                self._table_p("-", 7, align="CENTER"),
+                self._table_p("-", 7),
+                self._table_p(self._money(0), 7, align="RIGHT"),
+                self._table_p("-", 7, align="CENTER"),
+            ])
+        table = Table(
+            data,
+            colWidths=[width * 0.11, width * 0.09, width * 0.19, width * 0.10, width * 0.29, width * 0.11, width * 0.11],
+            repeatRows=1,
+        )
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (0, 0), (1, -1), "CENTER"),
+            ("ALIGN", (2, 0), (2, -1), "LEFT"),
+            ("ALIGN", (3, 0), (3, -1), "CENTER"),
+            ("ALIGN", (4, 0), (4, -1), "LEFT"),
+            ("ALIGN", (5, 0), (5, -1), "RIGHT"),
+            ("ALIGN", (6, 0), (6, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.5, _PDF_BORDER),
+            ("WORDWRAP", (0, 0), (-1, -1), "CJK"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ]))
         story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MULTAS", signer_name="Administración", signer_role="Administrador del edificio")
-        story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
-        doc.build(story)
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-MULTAS", signer_name="Administración", signer_role="Administrador del edificio")
+        footer = self._footer_callback(building, width)
+        doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
 
     async def fines_excel(self, period: Optional[str] = None, start_date: Optional[date] = None, end_date: Optional[date] = None, status: Optional[str] = None, reason: Optional[str] = None, search: Optional[str] = None) -> bytes:
@@ -3447,8 +3569,8 @@ class ReportService:
                     COALESCE(p.amount, 0.0) as payments_amount,
                     COALESCE(f.amount, 0.0) as fines_amount
                 FROM apartment_fees af
-                FULL OUTER JOIN payments p ON p.apartment_id = af.apartment_id AND p.period = af.period AND p.status = 'REGISTRADO'
-                FULL OUTER JOIN fines f ON f.apartment_id = af.apartment_id AND f.period = f.period AND f.status = 'ACTIVA'
+                FULL OUTER JOIN payments p ON p.apartment_id = af.apartment_id AND p.period = af.period AND p.status = 'REGISTRADO' AND p.fine_id IS NULL
+                FULL OUTER JOIN fines f ON f.apartment_id = af.apartment_id AND f.period = af.period AND f.status = 'ACTIVA'
                 JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
                 WHERE oa.owner_id = $1
             ) balance_calc
@@ -3460,7 +3582,7 @@ class ReportService:
         # Current month charges and payments
         current_month = datetime.now().strftime("%Y-%m")
         pagos_mes = await conn.fetchval(
-            "SELECT COALESCE(SUM(amount), 0.0) FROM payments WHERE owner_id = $1 AND period = $2 AND status = 'REGISTRADO'",
+            "SELECT COALESCE(SUM(amount), 0.0) FROM payments WHERE owner_id = $1 AND TO_CHAR(paid_at, 'YYYY-MM') = $2 AND status = 'REGISTRADO'",
             owner_id,
             current_month,
         )

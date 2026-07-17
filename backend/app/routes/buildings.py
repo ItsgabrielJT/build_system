@@ -72,6 +72,7 @@ async def update_building_config(
     address = str(form.get("address") or "")
     phone = str(form.get("phone") or "")
     email = str(form.get("email") or "")
+    documents_link = str(form.get("documents_link") or "")
     photo_file = form.get("photo_file")
     logo_file = form.get("logo_file")
     signature_file = form.get("signature_file")
@@ -130,6 +131,7 @@ async def update_building_config(
         address=address,
         phone=phone,
         email=email,
+        documents_link=documents_link,
     )
     service = BuildingService(BuildingRepository(db))
     return await service.update_config(

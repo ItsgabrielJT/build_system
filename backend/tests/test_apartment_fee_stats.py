@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+
+from app.repositories.apartment_fee_repository import ApartmentFeeRepository
 
 
 def _setup_stats_db(
@@ -257,6 +261,41 @@ async def test_periods_summary_default_pagination(
     data = response.json()
     assert data["page"] == 1
     assert data["page_size"] == 10
+
+
+@pytest.mark.asyncio
+async def test_get_by_period_carries_previous_debt_and_credit():
+    apt_id = UUID("550e8400-e29b-41d4-a716-446655440101")
+    mock_conn = AsyncMock()
+    mock_conn.fetch = AsyncMock(return_value=[
+        {
+            "id": UUID("660e8400-e29b-41d4-a716-446655440001"),
+            "apartment_id": apt_id,
+            "period": "2026-04",
+            "amount": Decimal("100.00"),
+            "paid_amount": Decimal("0.00"),
+            "created_at": None,
+        },
+        {
+            "id": UUID("660e8400-e29b-41d4-a716-446655440002"),
+            "apartment_id": apt_id,
+            "period": "2026-05",
+            "amount": Decimal("100.00"),
+            "paid_amount": Decimal("250.00"),
+            "created_at": None,
+        },
+    ])
+
+    rows = await ApartmentFeeRepository(mock_conn).get_by_period("2026-05")
+
+    assert len(rows) == 1
+    may = rows[0]
+    assert may["prior_debt_amount"] == Decimal("100.00")
+    assert may["prior_credit_amount"] == Decimal("0")
+    assert may["paid_amount"] == Decimal("250.00")
+    assert may["pending_amount"] == Decimal("0")
+    assert may["credit_amount"] == Decimal("50.00")
+    assert may["is_paid"] is True
 
 
 @pytest.mark.asyncio

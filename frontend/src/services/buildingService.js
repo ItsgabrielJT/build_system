@@ -29,6 +29,7 @@ export async function updateBuildingConfig(data, token) {
   configData.append('address', data.address || '');
   configData.append('phone', data.phone || '');
   configData.append('email', data.email || '');
+  configData.append('documents_link', data.documents_link || '');
   if (data.photo_file) configData.append('photo_file', data.photo_file);
   if (data.logo_file) configData.append('logo_file', data.logo_file);
   if (data.signature_file) configData.append('signature_file', data.signature_file);

@@ -81,7 +81,8 @@ export default function OwnerLayout() {
               building,
               refreshBuilding: fetchPrimaryBuilding,
               ownerProfile,
-              refreshOwnerProfile: fetchOwnerProfile
+              refreshOwnerProfile: fetchOwnerProfile,
+              avatarUrl
             }}
           />
         </main>

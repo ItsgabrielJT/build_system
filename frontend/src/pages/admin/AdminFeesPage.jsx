@@ -226,6 +226,14 @@ export default function AdminFeesPage() {
     return { label: 'Pagado', className: styles.inlineBadge_PAGADO };
   };
 
+  const formatPriorBalance = (fee) => {
+    const debt = Number(fee.prior_debt_amount || 0);
+    const credit = Number(fee.prior_credit_amount || 0);
+    if (credit > 0) return `A favor ${formatMoney(credit)}`;
+    if (debt > 0) return `Debía ${formatMoney(debt)}`;
+    return formatMoney(0);
+  };
+
   const handleSaveFee = async (fee) => {
     const nextAmount = Number(editingFeeAmount);
     if (!Number.isFinite(nextAmount) || nextAmount < 0) {
@@ -461,8 +469,9 @@ export default function AdminFeesPage() {
                       <th className={styles.th}>Departamento</th>
                       <th className={styles.th}>Piso</th>
                       <th className={styles.th}>Torre</th>
+                      <th className={styles.th}>Saldo anterior</th>
                       <th className={styles.th}>Cuota</th>
-                      <th className={styles.th}>Pagado</th>
+                      <th className={styles.th}>Pagado mes</th>
                       <th className={styles.th}>Estado</th>
                       <th className={styles.th}>Acciones</th>
                     </tr>
@@ -470,7 +479,7 @@ export default function AdminFeesPage() {
                   <tbody>
                     {detailFees.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
+                        <td colSpan={8} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
                           Sin cuotas registradas en este período
                         </td>
                       </tr>
@@ -484,6 +493,7 @@ export default function AdminFeesPage() {
                             <td className={styles.td}>{apt.code || '—'}</td>
                             <td className={styles.td}>{apt.floor ?? '—'}</td>
                             <td className={styles.td}>{apt.tower ?? '—'}</td>
+                            <td className={styles.td}>{formatPriorBalance(fee)}</td>
                             <td className={styles.td}>
                               {isEditing ? (
                                 <input

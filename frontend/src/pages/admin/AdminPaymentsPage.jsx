@@ -294,35 +294,38 @@ export default function AdminPaymentsPage() {
     };
   };
 
-  const handleDebtChangeSelection = (selectedVal) => {
-    if (!selectedVal) {
+  const findDebtByValue = (selectedVal) => {
+    const [type, id] = selectedVal.split(':');
+    if (type === 'cuota') {
+      const selected = formPendingDebts.cuotas.find((c) => c.id === id);
+      return selected ? { type, ...selected } : null;
+    }
+    if (type === 'multas') {
+      const selected = formPendingDebts.multas.find((m) => m.id === id);
+      return selected ? { type, ...selected } : null;
+    }
+    return null;
+  };
+
+  const handleDebtChangeSelection = (selectedValues) => {
+    const values = Array.isArray(selectedValues)
+      ? selectedValues
+      : selectedValues ? [selectedValues] : [];
+    if (!values.length) {
       return {
         period: getCurrentMonth(),
         amount: '',
         fine_id: '',
       };
     }
-    const [type, id] = selectedVal.split(':');
-    if (type === 'cuota') {
-      const selected = formPendingDebts.cuotas.find((c) => c.id === id);
-      if (selected) {
-        return {
-          period: selected.period,
-          amount: selected.amount.toString(),
-          fine_id: '',
-        };
-      }
-    } else if (type === 'multas') {
-      const selected = formPendingDebts.multas.find((m) => m.id === id);
-      if (selected) {
-        return {
-          period: selected.period,
-          amount: selected.amount.toString(),
-          fine_id: selected.id,
-        };
-      }
-    }
-    return null;
+    const selectedDebts = values.map(findDebtByValue).filter(Boolean);
+    const total = selectedDebts.reduce((sum, debt) => sum + Number(debt.amount || 0), 0);
+    const onlyDebt = selectedDebts.length === 1 ? selectedDebts[0] : null;
+    return {
+      period: values.length > 1 ? getCurrentMonth() : onlyDebt?.period || getCurrentMonth(),
+      amount: total ? total.toFixed(2) : '',
+      fine_id: onlyDebt?.type === 'multas' ? onlyDebt.id : '',
+    };
   };
 
   const getPaymentFields = () => {
@@ -370,7 +373,7 @@ export default function AdminPaymentsPage() {
             {
               name: 'selected_debt',
               label: 'Concepto / Deuda Pendiente',
-              type: 'select',
+              type: 'multiselect',
               options: debtOptions,
               onChange: handleDebtChangeSelection,
             },
@@ -393,16 +396,58 @@ export default function AdminPaymentsPage() {
   const handleCreate = async (data) => {
     try {
       const { selected_debt: _selectedDebt, fine_id, method, reference, ...paymentData } = data;
-      const payload = {
-        ...paymentData,
-        amount: parseFloat(data.amount),
-        ...(method ? { method } : {}),
-        ...(reference ? { reference } : {}),
-        ...(fine_id ? { fine_id } : {}),
-      };
+      const selectedValues = Array.isArray(_selectedDebt) ? _selectedDebt : [];
+      if (selectedValues.length > 0) {
+        const selectedDebts = selectedValues.map(findDebtByValue).filter(Boolean);
+        // Sort debts by period to pay oldest first
+        selectedDebts.sort((a, b) => a.period.localeCompare(b.period));
+        
+        let remainingPayment = Number(data.amount);
+        const paymentPayloads = [];
 
-      await createPayment(payload);
-      success('Pago registrado con éxito');
+        for (let i = 0; i < selectedDebts.length; i++) {
+          const debt = selectedDebts[i];
+          const debtAmount = Number(debt.amount || 0);
+          
+          if (i === selectedDebts.length - 1) {
+            // Last debt gets all remaining payment (including any excess/surplus)
+            paymentPayloads.push({
+              ...paymentData,
+              period: debt.period,
+              amount: remainingPayment,
+              ...(method ? { method } : {}),
+              ...(reference ? { reference } : {}),
+              ...(debt.type === 'multas' ? { fine_id: debt.id } : {}),
+            });
+          } else {
+            // Pay off this debt fully if we have enough, otherwise pay what's left
+            const payAmount = Math.min(debtAmount, remainingPayment);
+            if (payAmount > 0) {
+              paymentPayloads.push({
+                ...paymentData,
+                period: debt.period,
+                amount: payAmount,
+                ...(method ? { method } : {}),
+                ...(reference ? { reference } : {}),
+                ...(debt.type === 'multas' ? { fine_id: debt.id } : {}),
+              });
+              remainingPayment -= payAmount;
+            }
+          }
+        }
+
+        await Promise.all(paymentPayloads.map((payload) => createPayment(payload)));
+      } else {
+        const payload = {
+          ...paymentData,
+          amount: parseFloat(data.amount),
+          ...(method ? { method } : {}),
+          ...(reference ? { reference } : {}),
+          ...(fine_id ? { fine_id } : {}),
+        };
+        await createPayment(payload);
+      }
+      success(selectedValues.length > 1 ? 'Pagos registrados con éxito' : 'Pago registrado con éxito');
       setIsFormOpen(false);
       setFilteredApartments([]);
       setSelectedApartmentId('');

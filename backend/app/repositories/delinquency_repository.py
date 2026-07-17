@@ -93,23 +93,70 @@ class DelinquencyRepository:
         end_period: Optional[str],
     ) -> list[dict]:
         params: list = [owner_id]
-        idx = 2
-        extra = " AND o.id = $1"
-
-        if start_period:
-            extra += f" AND ap.period >= ${idx}"
-            params.append(start_period)
-            idx += 1
+        
         if end_period:
-            extra += f" AND ap.period <= ${idx}"
+            query = """
+                WITH all_periods AS (
+                    SELECT apartment_id, period FROM apartment_fees WHERE period <= $2
+                    UNION
+                    SELECT apartment_id, period FROM payments WHERE status = 'REGISTRADO' AND TO_CHAR(paid_at, 'YYYY-MM') <= $2
+                    UNION
+                    SELECT apartment_id, period FROM fines WHERE status != 'ANULADA' AND status != 'ANULADO' AND period <= $2
+                ),
+                agg_fines AS (
+                    SELECT 
+                        apartment_id, 
+                        period, 
+                        COALESCE(SUM(amount), 0) AS total_fines
+                    FROM fines
+                    WHERE status != 'ANULADA' AND status != 'ANULADO' AND period <= $2
+                    GROUP BY apartment_id, period
+                ),
+                agg_payments AS (
+                    SELECT 
+                        apartment_id, 
+                        period, 
+                        COALESCE(SUM(amount), 0) AS total_payments
+                    FROM payments
+                    WHERE status = 'REGISTRADO' AND TO_CHAR(paid_at, 'YYYY-MM') <= $2
+                    GROUP BY apartment_id, period
+                )
+                SELECT
+                    o.id           AS owner_id,
+                    o.full_name,
+                    o.email,
+                    o.document_id,
+                    a.id           AS apartment_id,
+                    a.code         AS apartment_code,
+                    a.floor,
+                    ap.period,
+                    COALESCE(af.amount, 0) AS esperado,
+                    COALESCE(f.total_fines, 0) AS multas,
+                    COALESCE(p.total_payments, 0) AS pagado
+                FROM owners o
+                JOIN owner_apartments oa ON o.id = oa.owner_id
+                JOIN apartments        a  ON oa.apartment_id = a.id
+                JOIN all_periods       ap ON ap.apartment_id = a.id
+                LEFT JOIN apartment_fees af ON af.apartment_id = a.id AND af.period = ap.period
+                LEFT JOIN agg_fines      f  ON  f.apartment_id = a.id AND  f.period = ap.period
+                LEFT JOIN agg_payments   p  ON  p.apartment_id = a.id AND  p.period = ap.period
+                WHERE o.status = 'ACTIVO' AND o.id = $1
+            """
             params.append(end_period)
-            idx += 1
-
-        query = (
-            _PERIOD_DATA_QUERY
-            + extra
-            + self._GROUP_ALL
-            + " ORDER BY ap.period, a.code"
-        )
+            
+            if start_period:
+                query += " AND ap.period >= $3"
+                params.append(start_period)
+            
+            query += " ORDER BY ap.period, a.code"
+        else:
+            extra = " AND o.id = $1"
+            idx = 2
+            if start_period:
+                extra += f" AND ap.period >= ${idx}"
+                params.append(start_period)
+                idx += 1
+            query = _PERIOD_DATA_QUERY + extra + " ORDER BY ap.period, a.code"
+            
         rows = await self._conn.fetch(query, *params)
         return [dict(r) for r in rows]

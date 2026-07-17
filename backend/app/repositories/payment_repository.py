@@ -29,6 +29,7 @@ class PaymentRepository:
         period: Optional[str] = None,
         owner_id: Optional[UUID] = None,
         status: Optional[str] = None,
+        payment_month: Optional[str] = None,
     ) -> list[dict]:
         conditions: list[str] = []
         params: list = []
@@ -37,6 +38,10 @@ class PaymentRepository:
         if period:
             conditions.append(f"p.period = ${idx}")
             params.append(period)
+            idx += 1
+        if payment_month:
+            conditions.append(f"TO_CHAR(p.paid_at, 'YYYY-MM') = ${idx}")
+            params.append(payment_month)
             idx += 1
         if owner_id:
             conditions.append(f"p.owner_id = ${idx}")

@@ -120,6 +120,20 @@
   background: var(--color-gray-50);
 }
 
+.checkGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checkGroupLabel {
+  color: var(--color-gray-500);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px 0;
+  text-transform: uppercase;
+}
+
 .checkItem input {
   width: 16px;
   height: 16px;

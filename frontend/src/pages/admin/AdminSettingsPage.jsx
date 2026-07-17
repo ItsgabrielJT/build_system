@@ -14,6 +14,7 @@ const initialForm = {
   address: '',
   phone: '',
   email: '',
+  documents_link: '',
 };
 
 export default function AdminSettingsPage() {
@@ -79,6 +80,7 @@ export default function AdminSettingsPage() {
       address: building.address || '',
       phone: building.phone || '',
       email: building.email || '',
+      documents_link: building.documents_link || '',
     });
   }, [building]);
 
@@ -257,6 +259,16 @@ export default function AdminSettingsPage() {
                       value={formData.phone}
                       onChange={handleChange}
                       placeholder="+593 99 999 9999"
+                    />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span>Enlace de documentos</span>
+                    <input
+                      name="documents_link"
+                      value={formData.documents_link}
+                      onChange={handleChange}
+                      placeholder="Ej. https://drive.google.com/..."
                     />
                   </label>
                 </div>

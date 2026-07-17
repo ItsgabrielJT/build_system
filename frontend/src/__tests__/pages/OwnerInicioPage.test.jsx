@@ -120,4 +120,36 @@ describe('OwnerInicioPage', () => {
     expect(screen.getByText('USD 125,50 pendiente')).toBeInTheDocument();
     expect(screen.getByText('Valor pendiente de pago')).toBeInTheDocument();
   });
+
+  it('redirects to the documents link if configured', async () => {
+    const documentsLink = 'https://example.com/docs';
+    const { getBuildingConfig } = await import('../../services/buildingService');
+    getBuildingConfig.mockResolvedValue({
+      id: 'building-1',
+      documents_link: documentsLink,
+    });
+
+    getOwnerProfile.mockResolvedValue({
+      full_name: 'Propietario Demo',
+      apartments: [],
+      balance_consolidated: 0,
+      recent_transactions: [],
+    });
+    getRecentAnnouncements.mockResolvedValue([]);
+    getMyEvents.mockResolvedValue([]);
+
+    const openMock = vi.spyOn(window, 'open').mockImplementation(() => {});
+
+    render(<OwnerInicioPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Cargando panel de inicio...')).not.toBeInTheDocument();
+    });
+
+    const btn = screen.getByText('Ver documentos');
+    btn.click();
+
+    expect(openMock).toHaveBeenCalledWith(documentsLink, '_blank', 'noopener,noreferrer');
+    openMock.mockRestore();
+  });
 });

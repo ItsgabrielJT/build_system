@@ -88,6 +88,7 @@ class BuildingCreate(BaseModel):
     regulation_file_name: Optional[str] = None
     regulation_content_type: Optional[str] = None
     regulation_storage_path: Optional[str] = None
+    documents_link: Optional[str] = None
 
 
 class BuildingUpdate(BaseModel):
@@ -110,6 +111,7 @@ class BuildingUpdate(BaseModel):
     regulation_file_name: Optional[str] = None
     regulation_content_type: Optional[str] = None
     regulation_storage_path: Optional[str] = None
+    documents_link: Optional[str] = None
 
 
 class BuildingResponse(BaseModel):
@@ -133,6 +135,7 @@ class BuildingResponse(BaseModel):
     regulation_file_name: Optional[str] = None
     regulation_content_type: Optional[str] = None
     regulation_storage_path: Optional[str] = None
+    documents_link: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -640,6 +643,7 @@ class BuildingCreate(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    documents_link: Optional[str] = None
 
 
 class BuildingUpdate(BaseModel):
@@ -647,6 +651,7 @@ class BuildingUpdate(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    documents_link: Optional[str] = None
 
 
 class BuildingResponse(BaseModel):
@@ -655,6 +660,7 @@ class BuildingResponse(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    documents_link: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

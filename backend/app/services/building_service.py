@@ -119,6 +119,7 @@ class BuildingService:
             address=data.address,
             phone=data.phone,
             email=data.email,
+            documents_link=getattr(data, "documents_link", None),
             photo_file_name=photo_meta["file_name"] if photo_meta else None,
             photo_content_type=photo_meta["content_type"] if photo_meta else None,
             photo_storage_path=photo_meta["storage_path"] if photo_meta else None,

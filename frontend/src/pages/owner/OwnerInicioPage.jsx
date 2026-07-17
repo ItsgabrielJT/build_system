@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getOwnerProfile } from '../../services/ownerService';
 import { getRecentAnnouncements } from '../../services/announcementService';
 import { getMyEvents } from '../../services/eventService';
 import { getBuildingAssetBlob, getBuildingConfig } from '../../services/buildingService';
+import { exportExpenseCertificate } from '../../services/accountStatementService';
 import { getOwnerPayments } from '../../services/paymentService';
 import { useNotification } from '../../context/NotificationContext';
 import styles from './OwnerInicioPage.module.css';
@@ -21,6 +22,7 @@ function triggerDownload(blob, filename) {
 export default function OwnerInicioPage() {
   const navigate = useNavigate();
   const { token } = useAuth();
+  const { avatarUrl } = useOutletContext() || {};
   const { success: toastSuccess, error: toastError } = useNotification();
 
   const [profile, setProfile] = useState(null);
@@ -29,6 +31,7 @@ export default function OwnerInicioPage() {
   const [events, setEvents] = useState([]);
   const [payments, setPayments] = useState([]);
   const [downloadingRegulation, setDownloadingRegulation] = useState(false);
+  const [downloadingCertificate, setDownloadingCertificate] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -192,6 +195,24 @@ export default function OwnerInicioPage() {
     }
   };
 
+  const handleDownloadExpenseCertificate = async () => {
+    if (!token) {
+      toastError('No se encontró la sesión del propietario.');
+      return;
+    }
+
+    setDownloadingCertificate(true);
+    try {
+      const blob = await exportExpenseCertificate(token);
+      triggerDownload(blob, 'certificado-expensas.pdf');
+      toastSuccess('Certificado de expensas descargado correctamente.');
+    } catch (err) {
+      toastError(err.response?.data?.detail || 'No se pudo descargar el certificado de expensas.');
+    } finally {
+      setDownloadingCertificate(false);
+    }
+  };
+
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -239,7 +260,17 @@ export default function OwnerInicioPage() {
         </div>
 
         {/* Card 3: Documentos disponibles */}
-        <div className={styles.metricCard}>
+        <div
+          className={styles.metricCard}
+          onClick={() => {
+            if (buildingConfig?.documents_link) {
+              window.open(buildingConfig.documents_link, '_blank', 'noopener,noreferrer');
+            } else {
+              toastError('No hay un enlace de documentos configurado.');
+            }
+          }}
+          style={{ cursor: buildingConfig?.documents_link ? 'pointer' : 'default' }}
+        >
           <div className={`${styles.iconCircle} ${styles.bgBlueCircle}`}>
             <svg className={styles.metricCardSvg} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -282,9 +313,13 @@ export default function OwnerInicioPage() {
             <aside className={styles.profileCard}>
               <div className={styles.profileAvatarSection}>
                 <div className={styles.profileAvatar}>
-                  <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" className={styles.avatarIcon}>
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                  </svg>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Foto de perfil" className={styles.profileAvatarImg} />
+                  ) : (
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor" className={styles.avatarIcon}>
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    </svg>
+                  )}
                 </div>
                 <h2 className={styles.profileName}>{ownerName}</h2>
                 <span className={styles.profileRole}>Copropietario</span>
@@ -340,21 +375,38 @@ export default function OwnerInicioPage() {
               </div>
 
               <div className={styles.profileRegulationSection}>
-                <span className={styles.profileRegulationTitle}>Descargar reglamento</span>
-                <p className={styles.profileRegulationDescription}>
-                  Obtenga el PDF oficial cargado por administración.
-                </p>
-                <button
-                  type="button"
-                  className={styles.profileRegulationButton}
-                  onClick={handleDownloadRegulation}
-                  disabled={downloadingRegulation || !buildingConfig?.regulation_file_name}
-                >
-                  {downloadingRegulation ? 'Descargando...' : 'Descargar PDF'}
-                </button>
-                {!buildingConfig?.regulation_file_name ? (
-                  <small className={styles.profileRegulationHint}>Aún no hay reglamento disponible.</small>
-                ) : null}
+                <div className={styles.profileDocumentItem}>
+                  <span className={styles.profileRegulationTitle}>Descargar reglamento</span>
+                  <p className={styles.profileRegulationDescription}>
+                    Obtenga el PDF oficial cargado por administración.
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.profileRegulationButton}
+                    onClick={handleDownloadRegulation}
+                    disabled={downloadingRegulation || !buildingConfig?.regulation_file_name}
+                  >
+                    {downloadingRegulation ? 'Descargando...' : 'Descargar PDF'}
+                  </button>
+                  {!buildingConfig?.regulation_file_name ? (
+                    <small className={styles.profileRegulationHint}>Aún no hay reglamento disponible.</small>
+                  ) : null}
+                </div>
+
+                <div className={styles.profileDocumentItem}>
+                  <span className={styles.profileRegulationTitle}>Certificado de expensas</span>
+                  <p className={styles.profileRegulationDescription}>
+                    Descargue el certificado oficial de estado de expensas.
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.profileCertificateButton}
+                    onClick={handleDownloadExpenseCertificate}
+                    disabled={downloadingCertificate}
+                  >
+                    {downloadingCertificate ? 'Generando...' : 'Descargar certificado'}
+                  </button>
+                </div>
               </div>
             </aside>
 
@@ -402,7 +454,16 @@ export default function OwnerInicioPage() {
                     <span className={styles.qaArrow}>&rsaquo;</span>
                   </button>
 
-                  <button onClick={() => navigate('/owner/apartments')} className={styles.quickAccessItem}>
+                  <button
+                    onClick={() => {
+                      if (buildingConfig?.documents_link) {
+                        window.open(buildingConfig.documents_link, '_blank', 'noopener,noreferrer');
+                      } else {
+                        toastError('No hay un enlace de documentos configurado.');
+                      }
+                    }}
+                    className={styles.quickAccessItem}
+                  >
                     <div className={`${styles.qaIcon} ${styles.qaBlueCircle}`}>
                       <svg className={styles.qaSvgIcon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />

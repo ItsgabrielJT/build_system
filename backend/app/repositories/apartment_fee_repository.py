@@ -24,27 +24,49 @@ class ApartmentFeeRepository:
         rows = await self._conn.fetch(
             """
             SELECT
-                f.*,
-                COALESCE(p.paid_amount, 0) AS paid_amount,
-                f.amount - COALESCE(p.paid_amount, 0) AS pending_amount,
-                CASE
-                    WHEN COALESCE(p.paid_amount, 0) > f.amount THEN COALESCE(p.paid_amount, 0) - f.amount
-                    ELSE 0
-                END AS credit_amount,
-                COALESCE(p.paid_amount, 0) >= f.amount AS is_paid
+                f.id,
+                f.apartment_id,
+                f.period,
+                f.amount,
+                f.created_at,
+                COALESCE(p.paid_amount, 0) AS paid_amount
             FROM apartment_fees f
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
                 FROM payments
-                WHERE status = 'REGISTRADO' AND fine_id IS NULL
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $1
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = f.apartment_id AND p.period = f.period
-            WHERE f.period = $1
-            ORDER BY f.apartment_id
+            WHERE f.period <= $1
+            ORDER BY f.apartment_id, f.period
             """,
             period,
         )
-        return [dict(r) for r in rows]
+        balances: dict[UUID, Decimal] = {}
+        result: list[dict] = []
+
+        for raw in rows:
+            row = dict(raw)
+            apartment_id = row["apartment_id"]
+            previous_balance = balances.get(apartment_id, Decimal("0"))
+            amount = Decimal(str(row["amount"] or 0))
+            paid_amount = Decimal(str(row["paid_amount"] or 0))
+            balance_before = previous_balance
+            balance_after = previous_balance + paid_amount - amount
+            balances[apartment_id] = balance_after
+
+            if row["period"] != period:
+                continue
+
+            row["balance_before_amount"] = balance_before
+            row["prior_debt_amount"] = abs(balance_before) if balance_before < 0 else Decimal("0")
+            row["prior_credit_amount"] = balance_before if balance_before > 0 else Decimal("0")
+            row["pending_amount"] = abs(balance_after) if balance_after < 0 else Decimal("0")
+            row["credit_amount"] = balance_after if balance_after > 0 else Decimal("0")
+            row["is_paid"] = balance_after >= 0
+            result.append(row)
+
+        return result
 
     async def get_by_id(self, fee_id: UUID) -> Optional[dict]:
         row = await self._conn.fetchrow(

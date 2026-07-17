@@ -91,26 +91,29 @@ export async function downloadBuildingsReport(token, params = {}) {
   return res.data;
 }
 
-export async function getAdminMonthlyBalance(period, token) {
+export async function getAdminMonthlyBalance(params, token) {
+  const serviceParams = typeof params === 'string' ? { period: params } : params;
   const res = await axios.get(`${API_BASE}/api/v1/reports/monthly-balance`, {
     headers: { Authorization: `Bearer ${token}` },
-    params: period ? { period } : {},
+    params: serviceParams,
   });
   return res.data;
 }
 
-export async function getOwnerMonthlyBalance(period, token) {
+export async function getOwnerMonthlyBalance(params, token) {
+  const serviceParams = typeof params === 'string' ? { period: params } : params;
   const res = await axios.get(`${API_BASE}/api/v1/owner/monthly-balance`, {
     headers: { Authorization: `Bearer ${token}` },
-    params: period ? { period } : {},
+    params: serviceParams,
   });
   return res.data;
 }
 
-export async function downloadOwnerMonthlyBalancePdf(period, token) {
+export async function downloadOwnerMonthlyBalancePdf(params, token) {
+  const serviceParams = typeof params === 'string' ? { period: params } : params;
   const res = await axios.get(`${API_BASE}/api/v1/owner/monthly-balance`, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { ...(period ? { period } : {}), format: 'pdf' },
+    params: { ...serviceParams, format: 'pdf' },
     responseType: 'blob',
   });
   return res.data;

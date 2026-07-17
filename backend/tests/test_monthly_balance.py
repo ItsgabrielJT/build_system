@@ -68,7 +68,7 @@ async def test_monthly_balance_owner_success(
     data = response.json()
     assert data["period"] == "2026-05"
     assert data["income_breakdown"][0]["label"] == "transferencia"
-    mocked_summary.assert_awaited_once_with("2026-05")
+    mocked_summary.assert_awaited_once_with("2026-05", None, None)
 
 
 @pytest.mark.asyncio
@@ -216,3 +216,30 @@ async def test_balance_pdf_excludes_zero_expenses():
     
     assert isinstance(pdf_bytes, bytes)
     assert pdf_bytes.startswith(b"%PDF")
+
+
+@pytest.mark.asyncio
+async def test_monthly_balance_summary_with_date_range():
+    payment_repo = MagicMock()
+    expense_repo = MagicMock()
+    income_repo = MagicMock()
+    service = ReportService(MagicMock(), payment_repo, expense_repo, income_repo)
+
+    from datetime import date
+    service._payments = AsyncMock(return_value=[
+        {"amount": Decimal("1500.00"), "apartment_id": "apt-1", "owner_id": "owner-1"}
+    ])
+    service._incomes = AsyncMock(return_value=[])
+    service._expenses = AsyncMock(return_value=[
+        {"amount": Decimal("500.00"), "category": "Mantenimiento"}
+    ])
+
+    result = await service.monthly_balance_summary(
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 6, 30)
+    )
+
+    assert result["income_total"] == Decimal("1500.00")
+    assert result["expense_total"] == Decimal("500.00")
+    assert result["net_balance"] == Decimal("1000.00")
+    assert result["period"] == "2026-01 a 2026-06"

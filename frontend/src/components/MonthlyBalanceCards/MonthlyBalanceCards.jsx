@@ -6,13 +6,14 @@ function formatCurrency(value) {
   })}`;
 }
 
-function formatVariation(value) {
+function formatVariation(value, compLabel) {
   if (value === null || value === undefined) return 'Sin base comparativa';
   const sign = Number(value) > 0 ? '+' : '';
-  return `${sign}${Number(value).toFixed(1)}% vs mes anterior`;
+  return `${sign}${Number(value).toFixed(1)}% vs ${compLabel}`;
 }
 
-export default function MonthlyBalanceCards({ summary, loading = false }) {
+export default function MonthlyBalanceCards({ summary, loading = false, periodLabel = 'del mes' }) {
+  const compLabel = periodLabel === 'del semestre' ? 'semestre anterior' : periodLabel === 'del año' ? 'año anterior' : 'mes anterior';
   const balance = summary || {};
   const variation = balance.previous_period_variation || {};
 
@@ -26,13 +27,13 @@ export default function MonthlyBalanceCards({ summary, loading = false }) {
 
   const items = [
     {
-      label: 'Ingresos del mes',
+      label: `Ingresos ${periodLabel}`,
       value: balance.income_total,
       variation: variation.income_pct,
       tone: 'income',
     },
     {
-      label: 'Gastos del mes',
+      label: `Gastos ${periodLabel}`,
       value: balance.expense_total,
       variation: variation.expense_pct,
       tone: 'expense',
@@ -51,7 +52,7 @@ export default function MonthlyBalanceCards({ summary, loading = false }) {
         <article key={item.label} className={`${styles.card} ${styles[item.tone]}`}>
           <span>{item.label}</span>
           <strong>{formatCurrency(item.value)}</strong>
-          <small>{formatVariation(item.variation)}</small>
+          <small>{formatVariation(item.variation, compLabel)}</small>
         </article>
       ))}
     </div>

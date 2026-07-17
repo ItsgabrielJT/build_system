@@ -8,11 +8,15 @@ function getServiceForRole(role) {
     : reportService.getAdminMonthlyBalance;
 }
 
-export function useMonthlyBalance(role, period) {
+export function useMonthlyBalance(role, periodOrParams) {
   const { token } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const paramsKey = typeof periodOrParams === 'string'
+    ? periodOrParams
+    : JSON.stringify(periodOrParams);
 
   const reload = useCallback(async () => {
     if (!token || !role) {
@@ -24,7 +28,7 @@ export function useMonthlyBalance(role, period) {
 
     try {
       const service = getServiceForRole(role);
-      const response = await service(period, token);
+      const response = await service(periodOrParams, token);
       setData(response);
       return response;
     } catch (err) {
@@ -34,7 +38,7 @@ export function useMonthlyBalance(role, period) {
     } finally {
       setLoading(false);
     }
-  }, [period, role, token]);
+  }, [paramsKey, role, token]);
 
   useEffect(() => {
     reload();

@@ -168,6 +168,13 @@ class ReportService:
     def _period_name(self, period: Optional[str]) -> str:
         if not period:
             return "Todos"
+        if isinstance(period, str):
+            if period.endswith("-Sem1"):
+                return f"1er Semestre {period.split('-')[0]}"
+            if period.endswith("-Sem2"):
+                return f"2do Semestre {period.split('-')[0]}"
+            if period.endswith("-Anual"):
+                return f"Anual {period.split('-')[0]}"
         try:
             parsed = datetime.strptime(f"{period}-01", "%Y-%m-%d")
         except ValueError:
@@ -620,7 +627,7 @@ class ReportService:
         conditions = ["p.status IN ('REGISTRADO', 'APROBADO')"]
         params: list = []
         idx = 1
-        if period:
+        if period and not (start_date or end_date):
             conditions.append(f"TO_CHAR(p.paid_at, 'YYYY-MM') = ${idx}")
             params.append(period)
             idx += 1
@@ -655,7 +662,7 @@ class ReportService:
         if not self._income_repo:
             return []
         return await self._income_repo.get_all(
-            period=period,
+            period=period if not (start_date or end_date) else None,
             status="REGISTRADO",
             start_date=start_date,
             end_date=end_date,
@@ -677,7 +684,7 @@ class ReportService:
         conditions = ["status NOT IN ('ANULADO', 'ANULADA')"]
         params: list = []
         idx = 1
-        if period:
+        if period and not (start_date or end_date):
             conditions.append(f"TO_CHAR(date, 'YYYY-MM') = ${idx}")
             params.append(period)
             idx += 1
@@ -700,16 +707,36 @@ class ReportService:
         )
         return [dict(row) for row in rows]
 
-    async def monthly_balance_summary(self, period: Optional[str] = None) -> dict:
-        target_period = self._validate_month_period(period or date.today().strftime("%Y-%m"))
-        previous_period = self._previous_period(target_period)
+    async def monthly_balance_summary(
+        self,
+        period: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> dict:
+        if start_date and end_date:
+            target_period = period or f"{start_date.strftime('%Y-%m')} a {end_date.strftime('%Y-%m')}"
+            
+            payments = await self._payments(start_date=start_date, end_date=end_date)
+            incomes = await self._incomes(start_date=start_date, end_date=end_date)
+            expenses = await self._expenses(start_date=start_date, end_date=end_date)
+            
+            days = (end_date - start_date).days + 1
+            previous_end = start_date - timedelta(days=1)
+            previous_start = previous_end - timedelta(days=days - 1)
+            
+            previous_payments = await self._payments(start_date=previous_start, end_date=previous_end)
+            previous_incomes = await self._incomes(start_date=previous_start, end_date=previous_end)
+            previous_expenses = await self._expenses(start_date=previous_start, end_date=previous_end)
+        else:
+            target_period = self._validate_month_period(period or date.today().strftime("%Y-%m"))
+            previous_period = self._previous_period(target_period)
 
-        payments = await self._monthly_payments(target_period)
-        incomes = await self._monthly_incomes(target_period)
-        expenses = await self._monthly_expenses(target_period)
-        previous_payments = await self._monthly_payments(previous_period)
-        previous_incomes = await self._monthly_incomes(previous_period)
-        previous_expenses = await self._monthly_expenses(previous_period)
+            payments = await self._monthly_payments(target_period)
+            incomes = await self._monthly_incomes(target_period)
+            expenses = await self._monthly_expenses(target_period)
+            previous_payments = await self._monthly_payments(previous_period)
+            previous_incomes = await self._monthly_incomes(previous_period)
+            previous_expenses = await self._monthly_expenses(previous_period)
 
         income_rows = [*payments, *incomes]
         previous_income_rows = [*previous_payments, *previous_incomes]
@@ -1544,6 +1571,19 @@ class ReportService:
             return math.ceil(val / 5000) * 5000.0
 
     def _get_period_dates(self, period: str) -> tuple[date, date]:
+        if not period:
+            today = date.today()
+            return date(today.year, today.month, 1), date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+        if isinstance(period, str):
+            if period.endswith("-Sem1"):
+                year = int(period.split("-")[0])
+                return date(year, 1, 1), date(year, 6, 30)
+            if period.endswith("-Sem2"):
+                year = int(period.split("-")[0])
+                return date(year, 7, 1), date(year, 12, 31)
+            if period.endswith("-Anual"):
+                year = int(period.split("-")[0])
+                return date(year, 1, 1), date(year, 12, 31)
         try:
             year, month = map(int, period.split("-"))
             last_day = calendar.monthrange(year, month)[1]
@@ -1560,13 +1600,41 @@ class ReportService:
         end_date: Optional[date] = None,
         compare_period: Optional[str] = None,
     ) -> bytes:
-        current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
-        current_start, current_end = self._get_period_dates(current_period)
-        current_start = start_date or current_start
-        current_end = end_date or current_end
-        
-        compare_period = compare_period or self._previous_period(current_period)
-        compare_start, compare_end = self._get_period_dates(compare_period)
+        is_annual = False
+        is_semestral = False
+        if start_date and end_date:
+            is_annual = (start_date.month == 1 and start_date.day == 1 and end_date.month == 12 and end_date.day == 31)
+            is_semestral = (start_date.month == 1 and start_date.day == 1 and end_date.month == 6 and end_date.day == 30) or \
+                           (start_date.month == 7 and start_date.day == 1 and end_date.month == 12 and end_date.day == 31)
+
+        if is_annual:
+            current_start = start_date
+            current_end = end_date
+            current_period = f"{start_date.year}-Anual"
+            compare_start = date(start_date.year - 1, 1, 1)
+            compare_end = date(start_date.year - 1, 12, 31)
+            compare_period = f"{start_date.year - 1}-Anual"
+        elif is_semestral:
+            current_start = start_date
+            current_end = end_date
+            if start_date.month == 1:
+                current_period = f"{start_date.year}-Sem1"
+                compare_start = date(start_date.year - 1, 7, 1)
+                compare_end = date(start_date.year - 1, 12, 31)
+                compare_period = f"{start_date.year - 1}-Sem2"
+            else:
+                current_period = f"{start_date.year}-Sem2"
+                compare_start = date(start_date.year, 1, 1)
+                compare_end = date(start_date.year, 6, 30)
+                compare_period = f"{start_date.year}-Sem1"
+        else:
+            current_period = period or (start_date.strftime("%Y-%m") if start_date else date.today().strftime("%Y-%m"))
+            current_start, current_end = self._get_period_dates(current_period)
+            current_start = start_date or current_start
+            current_end = end_date or current_end
+            
+            compare_period = compare_period or self._previous_period(current_period)
+            compare_start, compare_end = self._get_period_dates(compare_period)
         
         # Fetch current period data
         current_payments = await self._income_entries(current_period, current_start, current_end)
@@ -1605,10 +1673,16 @@ class ReportService:
         story = []
         building = await get_default_building_config(getattr(self._payment_repo, "_conn", None))
         
+        report_title = "BALANCE DE FIN DE MES\nINGRESOS Y EGRESOS"
+        if is_annual:
+            report_title = "BALANCE ANUAL\nINGRESOS Y EGRESOS"
+        elif is_semestral:
+            report_title = "BALANCE SEMESTRAL\nINGRESOS Y EGRESOS"
+
         # Header - original header formatting preserved
         story.extend(
             await self._three_column_report_header(
-                "BALANCE DE FIN DE MES\nINGRESOS Y EGRESOS",
+                report_title,
                 f"Rango: {self._date_label(period, start_date, end_date)} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
                 width,
                 building=building,

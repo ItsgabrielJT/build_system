@@ -21,10 +21,10 @@
 }
 
 .actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.15fr auto auto;
-  gap: 18px;
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
 }
 
 .dateField,
@@ -430,10 +430,6 @@
 }
 
 @media (max-width: 1240px) {
-  .actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .btnPdf,
   .btnExcel {
     width: 100%;
@@ -458,7 +454,10 @@
     font-size: 30px;
   }
 
-  .actions,
+  .actions {
+    flex-direction: column;
+  }
+
   .statsGrid {
     grid-template-columns: 1fr;
   }

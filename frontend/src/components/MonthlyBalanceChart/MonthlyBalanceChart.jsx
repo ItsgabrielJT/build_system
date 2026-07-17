@@ -18,13 +18,13 @@ function formatCurrency(value) {
   })}`;
 }
 
-export default function MonthlyBalanceChart({ summary, loading = false }) {
+export default function MonthlyBalanceChart({ summary, loading = false, periodLabel = 'del mes' }) {
   if (loading) {
     return <div className={styles.loading}>Cargando gráfica mensual...</div>;
   }
 
   if (!summary) {
-    return <div className={styles.empty}>Sin datos del mes seleccionado.</div>;
+    return <div className={styles.empty}>Sin datos {periodLabel} seleccionado.</div>;
   }
 
   const chartData = [
@@ -39,7 +39,7 @@ export default function MonthlyBalanceChart({ summary, loading = false }) {
     <section className={styles.panel}>
       <div className={styles.header}>
         <div>
-          <h3>Comparativo del mes</h3>
+          <h3>Comparativo {periodLabel}</h3>
           <p>Ingresos, gastos y resultado neto consolidado.</p>
         </div>
         <span className={styles.pill}>{summary.period}</span>

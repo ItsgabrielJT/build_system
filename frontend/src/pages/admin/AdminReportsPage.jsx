@@ -175,9 +175,37 @@ export default function AdminReportsPage() {
   const [loadingExport, setLoadingExport] = useState({});
   const [error, setError] = useState(null);
 
+  const [frequency, setFrequency] = useState('mensual');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedSemester, setSelectedSemester] = useState('sem1');
+
   useEffect(() => {
-    setDateRange(getMonthRange(period));
-  }, [period]);
+    if (frequency === 'mensual') {
+      const range = getMonthRange(period);
+      setDateRange({ startDate: range.startDate, endDate: range.endDate });
+      setComparePeriod(getPreviousMonthPeriod(period));
+    } else if (frequency === 'semestral') {
+      if (selectedSemester === 'sem1') {
+        setDateRange({
+          startDate: `${selectedYear}-01-01`,
+          endDate: `${selectedYear}-06-30`,
+        });
+        setComparePeriod(`${selectedYear - 1}-Sem2`);
+      } else {
+        setDateRange({
+          startDate: `${selectedYear}-07-01`,
+          endDate: `${selectedYear}-12-31`,
+        });
+        setComparePeriod(`${selectedYear}-Sem1`);
+      }
+    } else if (frequency === 'anual') {
+      setDateRange({
+        startDate: `${selectedYear}-01-01`,
+        endDate: `${selectedYear}-12-31`,
+      });
+      setComparePeriod(`${selectedYear - 1}-Anual`);
+    }
+  }, [frequency, period, selectedYear, selectedSemester]);
 
   useEffect(() => {
     let cancelled = false;
@@ -186,7 +214,22 @@ export default function AdminReportsPage() {
       setLoadingStats(true);
       setError(null);
       try {
-        const compareRange = getMonthRange(comparePeriod);
+        let compareRange;
+        if (frequency === 'mensual') {
+          compareRange = getMonthRange(comparePeriod);
+        } else if (frequency === 'semestral') {
+          if (comparePeriod.endsWith('-Sem1')) {
+            const yr = parseInt(comparePeriod.split('-')[0], 10);
+            compareRange = { startDate: `${yr}-01-01`, endDate: `${yr}-06-30` };
+          } else {
+            const yr = parseInt(comparePeriod.split('-')[0], 10);
+            compareRange = { startDate: `${yr}-07-01`, endDate: `${yr}-12-31` };
+          }
+        } else { // anual
+          const yr = parseInt(comparePeriod.split('-')[0], 10);
+          compareRange = { startDate: `${yr}-01-01`, endDate: `${yr}-12-31` };
+        }
+
         const [currentData, previousData] = await Promise.all([
           reportService.getDashboardStats(token, { start_date: startDate, end_date: endDate }),
           reportService.getDashboardStats(token, {
@@ -209,7 +252,7 @@ export default function AdminReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, startDate, endDate, comparePeriod]);
+  }, [token, startDate, endDate, comparePeriod, frequency]);
 
   const handleDownloadSelected = async (format) => {
     setLoadingExport((prev) => ({ ...prev, [format]: true }));
@@ -306,6 +349,9 @@ export default function AdminReportsPage() {
     { period: getPeriodLabel(period), expected: currentExpected, collected: currentCollected },
   ];
 
+  const periodLabel = frequency === 'semestral' ? 'del semestre' : frequency === 'anual' ? 'del año' : 'del mes';
+  const compLabel = frequency === 'semestral' ? 'semestre anterior' : frequency === 'anual' ? 'año anterior' : 'mes anterior';
+
   return (
     <div className={styles.page}>
       <section className={styles.header}>
@@ -316,14 +362,49 @@ export default function AdminReportsPage() {
       </section>
 
       <section className={styles.actions}>
-        <label className={styles.dateField}>
-          <span>Periodo</span>
-          <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} />
+        <label className={styles.selectField}>
+          <span>Frecuencia</span>
+          <select value={frequency} onChange={(event) => setFrequency(event.target.value)}>
+            <option value="mensual">Mensual</option>
+            <option value="semestral">Semestral</option>
+            <option value="anual">Anual</option>
+          </select>
         </label>
-        <label className={styles.dateField}>
-          <span>Comparar con</span>
-          <input type="month" value={comparePeriod} onChange={(event) => setComparePeriod(event.target.value)} />
-        </label>
+
+        {frequency === 'mensual' && (
+          <>
+            <label className={styles.dateField}>
+              <span>Periodo</span>
+              <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} />
+            </label>
+            <label className={styles.dateField}>
+              <span>Comparar con</span>
+              <input type="month" value={comparePeriod} onChange={(event) => setComparePeriod(event.target.value)} />
+            </label>
+          </>
+        )}
+
+        {(frequency === 'semestral' || frequency === 'anual') && (
+          <label className={styles.selectField}>
+            <span>Año</span>
+            <select value={selectedYear} onChange={(event) => setSelectedYear(parseInt(event.target.value, 10))}>
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((yr) => (
+                <option key={yr} value={yr}>{yr}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {frequency === 'semestral' && (
+          <label className={styles.selectField}>
+            <span>Semestre</span>
+            <select value={selectedSemester} onChange={(event) => setSelectedSemester(event.target.value)}>
+              <option value="sem1">1er Semestre (Ene - Jun)</option>
+              <option value="sem2">2do Semestre (Jul - Dic)</option>
+            </select>
+          </label>
+        )}
+
         <label className={styles.selectField}>
           <span>Tipo de reporte</span>
           <select value={selectedReport} onChange={(event) => setSelectedReport(event.target.value)}>
@@ -354,7 +435,7 @@ export default function AdminReportsPage() {
                 <span>{metric.label}</span>
                 <strong>{metric.value}</strong>
                 <em className={isGood ? styles.positive : styles.negative}>{formatChange(metric.change)}</em>
-                <small>vs. mes anterior</small>
+                <small>vs. {compLabel}</small>
               </div>
             </article>
           );
@@ -364,7 +445,7 @@ export default function AdminReportsPage() {
       <section className={styles.chartGrid}>
         <article className={`${styles.panel} ${styles.comparisonPanel}`}>
           <div className={styles.panelHeader}>
-            <h2>Comparativo del mes</h2>
+            <h2>Comparativo {periodLabel}</h2>
           </div>
           <ResponsiveContainer width="100%" height={218}>
             <BarChart data={comparisonChart} barGap={7} barCategoryGap="24%" margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
@@ -455,7 +536,7 @@ export default function AdminReportsPage() {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan="4" className={styles.emptyCell}>Sin alícuotas en el período</td>
+                    <td colSpan="4" className={styles.emptyCell}>Sin alícuotas en el período seleccionado</td>
                   </tr>
                 )}
               </tbody>
@@ -505,7 +586,7 @@ export default function AdminReportsPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="3">Total egresos del mes</td>
+                  <td colSpan="3">Total egresos {periodLabel}</td>
                   <td>{formatMoney(summary.total_expenses)}</td>
                 </tr>
               </tfoot>

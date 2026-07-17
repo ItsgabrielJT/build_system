@@ -55,13 +55,17 @@ def create_pdf_validation_token(
     }
     payload_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     encoded_payload = _b64url_encode(payload_json.encode("utf-8"))
-    return f"{encoded_payload}.{_sign(encoded_payload)}"
+    return f"{encoded_payload}~{_sign(encoded_payload)}"
 
 
 def validate_pdf_validation_token(token: str) -> dict[str, Any]:
-    try:
-        encoded_payload, signature = token.split(".", 1)
-    except ValueError:
+    # Try tilde separator first (new format), then dot (legacy format)
+    for sep in ("~", "."):
+        if sep in token:
+            encoded_payload, _, signature = token.partition(sep)
+            if encoded_payload and signature:
+                break
+    else:
         return {"valid": False}
 
     expected_signature = _sign(encoded_payload)

@@ -347,21 +347,30 @@ async def report_monthly_balance(
 @router.get("/owner/monthly-balance", response_model=MonthlyBalanceResponse)
 async def owner_monthly_balance(
     period: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     format: str = "json",
     _user: dict = Depends(require_owner),
     db=Depends(get_db),
 ):
+    _validate_date_range_or_422(start_date, end_date)
     if format not in ("json", "pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Format debe ser: json o pdf'
         )
 
-    validated_period = _validate_month_period_or_400(period)
+    # When date range is provided, don't enforce strict YYYY-MM period validation
+    if start_date and end_date:
+        validated_period = period  # may be None or a label like "2026-Sem1"
+    else:
+        validated_period = _validate_month_period_or_400(period)
     service = _get_report_service(db)
     if format == "pdf":
-        content = await service.balance_pdf(validated_period)
+        content = await service.balance_pdf(validated_period, start_date, end_date)
         filename_base = f"balance-mensual{'-' + validated_period if validated_period else ''}"
+        if start_date and end_date:
+            filename_base = f"balance-{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}"
         return _pdf_response(content, f"{filename_base}.pdf")
 
-    return await service.monthly_balance_summary(validated_period)
+    return await service.monthly_balance_summary(validated_period, start_date, end_date)

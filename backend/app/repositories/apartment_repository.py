@@ -48,6 +48,8 @@ class ApartmentRepository:
                 a.acquisition_date,
                 a.unit_type,
                 a.use_type,
+                a.pet_count,
+                a.vehicle_plates,
                 {APARTMENT_STATUS_SQL} AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,
@@ -84,6 +86,8 @@ class ApartmentRepository:
                 a.acquisition_date,
                 a.unit_type,
                 a.use_type,
+                a.pet_count,
+                a.vehicle_plates,
                 {APARTMENT_STATUS_SQL} AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,
@@ -136,9 +140,11 @@ class ApartmentRepository:
                 storage,
                 acquisition_date,
                 unit_type,
-                use_type
+                use_type,
+                pet_count,
+                vehicle_plates
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING
                 id,
                 code,
@@ -153,6 +159,8 @@ class ApartmentRepository:
                 acquisition_date,
                 unit_type,
                 use_type,
+                pet_count,
+                vehicle_plates,
                 created_at,
                 updated_at
             """,
@@ -167,6 +175,8 @@ class ApartmentRepository:
             data.acquisition_date,
             data.unit_type,
             data.use_type,
+            data.pet_count,
+            data.vehicle_plates,
         )
         return dict(row)
 
@@ -185,6 +195,8 @@ class ApartmentRepository:
                 acquisition_date = COALESCE($10, acquisition_date),
                 unit_type  = COALESCE($11, unit_type),
                 use_type   = COALESCE($12, use_type),
+                pet_count  = COALESCE($13, pet_count),
+                vehicle_plates = COALESCE($14, vehicle_plates),
                 updated_at = NOW()
             WHERE id = $1
             RETURNING
@@ -201,6 +213,8 @@ class ApartmentRepository:
                 acquisition_date,
                 unit_type,
                 use_type,
+                pet_count,
+                vehicle_plates,
                 created_at,
                 updated_at
             """,
@@ -216,6 +230,8 @@ class ApartmentRepository:
             data.acquisition_date,
             data.unit_type,
             data.use_type,
+            data.pet_count,
+            data.vehicle_plates,
         )
         return dict(row) if row else None
 
@@ -336,6 +352,8 @@ class ApartmentRepository:
                 a.acquisition_date,
                 a.unit_type,
                 a.use_type,
+                a.pet_count,
+                a.vehicle_plates,
                 {APARTMENT_STATUS_SQL} AS status,
                 a.building_id,
                 oa.owner_id,
@@ -385,6 +403,8 @@ class ApartmentRepository:
                 a.acquisition_date,
                 a.unit_type,
                 a.use_type,
+                a.pet_count,
+                a.vehicle_plates,
                 {APARTMENT_STATUS_SQL} AS status,
                 a.building_id,
                 oa.owner_id                                 AS owner_id,

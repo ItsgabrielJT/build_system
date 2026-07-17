@@ -100,6 +100,11 @@ export function useApartmentDirectory() {
   const handleCreateApartment = useCallback(
     async (formData) => {
       try {
+        const vehiclePlates = (formData.vehicle_plates || '')
+          .split(/[,\n]/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+
         const payload = {
           code: formData.code,
           floor: formData.floor ? parseInt(formData.floor, 10) : undefined,
@@ -112,6 +117,8 @@ export function useApartmentDirectory() {
           storage: formData.storage || undefined,
           acquisition_date: formData.acquisition_date || undefined,
           use_type: formData.use_type || undefined,
+          pet_count: formData.pet_count !== '' ? parseInt(formData.pet_count, 10) : undefined,
+          vehicle_plates: vehiclePlates.length ? vehiclePlates : undefined,
         };
         await apartmentService.createApartment(payload, token);
         success('Apartamento creado con éxito');

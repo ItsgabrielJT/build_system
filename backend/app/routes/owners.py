@@ -424,17 +424,13 @@ async def download_owner_ficha(
             detail=f"Error al generar la ficha PDF: {str(e)}",
         )
 
-    raw_file_name = f"ficha-{owner['full_name'].replace(' ', '_')}.pdf"
-    normalized_file_name = raw_file_name.replace("\r", "").replace("\n", "")
-    safe_file_name = normalized_file_name.encode("ascii", "ignore").decode("ascii") or "ficha-propietario.pdf"
-    encoded_file_name = quote(normalized_file_name)
+    # Keep ASCII-only static filename to avoid proxy/server header parsing issues.
+    safe_file_name = "ficha-copropietario.pdf"
         
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{safe_file_name}"; filename*=UTF-8\'\'{encoded_file_name}'
-            )
+            "Content-Disposition": f'attachment; filename="{safe_file_name}"'
         },
     )

@@ -94,6 +94,8 @@ export default function DepartmentsPage() {
     { name: 'storage', label: 'Bodega', placeholder: 'Ej: B-12' },
     { name: 'acquisition_date', label: 'Fecha de adquisición', type: 'date' },
     { name: 'use_type', label: 'Uso del departamento', placeholder: 'Ej: Residencial' },
+    { name: 'pet_count', label: 'Número de mascotas', type: 'number', min: 0, step: '1', placeholder: 'Ej: 2' },
+    { name: 'vehicle_plates', label: 'Placas de vehículos', type: 'textarea', placeholder: 'Ej: PBC1234, JDE5678 o una por línea' },
     ...(buildingOptions.length > 0
       ? [{ name: 'building_id', label: 'Edificio', type: 'select', options: buildingOptions }]
       : []),

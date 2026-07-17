@@ -154,6 +154,8 @@ class ApartmentCreate(BaseModel):
     acquisition_date: Optional[date] = None
     unit_type: Optional[str] = None
     use_type: Optional[str] = None
+    pet_count: Optional[int] = None
+    vehicle_plates: Optional[List[str]] = None
 
 
 class ApartmentUpdate(BaseModel):
@@ -168,6 +170,8 @@ class ApartmentUpdate(BaseModel):
     acquisition_date: Optional[date] = None
     unit_type: Optional[str] = None
     use_type: Optional[str] = None
+    pet_count: Optional[int] = None
+    vehicle_plates: Optional[List[str]] = None
 
 
 class ApartmentResponse(BaseModel):
@@ -184,6 +188,8 @@ class ApartmentResponse(BaseModel):
     acquisition_date: Optional[date] = None
     unit_type: Optional[str] = None
     use_type: Optional[str] = None
+    pet_count: Optional[int] = None
+    vehicle_plates: Optional[List[str]] = None
     owner_id: Optional[UUID] = None
     owner_name: Optional[str] = None
     owner_email: Optional[str] = None

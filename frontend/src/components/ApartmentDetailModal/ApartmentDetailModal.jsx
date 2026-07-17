@@ -22,6 +22,8 @@ const EDIT_FIELDS = [
   { name: 'storage', label: 'Bodega' },
   { name: 'acquisition_date', label: 'Fecha de adquisición', type: 'date' },
   { name: 'use_type', label: 'Uso del departamento' },
+  { name: 'pet_count', label: 'Número de mascotas', type: 'number', min: 0, step: '1' },
+  { name: 'vehicle_plates', label: 'Placas de vehículos', type: 'textarea', placeholder: 'Ej: PBC1234, JDE5678 o una por línea' },
   { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
 ];
 
@@ -60,6 +62,11 @@ export default function ApartmentDetailModal({ apartment, onClose, onRefresh }) 
 
   const handleSaveEdit = async (formData) => {
     try {
+      const vehiclePlates = (formData.vehicle_plates || '')
+        .split(/[,\n]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
       const payload = {
         code: formData.code,
         floor: formData.floor ? parseInt(formData.floor, 10) : undefined,
@@ -71,6 +78,8 @@ export default function ApartmentDetailModal({ apartment, onClose, onRefresh }) 
         storage: formData.storage || undefined,
         acquisition_date: formData.acquisition_date || undefined,
         use_type: formData.use_type || undefined,
+        pet_count: formData.pet_count !== '' ? parseInt(formData.pet_count, 10) : undefined,
+        vehicle_plates: vehiclePlates.length ? vehiclePlates : undefined,
         status: formData.status || undefined,
       };
       await apartmentService.updateApartment(apartment.id, payload, token);
@@ -205,6 +214,14 @@ export default function ApartmentDetailModal({ apartment, onClose, onRefresh }) 
                     <span className={styles.infoLabel}>Uso del departamento</span>
                     <span className={styles.infoValue}>{fullData?.use_type || '—'}</span>
                   </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Número de mascotas</span>
+                    <span className={styles.infoValue}>{fullData?.pet_count ?? '—'}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Placas de vehículos</span>
+                    <span className={styles.infoValue}>{(fullData?.vehicle_plates || []).join(', ') || '—'}</span>
+                  </div>
                   {apartment.area_sqm != null && (
                     <div className={styles.infoItem}>
                       <span className={styles.infoLabel}>Área</span>
@@ -285,7 +302,10 @@ export default function ApartmentDetailModal({ apartment, onClose, onRefresh }) 
         isOpen={showEditModal}
         title="Editar Apartamento"
         fields={EDIT_FIELDS}
-        initialData={fullData ?? apartment}
+        initialData={{
+          ...(fullData ?? apartment),
+          vehicle_plates: (fullData?.vehicle_plates || []).join(', '),
+        }}
         onSubmit={handleSaveEdit}
         onClose={() => setShowEditModal(false)}
       />

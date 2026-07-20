@@ -3788,7 +3788,8 @@ class ReportService:
         
         # Emission metadata in standardized system header
         emission_date = datetime.now().strftime("%d/%m/%Y")
-        sheet_number = f"FTN-{datetime.now().year}-{str(owner['document_id'])[-6:].zfill(6)}"
+        owner_document = str(owner.get("document_id") or "").strip()
+        sheet_number = f"FTN-{datetime.now().year}-{owner_document[-6:].zfill(6)}"
         story.extend(
             await self._three_column_report_header(
                 "FICHA DEL COPROPIETARIO",
@@ -3800,21 +3801,37 @@ class ReportService:
         )
         
         # Helper for sections titles
-        def make_section_title(title_text: str):
+        def make_section_title(number: str, title_text: str):
+            number_badge = Paragraph(
+                f"<font size='10' color='#ffffff'><b>{escape(number)}</b></font>",
+                ParagraphStyle("FichaSectionNumber", fontName="Helvetica-Bold", leading=12, alignment=1),
+            )
+            title = Paragraph(
+                f"<font size='9' color='#ffffff'><b>{escape(title_text)}</b></font>",
+                ParagraphStyle("FichaSectionTitle", fontName="Helvetica-Bold", leading=12),
+            )
+            tab_width = min(width * 0.54, max(6.1 * cm, (len(title_text) * 0.24 + 0.8) * cm))
             t = Table(
-                [[Paragraph(f"<font size='9' color='#123c7a'><b>{title_text}</b></font>", ParagraphStyle("SecTitle", fontName="Helvetica-Bold", leading=11))]],
-                colWidths=[width]
+                [[number_badge, title, ""]],
+                colWidths=[0.42 * cm, tab_width - 0.42 * cm, width - tab_width],
+                rowHeights=[0.42 * cm],
             )
             t.setStyle(TableStyle([
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BACKGROUND", (0, 0), (1, 0), _PDF_NAVY),
+                ("BOX", (0, 0), (0, 0), 0.8, colors.white),
+                ("BOX", (0, 0), (1, 0), 0.8, _PDF_NAVY),
+                ("LINEBELOW", (2, 0), (2, 0), 0.9, _PDF_BLUE),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("LINEBELOW", (0, 0), (-1, -1), 0.5, colors.HexColor("#123c7a")),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("LEFTPADDING", (1, 0), (1, 0), 8),
             ]))
             return t
 
         # SECTION 1: DATOS DEL COPROPIETARIO
-        story.append(make_section_title("1. DATOS DEL COPROPIETARIO"))
+        story.append(make_section_title("1", "DATOS DEL COPROPIETARIO"))
         story.append(Spacer(1, 0.15 * cm))
         
         # Left side: owner info
@@ -3855,10 +3872,10 @@ class ReportService:
         owner_text = (
             f"<font size='10' color='#1f2937'><b>{escape(owner['full_name'])}</b></font><br/>"
             f"<font size='7.5' color='#6b7280'>Copropietario</font><br/><br/>"
-            f"<font size='7.5' color='#4b5563'>✉ {escape(owner.get('email') or '--')}</font><br/>"
-            f"<font size='7.5' color='#4b5563'>📞 {escape(owner.get('phone') or '--')}</font><br/>"
-            f"<font size='7.5' color='#4b5563'>📇 C.I.: {escape(owner.get('document_id') or '--')}</font><br/>"
-            f"<font size='7.5' color='#4b5563'>📅 Fecha de registro: {reg_date_str}</font>"
+            f"<font size='7.5' color='#4b5563'>Email: {escape(owner.get('email') or '--')}</font><br/>"
+            f"<font size='7.5' color='#4b5563'>Tel.: {escape(owner.get('phone') or '--')}</font><br/>"
+            f"<font size='7.5' color='#4b5563'>C.I.: {escape(owner.get('document_id') or '--')}</font><br/>"
+            f"<font size='7.5' color='#4b5563'>Fecha de registro: {reg_date_str}</font>"
         )
         owner_info_p = Paragraph(owner_text, ParagraphStyle("OwnerInfoText", fontName="Helvetica", leading=11))
         
@@ -3872,12 +3889,12 @@ class ReportService:
         apt_status_color = "#1f8f4d" if saldo_actual <= 0 else "#c74444"
         
         unit_summary_data = [
-            [Paragraph("<font size='7.5' color='#4b5563'>🏢 Departamento:</font>", ParagraphStyle("L1")), Paragraph(f"<font size='7.5' color='#1f2937'><b>{apt_code}</b></font>", ParagraphStyle("R1"))],
-            [Paragraph("<font size='7.5' color='#4b5563'>🗼 Torre:</font>", ParagraphStyle("L2")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_tower}</font>", ParagraphStyle("R2"))],
-            [Paragraph("<font size='7.5' color='#4b5563'>📍 Piso:</font>", ParagraphStyle("L3")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_floor}</font>", ParagraphStyle("R3"))],
-            [Paragraph("<font size='7.5' color='#4b5563'>📐 Área del depto:</font>", ParagraphStyle("L4")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_area}</font>", ParagraphStyle("R4"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>Departamento:</font>", ParagraphStyle("L1")), Paragraph(f"<font size='7.5' color='#1f2937'><b>{apt_code}</b></font>", ParagraphStyle("R1"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>Torre:</font>", ParagraphStyle("L2")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_tower}</font>", ParagraphStyle("R2"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>Piso:</font>", ParagraphStyle("L3")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_floor}</font>", ParagraphStyle("R3"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>Área del depto:</font>", ParagraphStyle("L4")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_area}</font>", ParagraphStyle("R4"))],
             [Paragraph("<font size='7.5' color='#4b5563'>% Porcentaje alícuota:</font>", ParagraphStyle("L5")), Paragraph(f"<font size='7.5' color='#1f2937'>{apt_quota}</font>", ParagraphStyle("R5"))],
-            [Paragraph("<font size='7.5' color='#4b5563'>📊 Estado:</font>", ParagraphStyle("L6")), Paragraph(f"<font size='7.5' color='{apt_status_color}'><b>● {apt_status_label}</b></font>", ParagraphStyle("R6"))],
+            [Paragraph("<font size='7.5' color='#4b5563'>Estado:</font>", ParagraphStyle("L6")), Paragraph(f"<font size='7.5' color='{apt_status_color}'><b>● {apt_status_label}</b></font>", ParagraphStyle("R6"))],
         ]
         
         unit_summary_table = Table(unit_summary_data, colWidths=[width * 0.22, width * 0.22])
@@ -3908,7 +3925,7 @@ class ReportService:
         story.append(Spacer(1, 0.12 * cm))
         
         # SECTION 2: INFORMACIÓN DEL DEPARTAMENTO
-        story.append(make_section_title("2. INFORMACIÓN DEL DEPARTAMENTO"))
+        story.append(make_section_title("2", "INFORMACIÓN DEL DEPARTAMENTO"))
         story.append(Spacer(1, 0.15 * cm))
         
         # Replicating department details table (two-column key-value format without image)
@@ -3964,7 +3981,7 @@ class ReportService:
         story.append(Spacer(1, 0.12 * cm))
         
         # SECTION 3: INFORMACIÓN FINANCIERA
-        story.append(make_section_title("3. INFORMACIÓN FINANCIERA"))
+        story.append(make_section_title("3", "INFORMACIÓN FINANCIERA"))
         story.append(Spacer(1, 0.15 * cm))
         header_font_size = 7
         
@@ -3979,7 +3996,7 @@ class ReportService:
             [Paragraph(f"<font size='7' color='#4b5563'>Próximo vencimiento:</font><br/><font size='7.5' color='#1f2937'>{next_due_str}</font>", ParagraphStyle("Item3"))],
             [Paragraph(f"<font size='7' color='#4b5563'>Total alícuotas pagadas:</font><br/><font size='8' color='#1f2937'><b>{self._money(total_pagado)}</b></font>", ParagraphStyle("Item4"))],
             [Paragraph(f"<font size='7' color='#4b5563'>Total en mora:</font><br/><font size='8.5' color='{apt_status_color}'><b>{self._money(saldo_actual)}</b></font>", ParagraphStyle("Item5"))],
-            [Paragraph(f"<font size='6.5' color='#1f8f4d'><b>✓ El copropietario se encuentra al día con sus obligaciones.</b></font>" if saldo_actual <= 0 else f"<font size='6.5' color='#c74444'><b>⚠️ El copropietario registra saldo pendiente de pago.</b></font>", ParagraphStyle("AlertText"))]
+            [Paragraph(f"<font size='6.5' color='#1f8f4d'><b>El copropietario se encuentra al día con sus obligaciones.</b></font>" if saldo_actual <= 0 else f"<font size='6.5' color='#c74444'><b>El copropietario registra saldo pendiente de pago.</b></font>", ParagraphStyle("AlertText"))]
         ]
         resumen_table = Table(resumen_data, colWidths=[width * 0.32])
         resumen_table.setStyle(TableStyle([
@@ -4085,27 +4102,29 @@ class ReportService:
         story.append(Spacer(1, 0.10 * cm))
         
         # SECTION 4: CONTACTOS DE EMERGENCIA
-        story.append(make_section_title("4. CONTACTOS DE EMERGENCIA"))
+        story.append(make_section_title("4", "CONTACTOS DE EMERGENCIA"))
         story.append(Spacer(1, 0.15 * cm))
         
         # Three cards
         contact1_text = (
             f"<font size='8' color='#123c7a'><b>Contacto principal</b></font><br/><br/>"
             f"<font size='7.5' color='#1f2937'><b>{escape(owner['full_name'])}</b></font><br/>"
-            f"<font size='7' color='#4b5563'>📞 {escape(owner.get('phone') or '--')}</font><br/>"
-            f"<font size='7' color='#4b5563'>✉ {escape(owner.get('email') or '--')}</font>"
+            f"<font size='7' color='#4b5563'>Tel.: {escape(owner.get('phone') or '--')}</font><br/>"
+            f"<font size='7' color='#4b5563'>Email: {escape(owner.get('email') or '--')}</font>"
         )
         contact2_text = (
             f"<font size='8' color='#123c7a'><b>Contacto alterno</b></font><br/><br/>"
             f"<font size='7.5' color='#1f2937'><b>{escape(owner.get('occupant_name') or '--')}</b></font><br/>"
             f"<font size='7' color='#4b5563'>Relación: {escape(owner.get('occupant_relation') or '--')}</font><br/>"
-            f"<font size='7' color='#4b5563'>📞 {escape(owner.get('occupant_phone') or '--')}</font>"
+            f"<font size='7' color='#4b5563'>Tel.: {escape(owner.get('occupant_phone') or '--')}</font>"
         )
+        admin_phone = building.get("phone") or "+593 2 398 4500"
+        admin_email = building.get("email") or "administracion@torresnetanya.com"
         contact3_text = (
             f"<font size='8' color='#123c7a'><b>Uso exclusivo de emergencia</b></font><br/><br/>"
             f"<font size='7.5' color='#1f2937'><b>Administración</b></font><br/>"
-            f"<font size='7' color='#4b5563'>📞 +593 2 398 4500</font><br/>"
-            f"<font size='7' color='#4b5563'>✉ administracion@torresnetanya.com</font>"
+            f"<font size='7' color='#4b5563'>Tel.: {escape(admin_phone)}</font><br/>"
+            f"<font size='7' color='#4b5563'>Email: {escape(admin_email)}</font>"
         )
         
         c1_table = Table([[Paragraph(contact1_text, ParagraphStyle("C1T", leading=10))]], colWidths=[width * 0.32])
@@ -4147,7 +4166,7 @@ class ReportService:
         story.append(Spacer(1, 0.08 * cm))
         
         # SECTION 5: OBSERVACIONES
-        story.append(make_section_title("5. OBSERVACIONES"))
+        story.append(make_section_title("5", "OBSERVACIONES"))
         story.append(Spacer(1, 0.15 * cm))
         
         obs_box = Table(
@@ -4169,8 +4188,8 @@ class ReportService:
             width=width,
             building=building,
             document_tag=f"FICHA-{sheet_number}",
-            signer_name=owner.get("full_name") or "Copropietario",
-            signer_role="Copropietario",
+            signer_name="Administración",
+            signer_role="Administrador del edificio",
         )
         story.append(Spacer(1, 0.18 * cm))
         

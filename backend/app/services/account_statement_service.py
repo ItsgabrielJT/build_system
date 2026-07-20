@@ -435,8 +435,8 @@ class AccountStatementService:
                 width=width,
                 building=building,
                 document_tag=f"ESTADO-CUENTA-{owner_id}",
-                signer_name=owner.get("full_name") or "Copropietario",
-                signer_role="Copropietario",
+                signer_name="Administración",
+                signer_role="Administrador del edificio",
                 file_name="estado-cuenta.pdf",
             )
         )
@@ -506,8 +506,8 @@ class AccountStatementService:
                 width=width,
                 building=building,
                 document_tag=verification,
-                signer_name=profile.get("full_name") or "Copropietario",
-                signer_role="Copropietario",
+                signer_name="Administración",
+                signer_role="Administrador del edificio",
                 file_name="certificado-expensas.pdf",
             )
         )

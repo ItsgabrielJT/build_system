@@ -686,8 +686,8 @@ class OwnerPaymentService:
             self._build_signature_grid(
                 building=building,
                 document_tag=document_number,
-                signer_name=owner.get("full_name") or "Copropietario",
-                signer_role="Copropietario",
+                signer_name="Administración",
+                signer_role="Administrador del edificio",
                 file_name=f"{title.lower().replace(' ', '-')}-{payment.get('id') or document_number}.pdf",
             ),
             Spacer(1, 0.16 * inch),

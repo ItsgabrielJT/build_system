@@ -1,22 +1,30 @@
 import styles from './OwnerCamerasPage.module.css';
+import accesoPeatonal from '../../assets/camaras/acceso_peatonal.jpeg';
+import accesoVehicular from '../../assets/camaras/acceso_vehicular.jpeg';
+import parqueaderoInterior from '../../assets/camaras/parqueadero_interior.jpeg';
+import plantaBaja from '../../assets/camaras/planta_baja.jpeg';
 
 export default function OwnerCamerasPage() {
   const cameras = [
     {
       id: 1,
       name: 'Cámara 1 - Ingreso Principal',
+      image: accesoPeatonal,
     },
     {
       id: 2,
       name: 'Cámara 2 - Parqueadero',
+      image: parqueaderoInterior,
     },
     {
       id: 3,
       name: 'Cámara 3 - Lobby Piso 2',
+      image: plantaBaja,
     },
     {
       id: 4,
       name: 'Cámara 4 - Terraza',
+      image: accesoVehicular,
     },
   ];
 
@@ -45,9 +53,10 @@ export default function OwnerCamerasPage() {
         <div className={styles.grid}>
           {cameras.map((camera) => (
             <article key={camera.id} className={styles.camera}>
-              <div className={styles.skeletonBlock} aria-label={`Vista previa de ${camera.name} próximamente`} />
+              <img className={styles.cameraImage} src={camera.image} alt={`Vista previa de ${camera.name}`} />
+              <div className={styles.videoOverlay} aria-hidden="true" />
+              <div className={styles.liveBadge}><span /> En vivo</div>
               <div className={styles.cameraName}><span /> {camera.name}</div>
-              <div className={styles.comingSoonBadge}>Próximamente</div>
               <button className={styles.expandButton} type="button" aria-label={`Expandir ${camera.name}`}>↗</button>
             </article>
           ))}

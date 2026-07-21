@@ -8,22 +8,22 @@ export default function OwnerCamerasPage() {
   const cameras = [
     {
       id: 1,
-      name: 'Cámara 1 - Ingreso Principal',
+      name: 'Cámara 1 - Acceso Peatonal',
       image: accesoPeatonal,
     },
     {
       id: 2,
-      name: 'Cámara 2 - Parqueadero',
+      name: 'Cámara 2 - Parqueadero Interior',
       image: parqueaderoInterior,
     },
     {
       id: 3,
-      name: 'Cámara 3 - Lobby Piso 2',
+      name: 'Cámara 3 - Planta Baja',
       image: plantaBaja,
     },
     {
       id: 4,
-      name: 'Cámara 4 - Terraza',
+      name: 'Cámara 4 - Acceso Vehicular',
       image: accesoVehicular,
     },
   ];

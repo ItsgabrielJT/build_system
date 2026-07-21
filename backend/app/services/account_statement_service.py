@@ -345,8 +345,8 @@ class AccountStatementService:
         width: float,
         building: dict | None,
         document_tag: str,
-        signer_name: str,
-        signer_role: str,
+        signer_name: str = "Franz Guzmán Galarza",
+        signer_role: str = "Administrador 2026-2027",
         file_name: str | None = None,
     ) -> Table:
         qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
@@ -435,8 +435,8 @@ class AccountStatementService:
                 width=width,
                 building=building,
                 document_tag=f"ESTADO-CUENTA-{owner_id}",
-                signer_name="Administración",
-                signer_role="Administrador del edificio",
+                signer_name="Franz Guzmán Galarza",
+                signer_role="Administrador 2026-2027",
                 file_name="estado-cuenta.pdf",
             )
         )
@@ -506,8 +506,8 @@ class AccountStatementService:
                 width=width,
                 building=building,
                 document_tag=verification,
-                signer_name="Administración",
-                signer_role="Administrador del edificio",
+                signer_name="Franz Guzmán Galarza",
+                signer_role="Administrador 2026-2027",
                 file_name="certificado-expensas.pdf",
             )
         )

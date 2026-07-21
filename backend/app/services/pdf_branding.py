@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import escape
@@ -20,6 +19,9 @@ _PRIMARY_BLUE = colors.HexColor("#123c7a")
 _ACCENT_BLUE = colors.HexColor("#dbe7f7")
 _FOOTER_BLUE = colors.HexColor("#002e6d")
 _LIGHT_BORDER = colors.HexColor("#c8d6e8")
+_OFFICIAL_SIGNER_NAME = "Franz Guzmán Galarza"
+_OFFICIAL_SIGNER_ROLE = "Administrador 2026-2027"
+_OFFICIAL_SIGNER_BUILDING = "Edificio Torres Netanya"
 
 
 async def get_default_building_config(conn: Any) -> dict:
@@ -158,8 +160,8 @@ def build_pdf_signature_seal_qr_grid(
     validation_token = create_pdf_validation_token(
         document_id=document_id,
         file_name=display_file_name,
-        generated_by=signer_name or "Usuario del sistema",
-        generated_role=signer_role or "Rol no definido",
+        generated_by=_OFFICIAL_SIGNER_NAME,
+        generated_role=_OFFICIAL_SIGNER_ROLE,
         building_name=get_building_name(building),
         building_id=str(building.get("id") or "") or None,
     )
@@ -171,7 +173,6 @@ def build_pdf_signature_seal_qr_grid(
         verification_hash[8:12],
         verification_hash[12:16],
     ])
-    period_label = f"ADMINISTRACIÓN {datetime.now().year} - {datetime.now().year + 1}"
     signature_width = width * 0.34
     seal_width = width * 0.27
     qr_width = width * 0.39
@@ -180,9 +181,9 @@ def build_pdf_signature_seal_qr_grid(
         [
             [Paragraph('<font size="9.5" color="#123c7a"><b>Atentamente,</b></font>', ParagraphStyle("PdfSignGreeting", fontName="Helvetica-Bold", leading=12, textColor=text_blue))],
             [signature_cell],
-            [Paragraph('<font size="8.5" color="#123c7a"><b>' + escape(signer_name or "Usuario del sistema") + '</b></font>', ParagraphStyle("PdfSignerName", fontName="Helvetica-Bold", leading=10.5, textColor=text_blue))],
-            [Paragraph('<font size="8.5" color="#123c7a">' + escape(signer_role or "Rol no definido") + '</font>', ParagraphStyle("PdfSignerRole", fontName="Helvetica", leading=10.5, textColor=text_blue))],
-            [Paragraph('<font size="8.5" color="#123c7a"><b>' + escape(period_label) + '</b></font>', ParagraphStyle("PdfSignerPeriod", fontName="Helvetica-Bold", leading=11, textColor=text_blue))],
+            [Paragraph('<font size="8.5" color="#123c7a"><b>' + escape(_OFFICIAL_SIGNER_NAME) + '</b></font>', ParagraphStyle("PdfSignerName", fontName="Helvetica-Bold", leading=10.5, textColor=text_blue))],
+            [Paragraph('<font size="8.5" color="#123c7a">' + escape(_OFFICIAL_SIGNER_ROLE) + '</font>', ParagraphStyle("PdfSignerRole", fontName="Helvetica", leading=10.5, textColor=text_blue))],
+            [Paragraph('<font size="8.5" color="#123c7a"><b>' + escape(_OFFICIAL_SIGNER_BUILDING) + '</b></font>', ParagraphStyle("PdfSignerPeriod", fontName="Helvetica-Bold", leading=11, textColor=text_blue))],
         ],
         colWidths=[signature_width],
         rowHeights=[0.28 * inch, 0.54 * inch, 0.20 * inch, 0.20 * inch, 0.28 * inch],

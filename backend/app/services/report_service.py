@@ -488,8 +488,9 @@ class ReportService:
         return [
             Spacer(1, 0.22 * cm),
             line,
-            self._p("La Administración", 12, bold=True),
-            self._p("Período 2026-2027", 10),
+            self._p("Franz Guzmán Galarza", 12, bold=True),
+            self._p("Administrador 2026-2027", 10),
+            self._p("Edificio Torres Netanya", 10),
             Spacer(1, 0.18 * cm),
             build_pdf_footer_bar(building or {}, width=width),
         ]
@@ -521,8 +522,8 @@ class ReportService:
         width: float,
         building: Optional[dict],
         document_tag: str,
-        signer_name: str = "Usuario del sistema",
-        signer_role: str = "Rol no definido",
+        signer_name: str = "Franz Guzmán Galarza",
+        signer_role: str = "Administrador 2026-2027",
         file_name: str | None = None,
     ) -> None:
         story.extend(
@@ -1460,7 +1461,7 @@ class ReportService:
         ]))
         story.append(total_bar)
         
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-INGRESOS", signer_name="La Administración", signer_role="Período 2026-2027")
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-INGRESOS", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -2077,7 +2078,7 @@ class ReportService:
         story.append(comparison_table)
         
         # Signature block & Footer callbacks - original formatting preserved
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-BALANCE", signer_name="Administración", signer_role="Administrador del edificio")
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-BALANCE", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -2394,7 +2395,7 @@ class ReportService:
         ]))
         story.append(comp_table)
         
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-PAGOS", signer_name="La Administración", signer_role="Periodo 2026-2027")
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-PAGOS", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -2696,7 +2697,7 @@ class ReportService:
         ]))
         story.append(comp_table)
         
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-GASTOS", signer_name="La Administración", signer_role="Periodo 2026-2027")
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-GASTOS", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -2773,7 +2774,7 @@ class ReportService:
         story.append(table)
         story.append(Spacer(1, 0.22 * inch))
         story.append(self._p("Reporte generado automáticamente", 8, color="#334155"))
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MOROSIDAD", signer_name="Administración", signer_role="Administrador del edificio")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-MOROSIDAD", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         footer = self._footer_callback(building, doc.width)
 
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
@@ -3407,7 +3408,7 @@ class ReportService:
         ]))
         story.append(comp_table)
         
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-CUOTAS", signer_name="La Administración", signer_role="Periodo 2026-2027")
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-CUOTAS", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -3541,7 +3542,7 @@ class ReportService:
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
         ]))
         story.append(table)
-        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-MULTAS", signer_name="Administración", signer_role="Administrador del edificio")
+        self._append_signature_grid(story, width=width, building=building, document_tag="REPORTE-MULTAS", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         footer = self._footer_callback(building, width)
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
         return output.getvalue()
@@ -3577,7 +3578,7 @@ class ReportService:
         table = Table(data, colWidths=[0.7*inch, 1.25*inch, 0.85*inch, 1.35*inch, 0.8*inch, 0.9*inch, 0.65*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PROPIETARIOS", signer_name="Administración", signer_role="Administrador del edificio")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-PROPIETARIOS", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
@@ -3613,7 +3614,7 @@ class ReportService:
         table = Table(data, colWidths=[0.75*inch, 1.35*inch, 1.5*inch, 0.85*inch, 1.4*inch, 0.75*inch], repeatRows=1)
         table.setStyle(self._table_style(7))
         story.append(table)
-        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-EDIFICIOS", signer_name="Administración", signer_role="Administrador del edificio")
+        self._append_signature_grid(story, width=doc.width, building=building, document_tag="REPORTE-EDIFICIOS", signer_name="Franz Guzmán Galarza", signer_role="Administrador 2026-2027")
         story.extend([Spacer(1, 0.2 * inch), build_pdf_footer_bar(building, width=doc.width)])
         doc.build(story)
         return output.getvalue()
@@ -4188,8 +4189,8 @@ class ReportService:
             width=width,
             building=building,
             document_tag=f"FICHA-{sheet_number}",
-            signer_name="Administración",
-            signer_role="Administrador del edificio",
+            signer_name="Franz Guzmán Galarza",
+            signer_role="Administrador 2026-2027",
         )
         story.append(Spacer(1, 0.18 * cm))
         

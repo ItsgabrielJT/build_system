@@ -19,6 +19,16 @@ function triggerDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+function paymentDateValue(payment) {
+  const value = payment?.paid_at || payment?.date || payment?.created_at;
+  if (!value) return 0;
+  return new Date(`${String(value).slice(0, 10)}T00:00:00`).getTime() || 0;
+}
+
+function sortPaymentsByDateDesc(items) {
+  return [...items].sort((a, b) => paymentDateValue(b) - paymentDateValue(a));
+}
+
 export default function OwnerInicioPage() {
   const navigate = useNavigate();
   const { token } = useAuth();
@@ -124,9 +134,10 @@ export default function OwnerInicioPage() {
 
   // Resolve latest payment
   const paymentTransactions = profile?.recent_transactions?.filter(t => t.type === 'PAYMENT') || [];
-  const latestOwnerPayment = payments.find((payment) => payment.status === 'REGISTRADO') || payments[0];
-  const latestProfilePayment = paymentTransactions[0];
-  const latestPayment = latestOwnerPayment || latestProfilePayment;
+  const latestOwnerPayment = sortPaymentsByDateDesc(payments.filter((payment) => payment.status === 'REGISTRADO'))[0]
+    || sortPaymentsByDateDesc(payments)[0];
+  const latestProfilePayment = sortPaymentsByDateDesc(paymentTransactions)[0];
+  const latestPayment = sortPaymentsByDateDesc([latestOwnerPayment, latestProfilePayment].filter(Boolean))[0];
   const latestPaymentAmount = latestPayment ? formatCurrency(latestPayment.amount) : 'USD 0.00';
   const latestPaymentDate = latestPayment
     ? formatDate(latestPayment.paid_at || latestPayment.date || latestPayment.created_at)

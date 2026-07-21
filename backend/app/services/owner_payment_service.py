@@ -636,8 +636,8 @@ class OwnerPaymentService:
         *,
         building: dict,
         document_tag: str,
-        signer_name: str,
-        signer_role: str,
+        signer_name: str = "Franz Guzmán Galarza",
+        signer_role: str = "Administrador 2026-2027",
         file_name: str | None = None,
     ) -> Table:
         qr_value = f"{document_tag}|{datetime.now().strftime('%Y%m%d%H%M%S')}|{get_building_name(building)}"
@@ -686,8 +686,8 @@ class OwnerPaymentService:
             self._build_signature_grid(
                 building=building,
                 document_tag=document_number,
-                signer_name="Administración",
-                signer_role="Administrador del edificio",
+                signer_name="Franz Guzmán Galarza",
+                signer_role="Administrador 2026-2027",
                 file_name=f"{title.lower().replace(' ', '-')}-{payment.get('id') or document_number}.pdf",
             ),
             Spacer(1, 0.16 * inch),

@@ -121,6 +121,42 @@ describe('OwnerInicioPage', () => {
     expect(screen.getByText('Valor pendiente de pago')).toBeInTheDocument();
   });
 
+  it('shows the latest registered payment by payment date even when API order is older first', async () => {
+    getOwnerProfile.mockResolvedValue({
+      full_name: 'Propietario Demo',
+      apartments: [],
+      balance_consolidated: 0,
+      recent_transactions: [],
+    });
+    getRecentAnnouncements.mockResolvedValue([]);
+    getMyEvents.mockResolvedValue([]);
+    getOwnerPayments.mockResolvedValue([
+      {
+        id: 'pay-old',
+        amount: 16.82,
+        status: 'REGISTRADO',
+        paid_at: '2026-06-01',
+        created_at: '2026-07-20T10:00:00',
+      },
+      {
+        id: 'pay-latest',
+        amount: 40,
+        status: 'REGISTRADO',
+        paid_at: '2026-07-01',
+        created_at: '2026-07-01T10:00:00',
+      },
+    ]);
+
+    render(<OwnerInicioPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Cargando panel de inicio...')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByText('USD 40,00')).toBeInTheDocument();
+    expect(screen.getByText('01/07/2026')).toBeInTheDocument();
+  });
+
   it('redirects to the documents link if configured', async () => {
     const documentsLink = 'https://example.com/docs';
     const { getBuildingConfig } = await import('../../services/buildingService');

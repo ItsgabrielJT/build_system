@@ -170,7 +170,7 @@ class PaymentRepository:
             JOIN apartments a ON p.apartment_id = a.id
             JOIN owners o ON p.owner_id = o.id
             WHERE {' AND '.join(conditions)}
-            ORDER BY p.created_at DESC
+            ORDER BY p.paid_at DESC NULLS LAST, p.created_at DESC
             """,
             *params,
         )

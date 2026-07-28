@@ -186,7 +186,7 @@ async def report_payments(
     compare_period: Optional[str] = None,
     status_filter: Optional[str] = None,
     format: str = "pdf",
-    _user: dict = Depends(require_admin),
+    _user: dict = Depends(require_admin_or_owner),
     db=Depends(get_db),
 ):
     _validate_date_range_or_422(start_date, end_date)

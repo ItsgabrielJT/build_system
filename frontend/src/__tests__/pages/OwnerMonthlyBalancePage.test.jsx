@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import OwnerMonthlyBalancePage from '../../pages/owner/OwnerMonthlyBalancePage';
 import { useMonthlyBalance } from '../../hooks/useMonthlyBalance';
-import { downloadExpensesReport } from '../../services/reportService';
+import { downloadExpensesReport, downloadPaymentsReport } from '../../services/reportService';
 
 vi.mock('../../hooks/useMonthlyBalance', () => ({
   useMonthlyBalance: vi.fn(),
@@ -26,6 +26,7 @@ vi.mock('../../services/reportService', () => ({
   downloadExpensesReport: vi.fn(),
   downloadIncomeReport: vi.fn(),
   downloadOwnerMonthlyBalancePdf: vi.fn(),
+  downloadPaymentsReport: vi.fn(),
 }));
 
 describe('OwnerMonthlyBalancePage', () => {
@@ -63,19 +64,20 @@ describe('OwnerMonthlyBalancePage', () => {
     expect(screen.queryByRole('button', { name: /Exportar/i })).not.toBeInTheDocument();
   });
 
-  it('downloads the expenses detail report when the payments option is selected', async () => {
+  it('downloads the payments report when the payments option is selected', async () => {
     const user = userEvent.setup();
-    downloadExpensesReport.mockResolvedValue(new Blob(['expenses']));
+    downloadPaymentsReport.mockResolvedValue(new Blob(['payments']));
 
     render(<OwnerMonthlyBalancePage />);
 
-    await user.selectOptions(screen.getByDisplayValue('Balance ingresos y egresos'), 'payments');
+    await user.selectOptions(screen.getByLabelText('Reporte'), 'payments');
     await user.click(screen.getByRole('button', { name: /Descargar PDF/i }));
 
-    expect(downloadExpensesReport).toHaveBeenCalledWith('mock-token', {
+    expect(downloadPaymentsReport).toHaveBeenCalledWith('mock-token', {
       start_date: expect.stringMatching(/^\d{4}-\d{2}-01$/),
       end_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       format: 'pdf',
     });
+    expect(downloadExpensesReport).not.toHaveBeenCalled();
   });
 });

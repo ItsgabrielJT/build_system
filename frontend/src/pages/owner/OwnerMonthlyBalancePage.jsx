@@ -8,15 +8,16 @@ import {
   downloadExpensesReport,
   downloadIncomeReport,
   downloadOwnerMonthlyBalancePdf,
+  downloadPaymentsReport,
 } from '../../services/reportService';
 import DownloadIcon from '../../components/icons/DownloadIcon';
 import styles from './OwnerMonthlyBalancePage.module.css';
 
 const REPORT_OPTIONS = [
-  { value: 'income', label: 'Ingresos' },
   { value: 'balance', label: 'Balance ingresos y egresos' },
-  { value: 'payments', label: 'Pagos' },
-  { value: 'expenses', label: 'Gastos' },
+  { value: 'payments', label: 'Pagos (ingresos de copropietarios)' },
+  { value: 'expenses', label: 'Gastos (egresos del edificio)' },
+  { value: 'income', label: 'Ingresos adicionales' },
 ];
 
 function getCurrentMonthPeriod() {
@@ -114,9 +115,9 @@ export default function OwnerMonthlyBalancePage() {
       }
 
       if (selectedReport === 'payments') {
-        const blob = await downloadExpensesReport(token, reportParams);
+        const blob = await downloadPaymentsReport(token, reportParams);
         const suffix = frequency === 'mensual' ? period : `${balanceParams.period}`;
-        triggerDownload(blob, `reporte-detalle-gastos-${suffix}.${extension}`);
+        triggerDownload(blob, `reporte-pagos-${suffix}.${extension}`);
         return;
       }
 

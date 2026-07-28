@@ -86,6 +86,10 @@ class AccountStatementService:
     def _usd(self, value) -> str:
         return f"USD {float(Decimal(str(value or 0))):,.2f}"
 
+    def _quota_percent(self, value) -> str:
+        percent = Decimal(str(value if value is not None else 0)).quantize(Decimal("0.01"))
+        return f"{percent:.2f}".replace(".", ",") + " %"
+
     def _spanish_date(self, value: date) -> str:
         months = [
             "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -379,10 +383,15 @@ class AccountStatementService:
         story.append(Spacer(1, 0.18 * cm))
         owner = profile or {}
         apt = (owner.get("apartments") or [{}])[0]
+        quota_percent = owner.get("allocated_quota_percent")
+        if quota_percent is None:
+            quota_percent = apt.get("owner_allocated_quota_percent")
+        if quota_percent is None:
+            quota_percent = apt.get("allocated_quota_percent")
         owner_box = Table(
             [[
                 self._p(f"<b>{escape(owner.get('full_name') or 'Propietario')}</b><br/>Copropietario<br/><br/>{escape(apt.get('code') or '')} - Torre {escape(str(apt.get('tower') or ''))} - Piso {escape(str(apt.get('floor') or ''))}<br/>{escape(owner.get('email') or '')}<br/>{escape(owner.get('phone') or '')}<br/>C.I.: {escape(owner.get('document_id') or '')}", 9, raw=True),
-                self._p(f"<b>Unidad:</b> {escape(apt.get('code') or '')}<br/><br/><b>Área:</b> {escape(str(apt.get('area_sqm') or ''))} m²<br/><br/><b>Porcentaje de alícuota:</b> 2.45 %<br/><br/><b>Próximo vencimiento:</b> {(date.today().replace(day=1) + timedelta(days=35)).replace(day=settings.due_day).strftime('%d/%m/%Y')}", 9, raw=True),
+                self._p(f"<b>Unidad:</b> {escape(apt.get('code') or '')}<br/><br/><b>Área:</b> {escape(str(apt.get('area_sqm') or ''))} m²<br/><br/><b>Porcentaje de alícuota:</b> {self._quota_percent(quota_percent)}<br/><br/><b>Próximo vencimiento:</b> {(date.today().replace(day=1) + timedelta(days=35)).replace(day=settings.due_day).strftime('%d/%m/%Y')}", 9, raw=True),
             ]],
             colWidths=[width * 0.49, width * 0.49],
         )

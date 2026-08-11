@@ -3,6 +3,12 @@ import { useDelinquency } from '../../hooks/useDelinquency';
 import styles from './AdminDelinquencyPage.module.css';
 
 const money = (value) => `$${Number(value || 0).toLocaleString()}`;
+const PAGE_SIZE = 4;
+const moneyWithCents = (value) => `$${Number(value || 0).toLocaleString(undefined, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})}`;
+const LATE_INTEREST_START_PERIOD = '2026-08';
 
 const IconTrend = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -39,27 +45,6 @@ const IconDownload = () => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="7 10 12 15 17 10" />
     <line x1="12" y1="15" x2="12" y2="3" />
-  </svg>
-);
-
-const IconSend = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="m22 2-7 20-4-9-9-4Z" />
-    <path d="M22 2 11 13" />
-  </svg>
-);
-
-const IconFile = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-    <path d="M14 2v6h6M9 13h6M9 17h3" />
-  </svg>
-);
-
-const IconBell = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </svg>
 );
 
@@ -101,6 +86,28 @@ function AgingBar({ label, percent, color }) {
   );
 }
 
+function interestCell(period) {
+  const startPeriod = period.interes_mora_aplica_desde || LATE_INTEREST_START_PERIOD;
+  const missingRates = period.tasas_faltantes || [];
+  if (period.period < startPeriod) {
+    return <span className={styles.mutedValue}>No aplica</span>;
+  }
+  if (missingRates.length) {
+    return <span className={styles.warningValue}>Falta tasa BCE</span>;
+  }
+  return moneyWithCents(period.interes_mora);
+}
+
+function interestStatus(period) {
+  const startPeriod = period.interes_mora_aplica_desde || LATE_INTEREST_START_PERIOD;
+  const missingRates = period.tasas_faltantes || [];
+  if (period.period < startPeriod) return 'Fuera de vigencia';
+  if (period.status !== 'OVERDUE') return 'Sin mora';
+  if (missingRates.length) return `Registrar tasa ${missingRates.join(', ')}`;
+  if (Number(period.interes_mora || 0) > 0) return 'Interés generado';
+  return 'Pendiente de acumulación';
+}
+
 export default function AdminDelinquencyPage() {
   const {
     delinquentOwners,
@@ -108,11 +115,15 @@ export default function AdminDelinquencyPage() {
     loading,
     error,
     fetchDelinquentOwners,
+    fetchOwnerDetail,
     fetchDelinquencyStats,
   } = useDelinquency();
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState('');
   const [agingFilter, setAgingFilter] = useState('all');
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchDelinquentOwners({ status: 'OVERDUE' });
@@ -164,8 +175,42 @@ export default function AdminDelinquencyPage() {
     });
   }, [agingFilter, search, units]);
 
-  const visibleUnits = filteredUnits.slice(0, 4);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, agingFilter]);
+
+  const totalPages = Math.max(Math.ceil(filteredUnits.length / PAGE_SIZE), 1);
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = (safeCurrentPage - 1) * PAGE_SIZE;
+  const visibleUnits = filteredUnits.slice(pageStart, pageStart + PAGE_SIZE);
   const trendPrefix = summary.debt_change_percent >= 0 ? '+' : '';
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const openDetail = async (unit) => {
+    if (!unit.owner_id) return;
+    setDetailLoading(true);
+    const data = await fetchOwnerDetail(unit.owner_id);
+    if (data) setDetail(data);
+    setDetailLoading(false);
+  };
+
+  const closeDetail = () => setDetail(null);
+
+  const detailPeriods = detail?.apartments?.flatMap((item) => item.periods || []) || [];
+  const detailTotals = detailPeriods.reduce(
+    (acc, period) => ({
+      capital: acc.capital + Number(period.capital_pendiente ?? period.esperado ?? 0),
+      interest: acc.interest + Number(period.interes_mora || 0),
+      fines: acc.fines + Number(period.multas || 0),
+      total: acc.total + Number(period.saldo || 0),
+    }),
+    { capital: 0, interest: 0, fines: 0, total: 0 }
+  );
 
   const exportCsv = () => {
     const headers = ['Unidad', 'Propietario', '30 dias', '60 dias', '90+ dias', 'Total adeudado'];
@@ -259,6 +304,7 @@ export default function AdminDelinquencyPage() {
                   <th>60 Dias</th>
                   <th>90+ Dias</th>
                   <th>Total Adeudado</th>
+                  <th>Detalle</th>
                 </tr>
               </thead>
               <tbody>
@@ -280,11 +326,21 @@ export default function AdminDelinquencyPage() {
                         {money(unit.total_debt)}
                       </strong>
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={styles.detailButton}
+                        onClick={() => openDetail(unit)}
+                        disabled={detailLoading}
+                      >
+                        Ver detalle
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {!loading && visibleUnits.length === 0 && (
                   <tr>
-                    <td colSpan="5" className={styles.emptyState}>No hay unidades morosas con los filtros seleccionados</td>
+                    <td colSpan="6" className={styles.emptyState}>No hay unidades morosas con los filtros seleccionados</td>
                   </tr>
                 )}
               </tbody>
@@ -293,13 +349,24 @@ export default function AdminDelinquencyPage() {
 
           <footer className={styles.tableFooter}>
             <span>
-              Mostrando {visibleUnits.length} de {filteredUnits.length} unidades morosas
+              Mostrando {filteredUnits.length ? pageStart + 1 : 0}-{Math.min(pageStart + visibleUnits.length, filteredUnits.length)} de {filteredUnits.length} unidades morosas
             </span>
             <div className={styles.pagination}>
-              <button aria-label="Anterior">
+              <small>Página {safeCurrentPage} de {totalPages}</small>
+              <button
+                type="button"
+                aria-label="Anterior"
+                disabled={safeCurrentPage <= 1}
+                onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+              >
                 <IconChevron direction="left" />
               </button>
-              <button aria-label="Siguiente">
+              <button
+                type="button"
+                aria-label="Siguiente"
+                disabled={safeCurrentPage >= totalPages}
+                onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+              >
                 <IconChevron />
               </button>
             </div>
@@ -317,22 +384,85 @@ export default function AdminDelinquencyPage() {
             </blockquote>
           </section>
 
-          <section className={styles.actionsCard}>
-            <button disabled>
-              <IconSend />
-              Enviar Recordatorios
-            </button>
-            <button disabled>
-              <IconFile />
-              Generar Reporte de Corte
-            </button>
-            <button>
-              <IconBell />
-              Publicar Lista de Morosos
-            </button>
-          </section>
         </aside>
       </div>
+
+      {detail && (
+        <div className={styles.modalBackdrop} role="presentation" onClick={closeDetail}>
+          <section className={styles.detailModal} role="dialog" aria-modal="true" aria-label="Detalle de morosidad" onClick={(event) => event.stopPropagation()}>
+            <header className={styles.detailHeader}>
+              <div>
+                <h2>{detail.full_name}</h2>
+                <p>{detail.email || 'Sin correo registrado'}</p>
+              </div>
+              <button type="button" onClick={closeDetail} aria-label="Cerrar detalle">×</button>
+            </header>
+
+            <div className={styles.interestExplanation}>
+              <div>
+                <strong>Interés por mora</strong>
+                <p>Se genera automáticamente desde el día siguiente al vencimiento, solo sobre capital vencido. La tasa BCE configurada es anual y se divide para 365; no se calcula interés sobre interés.</p>
+              </div>
+              <span>Aplica desde {LATE_INTEREST_START_PERIOD}</span>
+            </div>
+
+            <div className={styles.detailSummaryGrid}>
+              <article>
+                <span>Capital vencido</span>
+                <strong>{moneyWithCents(detailTotals.capital)}</strong>
+              </article>
+              <article>
+                <span>Interés por mora</span>
+                <strong>{moneyWithCents(detailTotals.interest)}</strong>
+              </article>
+              <article>
+                <span>Multas</span>
+                <strong>{moneyWithCents(detailTotals.fines)}</strong>
+              </article>
+              <article>
+                <span>Total pendiente</span>
+                <strong>{moneyWithCents(detailTotals.total)}</strong>
+              </article>
+            </div>
+
+            {detail.apartments?.map((item) => (
+              <div className={styles.detailBlock} key={item.apartment.id}>
+                <h3>Unidad {item.apartment.code}</h3>
+                <div className={styles.detailTableWrap}>
+                  <table className={styles.detailTable}>
+                    <thead>
+                      <tr>
+                        <th>Periodo</th>
+                        <th>Capital vencido</th>
+                        <th>Interés por mora</th>
+                        <th>Situación mora</th>
+                        <th>Multas</th>
+                        <th>Pagado</th>
+                        <th>Total pendiente</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {item.periods.map((period) => (
+                        <tr key={`${item.apartment.id}-${period.period}`}>
+                          <td>{period.period}</td>
+                          <td>{moneyWithCents(period.capital_pendiente ?? period.esperado)}</td>
+                          <td>{interestCell(period)}</td>
+                          <td>{interestStatus(period)}</td>
+                          <td>{moneyWithCents(period.multas)}</td>
+                          <td>{moneyWithCents(period.pagado)}</td>
+                          <td><strong>{moneyWithCents(period.saldo)}</strong></td>
+                          <td>{period.status === 'OVERDUE' ? 'Vencido' : 'Al día'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

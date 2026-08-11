@@ -7,10 +7,11 @@ from typing import Optional
 from uuid import UUID
 from xml.sax.saxutils import escape
 
-from app.config.settings import settings
 from app.repositories.delinquency_repository import DelinquencyRepository
+from app.repositories.financial_settings_repository import FinancialSettingsRepository
 from app.repositories.owner_repository import OwnerRepository
 from app.services.delinquency_service import _period_status, _saldo
+from app.services.late_interest_service import calculate_late_interest, period_due_date
 from app.services.pdf_branding import (
     build_pdf_footer_bar,
     build_pdf_signature_seal_qr_grid,
@@ -58,14 +59,30 @@ class AccountStatementService:
         rows = await self._delinquency_repo.get_statement_data(
             owner_id, start_period, end_period
         )
+        financial_repo = FinancialSettingsRepository(self._delinquency_repo._conn)
+        due_day = await financial_repo.get_due_day()
+        rates = await financial_repo.get_interest_rate_map()
         result = []
         for row in rows:
+            interest_result = calculate_late_interest(
+                principal=Decimal(str(row["esperado"] or 0)),
+                period=row["period"],
+                due_day=due_day,
+                annual_rates_by_period=rates,
+                payments=row.get("pagos_capital") or [],
+            )
+            interes_mora = Decimal(str(interest_result["interest"]))
+            capital_pendiente = max(
+                Decimal(str(row["esperado"])) - Decimal(str(row["pagado"])),
+                Decimal("0"),
+            )
             s = _saldo(
                 Decimal(str(row["esperado"])),
                 Decimal(str(row["multas"])),
                 Decimal(str(row["pagado"])),
+                interes_mora,
             )
-            ps = _period_status(row["period"], s, settings.due_day, Decimal(str(row["esperado"])))
+            ps = _period_status(row["period"], s, due_day, Decimal(str(row["esperado"])))
             result.append(
                 {
                     "period": row["period"],
@@ -73,6 +90,10 @@ class AccountStatementService:
                     "apartment_code": row["apartment_code"],
                     "esperado": float(row["esperado"]),
                     "multas": float(row["multas"]),
+                    "interes_mora": float(interes_mora),
+                    "capital_pendiente": float(capital_pendiente),
+                    "interes_mora_inicio": interest_result["starts_at"].isoformat(),
+                    "tasas_faltantes": interest_result["missing_rate_periods"],
                     "pagado": float(row["pagado"]),
                     "saldo": float(s),
                     "status": ps,
@@ -365,6 +386,8 @@ class AccountStatementService:
 
     async def statement_pdf(self, owner_id: UUID, start_period: Optional[str], end_period: Optional[str]) -> bytes:
         rows = await self.get_statement(owner_id, start_period, end_period)
+        financial_repo = FinancialSettingsRepository(self._delinquency_repo._conn)
+        due_day = await financial_repo.get_due_day()
         profile = await self._owner_profile(owner_id)
         building = await get_default_building_config(self._owner_repo._conn)
         output = io.BytesIO()
@@ -388,10 +411,12 @@ class AccountStatementService:
             quota_percent = apt.get("owner_allocated_quota_percent")
         if quota_percent is None:
             quota_percent = apt.get("allocated_quota_percent")
+        next_month = date.today().replace(day=1) + timedelta(days=35)
+        next_due_date = period_due_date(f"{next_month.year:04d}-{next_month.month:02d}", due_day)
         owner_box = Table(
             [[
                 self._p(f"<b>{escape(owner.get('full_name') or 'Propietario')}</b><br/>Copropietario<br/><br/>{escape(apt.get('code') or '')} - Torre {escape(str(apt.get('tower') or ''))} - Piso {escape(str(apt.get('floor') or ''))}<br/>{escape(owner.get('email') or '')}<br/>{escape(owner.get('phone') or '')}<br/>C.I.: {escape(owner.get('document_id') or '')}", 9, raw=True),
-                self._p(f"<b>Unidad:</b> {escape(apt.get('code') or '')}<br/><br/><b>Área:</b> {escape(str(apt.get('area_sqm') or ''))} m²<br/><br/><b>Porcentaje de alícuota:</b> {self._quota_percent(quota_percent)}<br/><br/><b>Próximo vencimiento:</b> {(date.today().replace(day=1) + timedelta(days=35)).replace(day=settings.due_day).strftime('%d/%m/%Y')}", 9, raw=True),
+                self._p(f"<b>Unidad:</b> {escape(apt.get('code') or '')}<br/><br/><b>Área:</b> {escape(str(apt.get('area_sqm') or ''))} m²<br/><br/><b>Porcentaje de alícuota:</b> {self._quota_percent(quota_percent)}<br/><br/><b>Próximo vencimiento:</b> {next_due_date.strftime('%d/%m/%Y')}", 9, raw=True),
             ]],
             colWidths=[width * 0.49, width * 0.49],
         )
@@ -400,6 +425,7 @@ class AccountStatementService:
         totals = {
             "esperado": sum(Decimal(str(r.get("esperado", 0))) for r in rows),
             "multas": sum(Decimal(str(r.get("multas", 0))) for r in rows),
+            "interes_mora": sum(Decimal(str(r.get("interes_mora", 0))) for r in rows),
             "pagado": sum(Decimal(str(r.get("pagado", 0))) for r in rows),
             "saldo": sum(Decimal(str(r.get("saldo", 0))) for r in rows),
         }
@@ -415,25 +441,25 @@ class AccountStatementService:
         summary = Table([[
             self._p(saldo_text, 8, color=saldo_color, raw=True),
             self._p(f"Total ingresos<br/><font size='14'><b>{self._money(totals['pagado'])}</b></font>", 8, color="#159447", raw=True),
-            self._p(f"Total egresos<br/><font size='14'><b>-{self._money(totals['esperado'] + totals['multas'])}</b></font>", 8, color="#c91f1f", raw=True),
+            self._p(f"Interés por mora<br/><font size='14'><b>{self._money(totals['interes_mora'])}</b></font>", 8, color="#c91f1f", raw=True),
             self._p(f"Total pagos realizados<br/><font size='14'><b>{self._money(totals['pagado'])}</b></font>", 8, color="#1f5bd8", raw=True),
         ]], colWidths=[width / 4] * 4)
         summary.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#d4dfef")), ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#d4dfef")), ("BACKGROUND", (0, 0), (-1, -1), colors.white), ("TOPPADDING", (0, 0), (-1, -1), 12), ("BOTTOMPADDING", (0, 0), (-1, -1), 12)]))
         story.append(summary)
         story.append(Spacer(1, 0.3 * cm))
         story.append(self._p("DETALLE DE MOVIMIENTOS", 10, bold=True, color="#0c42a0"))
-        data = [["PERIODO", "DEPARTAMENTO", "ESPERADO", "MULTAS", "PAGADO", "SALDO", "ESTADO"]]
+        data = [["PERIODO", "DEPTO.", "CAPITAL", "INTERES MORA", "MULTAS", "PAGADO", "SALDO", "ESTADO"]]
         for row in rows:
             s_val = Decimal(str(row["saldo"]))
             s_str = f"{self._money(abs(s_val))} A favor" if s_val < 0 else self._money(s_val)
-            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["multas"]), self._money(row["pagado"]), s_str, self._status_label(row["status"])])
+            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["interes_mora"]), self._money(row["multas"]), self._money(row["pagado"]), s_str, self._status_label(row["status"])])
         
         total_s_val = totals["saldo"]
         total_s_str = f"{self._money(abs(total_s_val))} A favor" if total_s_val < 0 else self._money(total_s_val)
-        data.append(["TOTALES DEL PERIODO", "", self._money(totals["esperado"]), self._money(totals["multas"]), self._money(totals["pagado"]), total_s_str, ""])
-        story.append(self._blue_table(data, [2.4 * cm, 3 * cm, 2.4 * cm, 2.2 * cm, 2.4 * cm, 2.4 * cm, 3.2 * cm], font_size=7, total_rows=[len(data) - 1]))
+        data.append(["TOTALES", "", self._money(totals["esperado"]), self._money(totals["interes_mora"]), self._money(totals["multas"]), self._money(totals["pagado"]), total_s_str, ""])
+        story.append(self._blue_table(data, [1.9 * cm, 2.1 * cm, 2.1 * cm, 2.4 * cm, 2.0 * cm, 2.1 * cm, 2.2 * cm, 2.7 * cm], font_size=6.4, total_rows=[len(data) - 1]))
         story.append(Spacer(1, 0.35 * cm))
-        important = Table([[self._p("INFORMACIÓN IMPORTANTE<br/><br/>El vencimiento de la alícuota es el día 5 de cada mes.<br/>Realiza tus pagos a tiempo para evitar recargos.<br/>Si tienes alguna duda, contáctanos a través del sistema.", 8, raw=True)]], colWidths=[width])
+        important = Table([[self._p(f"INFORMACIÓN IMPORTANTE<br/><br/>El vencimiento de la alícuota es el día {due_day} de cada mes. Desde el día siguiente al vencimiento se genera interés por mora sobre el capital vencido, usando la tasa activa anual BCE vigente por mes. No se generan intereses sobre intereses.<br/>Si tienes alguna duda, contáctanos a través del sistema.", 8, raw=True)]], colWidths=[width])
         important.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#d4dfef")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 12), ("BOTTOMPADDING", (0, 0), (-1, -1), 12)]))
         story.append(important)
         story.append(Spacer(1, 0.35 * cm))
@@ -458,9 +484,12 @@ class AccountStatementService:
         if not profile:
             raise ValueError("Propietario no encontrado")
         building = await get_default_building_config(self._owner_repo._conn)
+        due_day = await FinancialSettingsRepository(self._owner_repo._conn).get_due_day()
         apt = (profile.get("apartments") or [{}])[0]
         balance = Decimal(str(profile.get("balance") or 0))
         last_payment = profile.get("last_payment") or {}
+        next_month = date.today().replace(day=1) + timedelta(days=35)
+        next_due_date = period_due_date(f"{next_month.year:04d}-{next_month.month:02d}", due_day)
         verification = f"TN-EXP-{date.today().year}-{str(owner_id).split('-')[0].upper()}"
         output = io.BytesIO()
         width = A4[0] - 2 * cm
@@ -497,7 +526,7 @@ class AccountStatementService:
         valid_rows = [
             [self._p("VALIDACIÓN FINANCIERA", 10, bold=True, color="#ffffff", align="CENTER"), ""],
             [self._p(f"<b>Estado de cuenta:</b> <font color='{status_color}'>{status_label.title()}</font>", 8, raw=True), self._p("<b>Periodo validado:</b> " + date.today().strftime("%m/%Y"), 8, raw=True)],
-            [self._p("<b>Saldo pendiente:</b> " + self._usd(max(balance, Decimal("0"))), 8, raw=True), self._p("<b>Próximo vencimiento:</b> " + (date.today().replace(day=1) + timedelta(days=35)).replace(day=settings.due_day).strftime("%d/%m/%Y"), 8, raw=True)],
+            [self._p("<b>Saldo pendiente:</b> " + self._usd(max(balance, Decimal("0"))), 8, raw=True), self._p("<b>Próximo vencimiento:</b> " + next_due_date.strftime("%d/%m/%Y"), 8, raw=True)],
             [self._p("<b>Último pago registrado:</b> " + (last_payment.get("paid_at").strftime("%d/%m/%Y") if last_payment.get("paid_at") else "Sin pagos"), 8, raw=True), self._p("<b>Observación:</b> " + ("Sin valores vencidos" if balance <= 0 else "Registra valores pendientes"), 8, raw=True)],
         ]
         valid_table = Table(valid_rows, colWidths=[width * 0.5, width * 0.5])

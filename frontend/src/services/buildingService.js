@@ -84,3 +84,26 @@ export async function getBuildingAssetBlob(buildingId, assetType, token) {
   });
   return res.data;
 }
+
+export async function getFinancialSettings(token) {
+  const res = await axios.get(`${API_BASE}/api/v1/financial-settings`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export async function updateDueDay(dueDay, token) {
+  const res = await axios.put(`${API_BASE}/api/v1/financial-settings/due-day`, {
+    due_day: Number(dueDay),
+  }, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export async function upsertInterestRate(data, token) {
+  const res = await axios.post(`${API_BASE}/api/v1/financial-settings/interest-rates`, data, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}

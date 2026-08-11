@@ -48,10 +48,11 @@ export default function OwnerAccountStatementPage() {
     (acc, row) => ({
       esperado: acc.esperado + (row.esperado || 0),
       multas: acc.multas + (row.multas || 0),
+      interes_mora: acc.interes_mora + (row.interes_mora || 0),
       pagado: acc.pagado + (row.pagado || 0),
       saldo: acc.saldo + (row.saldo || 0),
     }),
-    { esperado: 0, multas: 0, pagado: 0, saldo: 0 }
+    { esperado: 0, multas: 0, interes_mora: 0, pagado: 0, saldo: 0 }
   );
   const periodsInDebt = statement.filter((row) => Number(row.saldo || 0) > 0).length;
   const periodsPaid = statement.filter((row) => Number(row.saldo || 0) <= 0).length;
@@ -152,9 +153,10 @@ export default function OwnerAccountStatementPage() {
                 <th className={styles.th}>Período</th>
                 <th className={styles.th}>Departamento</th>
                 <th className={styles.th}>Esperado</th>
+                <th className={styles.th}>Interés por mora</th>
                 <th className={styles.th}>Multas</th>
                 <th className={styles.th}>Pagado</th>
-                <th className={styles.th}>Saldo</th>
+                <th className={styles.th}>Total pendiente</th>
                 <th className={styles.th}>Estado</th>
               </tr>
             </thead>
@@ -164,6 +166,7 @@ export default function OwnerAccountStatementPage() {
                   <td className={styles.td}>{row.period}</td>
                   <td className={styles.td}>{row.apartment_code}</td>
                   <td className={styles.td}>{formatCurrency(row.esperado)}</td>
+                  <td className={styles.td}>{formatCurrency(row.interes_mora)}</td>
                   <td className={styles.td}>{formatCurrency(row.multas)}</td>
                   <td className={styles.td}>{formatCurrency(row.pagado)}</td>
                   <td className={styles.td}>
@@ -182,6 +185,7 @@ export default function OwnerAccountStatementPage() {
                 <tr className={styles.totalsRow}>
                   <td className={styles.tdTotals} colSpan={2}>TOTALES</td>
                   <td className={styles.tdTotals}>{formatCurrency(totals.esperado)}</td>
+                  <td className={styles.tdTotals}>{formatCurrency(totals.interes_mora)}</td>
                   <td className={styles.tdTotals}>{formatCurrency(totals.multas)}</td>
                   <td className={styles.tdTotals}>{formatCurrency(totals.pagado)}</td>
                   <td className={styles.tdTotals}>

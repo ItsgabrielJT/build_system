@@ -240,6 +240,78 @@
   cursor: not-allowed;
 }
 
+.financialForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.inlineActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.inlineActions button {
+  min-height: 38px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inlineActions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rateHistory {
+  margin-top: 18px;
+  overflow-x: auto;
+}
+
+.rateHistory h3 {
+  margin-bottom: 10px;
+  color: var(--color-gray-700);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.rateHistory table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rateHistory th,
+.rateHistory td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-gray-200);
+  color: var(--color-gray-700);
+  text-align: left;
+}
+
+.rateHistory th {
+  background: var(--color-gray-50);
+  color: var(--color-gray-500);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.emptyInline {
+  padding: 12px;
+  border: 1px dashed var(--color-gray-300);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-gray-50);
+  color: var(--color-gray-500);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .loading,
 .emptyState {
   display: flex;

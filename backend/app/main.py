@@ -19,6 +19,7 @@ from app.routes import (
     events,
     expenses,
     fines,
+    financial_settings,
     incomes,
     owner_notifications,
     owner_payments,
@@ -68,6 +69,7 @@ app.include_router(apartment_fees.router, prefix=PREFIX)
 app.include_router(payments.router, prefix=PREFIX)
 app.include_router(incomes.router, prefix=PREFIX)
 app.include_router(fines.router, prefix=PREFIX)
+app.include_router(financial_settings.router, prefix=PREFIX)
 app.include_router(expenses.router, prefix=PREFIX)
 app.include_router(delinquency.router, prefix=PREFIX)
 app.include_router(account_statement.router, prefix=PREFIX)

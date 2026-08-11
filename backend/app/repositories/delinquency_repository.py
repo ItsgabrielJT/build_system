@@ -9,7 +9,7 @@ _PERIOD_DATA_QUERY = """
     WITH all_periods AS (
         SELECT apartment_id, period FROM apartment_fees
         UNION
-        SELECT apartment_id, period FROM payments
+        SELECT apartment_id, period FROM payments WHERE fine_id IS NULL
         UNION
         SELECT apartment_id, period FROM fines
     ),
@@ -28,7 +28,19 @@ _PERIOD_DATA_QUERY = """
             period, 
             COALESCE(SUM(amount), 0) AS total_payments
         FROM payments
-        WHERE status = 'REGISTRADO'
+        WHERE status = 'REGISTRADO' AND fine_id IS NULL
+        GROUP BY apartment_id, period
+    ),
+    fee_payments AS (
+        SELECT
+            apartment_id,
+            period,
+            jsonb_agg(
+                jsonb_build_object('paid_at', paid_at, 'amount', amount)
+                ORDER BY paid_at ASC
+            ) AS payments
+        FROM payments
+        WHERE status = 'REGISTRADO' AND fine_id IS NULL
         GROUP BY apartment_id, period
     )
     SELECT
@@ -42,7 +54,8 @@ _PERIOD_DATA_QUERY = """
         ap.period,
         COALESCE(af.amount, 0) AS esperado,
         COALESCE(f.total_fines, 0) AS multas,
-        COALESCE(p.total_payments, 0) AS pagado
+        COALESCE(p.total_payments, 0) AS pagado,
+        COALESCE(fp.payments, '[]'::jsonb) AS pagos_capital
     FROM owners o
     JOIN owner_apartments oa ON o.id = oa.owner_id
     JOIN apartments        a  ON oa.apartment_id = a.id
@@ -50,6 +63,7 @@ _PERIOD_DATA_QUERY = """
     LEFT JOIN apartment_fees af ON af.apartment_id = a.id AND af.period = ap.period
     LEFT JOIN agg_fines      f  ON  f.apartment_id = a.id AND  f.period = ap.period
     LEFT JOIN agg_payments   p  ON  p.apartment_id = a.id AND  p.period = ap.period
+    LEFT JOIN fee_payments   fp ON fp.apartment_id = a.id AND fp.period = ap.period
     WHERE o.status = 'ACTIVO'
 """
 
@@ -99,7 +113,7 @@ class DelinquencyRepository:
                 WITH all_periods AS (
                     SELECT apartment_id, period FROM apartment_fees WHERE period <= $2
                     UNION
-                    SELECT apartment_id, period FROM payments WHERE status = 'REGISTRADO' AND TO_CHAR(paid_at, 'YYYY-MM') <= $2
+                    SELECT apartment_id, period FROM payments WHERE status = 'REGISTRADO' AND fine_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $2
                     UNION
                     SELECT apartment_id, period FROM fines WHERE status != 'ANULADA' AND status != 'ANULADO' AND period <= $2
                 ),
@@ -118,7 +132,19 @@ class DelinquencyRepository:
                         period, 
                         COALESCE(SUM(amount), 0) AS total_payments
                     FROM payments
-                    WHERE status = 'REGISTRADO' AND TO_CHAR(paid_at, 'YYYY-MM') <= $2
+                    WHERE status = 'REGISTRADO' AND fine_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $2
+                    GROUP BY apartment_id, period
+                ),
+                fee_payments AS (
+                    SELECT
+                        apartment_id,
+                        period,
+                        jsonb_agg(
+                            jsonb_build_object('paid_at', paid_at, 'amount', amount)
+                            ORDER BY paid_at ASC
+                        ) AS payments
+                    FROM payments
+                    WHERE status = 'REGISTRADO' AND fine_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $2
                     GROUP BY apartment_id, period
                 )
                 SELECT
@@ -132,7 +158,8 @@ class DelinquencyRepository:
                     ap.period,
                     COALESCE(af.amount, 0) AS esperado,
                     COALESCE(f.total_fines, 0) AS multas,
-                    COALESCE(p.total_payments, 0) AS pagado
+                    COALESCE(p.total_payments, 0) AS pagado,
+                    COALESCE(fp.payments, '[]'::jsonb) AS pagos_capital
                 FROM owners o
                 JOIN owner_apartments oa ON o.id = oa.owner_id
                 JOIN apartments        a  ON oa.apartment_id = a.id
@@ -140,6 +167,7 @@ class DelinquencyRepository:
                 LEFT JOIN apartment_fees af ON af.apartment_id = a.id AND af.period = ap.period
                 LEFT JOIN agg_fines      f  ON  f.apartment_id = a.id AND  f.period = ap.period
                 LEFT JOIN agg_payments   p  ON  p.apartment_id = a.id AND  p.period = ap.period
+                LEFT JOIN fee_payments   fp ON fp.apartment_id = a.id AND fp.period = ap.period
                 WHERE o.status = 'ACTIVO' AND o.id = $1
             """
             params.append(end_period)

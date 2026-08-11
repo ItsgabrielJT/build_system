@@ -5,7 +5,10 @@ import { useNotification } from '../../context/NotificationContext';
 import {
   getBuildingAssetBlob,
   getBuildingConfig,
+  getFinancialSettings,
+  updateDueDay,
   updateBuildingConfig,
+  upsertInterestRate,
 } from '../../services/buildingService';
 import styles from './AdminSettingsPage.module.css';
 
@@ -33,6 +36,16 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [financialSettings, setFinancialSettings] = useState({
+    due_day: 5,
+    interest_rates: [],
+  });
+  const [rateForm, setRateForm] = useState({
+    period: new Date().toISOString().slice(0, 7),
+    annual_rate_percent: '',
+    source: 'Banco Central del Ecuador',
+  });
+  const [savingFinancial, setSavingFinancial] = useState(false);
   const [assetPreviews, setAssetPreviews] = useState({
     photo: null,
     logo: null,
@@ -72,6 +85,25 @@ export default function AdminSettingsPage() {
       cancelled = true;
     };
   }, [building, token]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFinancialSettings() {
+      if (!token) return;
+      try {
+        const settings = await getFinancialSettings(token);
+        if (!cancelled) setFinancialSettings(settings);
+      } catch {
+        if (!cancelled) setError('Error al cargar la configuración financiera.');
+      }
+    }
+
+    loadFinancialSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!building) return;
@@ -163,6 +195,16 @@ export default function AdminSettingsPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleDueDayChange = (event) => {
+    const dueDay = event.target.value;
+    setFinancialSettings((prev) => ({ ...prev, due_day: dueDay }));
+  };
+
+  const handleRateChange = (event) => {
+    const { name, value } = event.target;
+    setRateForm((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleFileChange = (event) => {
     const { name, files } = event.target;
     setAssetFiles((prev) => ({ ...prev, [name]: files?.[0] || null }));
@@ -192,6 +234,41 @@ export default function AdminSettingsPage() {
       toastError(message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleFinancialSubmit = async (event) => {
+    event.preventDefault();
+    setSavingFinancial(true);
+    setError(null);
+    try {
+      const dueDay = Number(financialSettings.due_day);
+      if (dueDay < 1 || dueDay > 31) {
+        throw new Error('El día de vencimiento debe estar entre 1 y 31.');
+      }
+
+      await updateDueDay(dueDay, token);
+      let savedRate = null;
+      if (rateForm.annual_rate_percent !== '') {
+        savedRate = await upsertInterestRate({
+          period: rateForm.period,
+          annual_rate_percent: Number(rateForm.annual_rate_percent),
+          source: rateForm.source || 'Banco Central del Ecuador',
+        }, token);
+      }
+
+      const settings = await getFinancialSettings(token);
+      setFinancialSettings(settings);
+      if (savedRate) {
+        setRateForm((prev) => ({ ...prev, annual_rate_percent: '' }));
+      }
+      success('Configuración financiera guardada');
+    } catch (err) {
+      const message = err.response?.data?.detail || err.message || 'Error al guardar la configuración financiera.';
+      setError(message);
+      toastError(message);
+    } finally {
+      setSavingFinancial(false);
     }
   };
 
@@ -271,6 +348,88 @@ export default function AdminSettingsPage() {
                       placeholder="Ej. https://drive.google.com/..."
                     />
                   </label>
+                </div>
+              </section>
+
+              <section className={styles.panel}>
+                <h2>Alícuotas e interés por mora</h2>
+                <div className={styles.financialForm}>
+                  <div className={styles.grid}>
+                    <label className={styles.field}>
+                      <span>Día de vencimiento de la alícuota</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        name="due_day"
+                        value={financialSettings.due_day}
+                        onChange={handleDueDayChange}
+                      />
+                    </label>
+
+                    <label className={styles.field}>
+                      <span>Período de tasa BCE</span>
+                      <input
+                        type="month"
+                        name="period"
+                        value={rateForm.period}
+                        onChange={handleRateChange}
+                      />
+                    </label>
+
+                    <label className={styles.field}>
+                      <span>Tasa activa anual (%)</span>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        min="0"
+                        name="annual_rate_percent"
+                        value={rateForm.annual_rate_percent}
+                        onChange={handleRateChange}
+                        placeholder="Ej. 6.79"
+                      />
+                    </label>
+
+                    <label className={styles.field}>
+                      <span>Fuente</span>
+                      <input
+                        name="source"
+                        value={rateForm.source}
+                        onChange={handleRateChange}
+                      />
+                    </label>
+                  </div>
+                  <div className={styles.inlineActions}>
+                    <button type="button" disabled={savingFinancial} onClick={handleFinancialSubmit}>
+                      {savingFinancial ? 'Guardando...' : 'Guardar fecha y tasa'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.rateHistory}>
+                  <h3>Historial de tasas aplicadas</h3>
+                  {financialSettings.interest_rates?.length ? (
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Período</th>
+                          <th>Tasa anual</th>
+                          <th>Fuente</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {financialSettings.interest_rates.slice(0, 12).map((rate) => (
+                          <tr key={rate.id || rate.period}>
+                            <td>{rate.period}</td>
+                            <td>{Number(rate.annual_rate_percent || 0).toFixed(6)}%</td>
+                            <td>{rate.source || 'Banco Central del Ecuador'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className={styles.emptyInline}>Sin tasas registradas.</div>
+                  )}
                 </div>
               </section>
 

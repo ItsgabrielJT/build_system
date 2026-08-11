@@ -6,12 +6,18 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
-from app.config.settings import settings
 from app.repositories.delinquency_repository import DelinquencyRepository
+from app.repositories.financial_settings_repository import FinancialSettingsRepository
+from app.services.late_interest_service import LATE_INTEREST_START_PERIOD, calculate_late_interest
 
 
-def _saldo(esperado: Decimal, multas: Decimal, pagado: Decimal) -> Decimal:
-    return esperado + multas - pagado
+def _saldo(
+    esperado: Decimal,
+    multas: Decimal,
+    pagado: Decimal,
+    interes_mora: Decimal = Decimal("0"),
+) -> Decimal:
+    return esperado + multas + interes_mora - pagado
 
 
 def _period_status(period: str, saldo: Decimal, due_day: int, esperado: Decimal = Decimal("0")) -> str:
@@ -55,18 +61,48 @@ class DelinquencyService:
     def __init__(self, repo: DelinquencyRepository) -> None:
         self._repo = repo
 
+    async def _financial_context(self) -> tuple[int, dict[str, Decimal]]:
+        financial_repo = FinancialSettingsRepository(self._repo._conn)
+        return await financial_repo.get_due_day(), await financial_repo.get_interest_rate_map()
+
+    def _interest_for_row(
+        self,
+        row: dict,
+        due_day: int,
+        rates: dict[str, Decimal],
+    ) -> Decimal:
+        result = self._interest_result_for_row(row, due_day, rates)
+        return Decimal(str(result["interest"]))
+
+    def _interest_result_for_row(
+        self,
+        row: dict,
+        due_day: int,
+        rates: dict[str, Decimal],
+    ) -> dict:
+        return calculate_late_interest(
+            principal=Decimal(str(row["esperado"] or 0)),
+            period=row["period"],
+            due_day=due_day,
+            annual_rates_by_period=rates,
+            payments=row.get("pagos_capital") or [],
+        )
+
     async def list_owners(self, status_filter: Optional[str] = None) -> list[dict]:
         rows = await self._repo.get_all_period_data()
+        due_day, rates = await self._financial_context()
         owners: dict[UUID, dict] = {}
 
         for row in rows:
+            interes_mora = self._interest_for_row(row, due_day, rates)
             oid = row["owner_id"]
             s = _saldo(
                 Decimal(str(row["esperado"])),
                 Decimal(str(row["multas"])),
                 Decimal(str(row["pagado"])),
+                interes_mora,
             )
-            ps = _period_status(row["period"], s, settings.due_day, Decimal(str(row["esperado"])))
+            ps = _period_status(row["period"], s, due_day, Decimal(str(row["esperado"])))
 
             if oid not in owners:
                 owners[oid] = {
@@ -102,6 +138,7 @@ class DelinquencyService:
     async def get_stats(self) -> dict:
         rows = await self._repo.get_all_period_data()
         total_apartments = await self._repo.get_active_apartment_count()
+        due_day, rates = await self._financial_context()
 
         if not rows:
             return {
@@ -152,12 +189,14 @@ class DelinquencyService:
         previous_period_debt = Decimal("0")
 
         for row in rows:
+            interes_mora = self._interest_for_row(row, due_day, rates)
             s = _saldo(
                 Decimal(str(row["esperado"])),
                 Decimal(str(row["multas"])),
                 Decimal(str(row["pagado"])),
+                interes_mora,
             )
-            if _period_status(row["period"], s, settings.due_day, Decimal(str(row["esperado"]))) != "OVERDUE":
+            if _period_status(row["period"], s, due_day, Decimal(str(row["esperado"]))) != "OVERDUE":
                 continue
 
             if row["period"] == latest_period:
@@ -166,7 +205,7 @@ class DelinquencyService:
                 previous_period_debt += s
 
             aid = row["apartment_id"]
-            bucket = _aging_bucket(row["period"], settings.due_day)
+            bucket = _aging_bucket(row["period"], due_day)
             aging_amounts[bucket] += s
 
             if aid not in units:
@@ -232,18 +271,22 @@ class DelinquencyService:
         rows = await self._repo.get_period_data_for_owner(owner_id)
         if not rows:
             return None
+        due_day, rates = await self._financial_context()
 
         first = rows[0]
         apartments: dict[UUID, dict] = {}
 
         for row in rows:
             aid = row["apartment_id"]
+            interest_result = self._interest_result_for_row(row, due_day, rates)
+            interes_mora = Decimal(str(interest_result["interest"]))
             s = _saldo(
                 Decimal(str(row["esperado"])),
                 Decimal(str(row["multas"])),
                 Decimal(str(row["pagado"])),
+                interes_mora,
             )
-            ps = _period_status(row["period"], s, settings.due_day, Decimal(str(row["esperado"])))
+            ps = _period_status(row["period"], s, due_day, Decimal(str(row["esperado"])))
 
             if aid not in apartments:
                 apartments[aid] = {
@@ -260,6 +303,16 @@ class DelinquencyService:
                     "period": row["period"],
                     "esperado": float(row["esperado"]),
                     "multas": float(row["multas"]),
+                    "interes_mora": float(interes_mora),
+                    "interes_mora_inicio": interest_result["starts_at"].isoformat(),
+                    "tasas_faltantes": interest_result["missing_rate_periods"],
+                    "interes_mora_aplica_desde": LATE_INTEREST_START_PERIOD,
+                    "capital_pendiente": float(
+                        max(
+                            Decimal(str(row["esperado"])) - Decimal(str(row["pagado"])),
+                            Decimal("0"),
+                        )
+                    ),
                     "pagado": float(row["pagado"]),
                     "saldo": float(s),
                     "status": ps,

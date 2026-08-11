@@ -301,7 +301,7 @@ export default function AdminFeesPage() {
 
   const getFeeStatus = (fee) => {
     const paid = Number(fee.paid_amount || 0);
-    const pending = Number(fee.pending_amount || 0);
+    const pending = Number(fee.total_pending_amount ?? fee.pending_amount ?? 0);
     const credit = Number(fee.credit_amount || 0);
     if (credit > 0) return { label: `Saldo a favor ${formatMoney(credit)}`, className: styles.inlineBadge_CREDIT };
     if (pending > 0 && paid > 0) return { label: `Debe ${formatMoney(pending)}`, className: styles.inlineBadge_PENDIENTE };
@@ -673,7 +673,9 @@ export default function AdminFeesPage() {
                         <th className={styles.th}>Torre</th>
                         <th className={styles.th}>Saldo anterior</th>
                         <th className={styles.th}>Cuota</th>
+                        <th className={styles.th}>Interés mora</th>
                         <th className={styles.th}>Pagado mes</th>
+                        <th className={styles.th}>Total pendiente</th>
                         <th className={styles.th}>Estado</th>
                         <th className={styles.th}>Acciones</th>
                       </tr>
@@ -681,7 +683,7 @@ export default function AdminFeesPage() {
                     <tbody>
                       {detailFees.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
+                          <td colSpan={11} className={styles.td} style={{ textAlign: 'center', color: 'var(--color-gray-400)' }}>
                             Sin cuotas registradas en este período
                           </td>
                         </tr>
@@ -718,7 +720,9 @@ export default function AdminFeesPage() {
                                   formatMoney(fee.amount)
                                 )}
                               </td>
+                              <td className={styles.td}>{formatMoney(fee.late_interest_amount || 0)}</td>
                               <td className={styles.td}>{formatMoney(fee.paid_amount || 0)}</td>
+                              <td className={styles.td}>{formatMoney(fee.total_pending_amount ?? fee.pending_amount ?? 0)}</td>
                               <td className={styles.td}>
                                 <span className={`${styles.inlineBadge} ${status.className}`}>
                                   {status.label}

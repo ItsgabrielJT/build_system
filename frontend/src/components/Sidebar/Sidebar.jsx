@@ -152,6 +152,7 @@ const ADMIN_LINKS = [
   { to: '/admin/apartments', label: 'Departamentos', Icon: IconApartments },
   { to: '/admin/fees', label: 'Alicuotas', Icon: IconFees },
   { to: '/admin/payments', label: 'Pagos', Icon: IconPayments },
+  { to: '/admin/delinquency', label: 'Morosidad', Icon: IconDelinquency },
   { to: '/admin/incomes', label: 'Otros Ingresos', Icon: IconIncomes },
   { to: '/admin/fines', label: 'Multas', Icon: IconFines },
   { to: '/admin/expenses', label: 'Gastos', Icon: IconExpenses },

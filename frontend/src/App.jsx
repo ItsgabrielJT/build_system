@@ -11,6 +11,7 @@ import AdminFinesPage from './pages/admin/AdminFinesPage';
 import AdminExpensesPage from './pages/admin/AdminExpensesPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
+import AdminDelinquencyPage from './pages/admin/AdminDelinquencyPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import OwnersDirectoryPage from './pages/admin/OwnersDirectoryPage';
 import OwnerApartmentsPage from './pages/owner/OwnerApartmentsPage';
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="apartments" element={<DepartmentsPage />} />
         <Route path="fees" element={<AdminFeesPage />} />
         <Route path="payments" element={<AdminPaymentsPage />} />
+        <Route path="delinquency" element={<AdminDelinquencyPage />} />
         <Route path="incomes" element={<AdminIncomesPage />} />
         <Route path="fines" element={<AdminFinesPage />} />
         <Route path="expenses" element={<AdminExpensesPage />} />

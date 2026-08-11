@@ -17,8 +17,10 @@ from app.models.schemas import (
     OwnerAssign,
 )
 from app.repositories.apartment_repository import ApartmentRepository
+from app.repositories.financial_settings_repository import FinancialSettingsRepository
 from app.repositories.owner_repository import OwnerRepository
 from app.services.apartment_service import ApartmentService
+from app.services.late_interest_service import calculate_late_interest
 
 router = APIRouter(tags=["apartments"])
 
@@ -201,7 +203,8 @@ async def get_apartment_pending_debts(
             af.id,
             af.period,
             af.amount,
-            COALESCE(p.paid_amount, 0) AS paid_amount
+            COALESCE(p.paid_amount, 0) AS paid_amount,
+            COALESCE(fp.payments, '[]'::jsonb) AS pagos_capital
         FROM apartment_fees af
         LEFT JOIN (
             SELECT apartment_id, period, SUM(amount) AS paid_amount
@@ -209,27 +212,71 @@ async def get_apartment_pending_debts(
             WHERE status IN ('REGISTRADO', 'PENDIENTE_APROBACION') AND fine_id IS NULL
             GROUP BY apartment_id, period
         ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
+        LEFT JOIN (
+            SELECT
+                apartment_id,
+                period,
+                jsonb_agg(
+                    jsonb_build_object('paid_at', paid_at, 'amount', amount)
+                    ORDER BY paid_at ASC
+                ) AS payments
+            FROM payments
+            WHERE status IN ('REGISTRADO', 'PENDIENTE_APROBACION') AND fine_id IS NULL
+            GROUP BY apartment_id, period
+        ) fp ON fp.apartment_id = af.apartment_id AND fp.period = af.period
         WHERE af.apartment_id = $1
         ORDER BY af.period ASC
         """,
         apartment_id,
     )
 
+    financial_repo = FinancialSettingsRepository(db)
+    due_day = await financial_repo.get_due_day()
+    rates = await financial_repo.get_interest_rate_map()
     pending_fees = []
     credit = Decimal("0")
     for row in fee_rows:
         amount = Decimal(str(row["amount"] or 0))
         paid_amount = Decimal(str(row["paid_amount"] or 0))
         net = amount - paid_amount - credit
+        interest_result = calculate_late_interest(
+            principal=amount,
+            period=row["period"],
+            due_day=due_day,
+            annual_rates_by_period=rates,
+            payments=row.get("pagos_capital") or [],
+        )
+        interest_amount = Decimal(str(interest_result["interest"]))
         if net <= 0:
             credit = abs(net)
+            unpaid_interest = max(interest_amount - credit, Decimal("0"))
+            credit = max(credit - interest_amount, Decimal("0"))
+            if unpaid_interest <= 0:
+                continue
+            pending_fees.append({
+                "id": str(row["id"]),
+                "period": row["period"],
+                "amount": float(unpaid_interest),
+                "capital_amount": 0.0,
+                "interest_amount": float(unpaid_interest),
+                "total_amount": float(unpaid_interest),
+                "interest_starts_at": interest_result["starts_at"].isoformat(),
+                "missing_interest_rate_periods": interest_result["missing_rate_periods"],
+                "description": f"Interés por mora - Período {row['period']}",
+            })
             continue
         credit = Decimal("0")
+        total_due = net + interest_amount
         pending_fees.append({
             "id": str(row["id"]),
             "period": row["period"],
-            "amount": float(net),
-            "description": f"Cuota - Período {row['period']}",
+            "amount": float(total_due),
+            "capital_amount": float(net),
+            "interest_amount": float(interest_amount),
+            "total_amount": float(total_due),
+            "interest_starts_at": interest_result["starts_at"].isoformat(),
+            "missing_interest_rate_periods": interest_result["missing_rate_periods"],
+            "description": f"Alícuota - Período {row['period']}",
         })
     
     fines = await db.fetch(

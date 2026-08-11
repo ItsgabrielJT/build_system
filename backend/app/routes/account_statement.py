@@ -52,7 +52,16 @@ async def export_account_statement(
 
     rows = await service.get_statement(resolved_id, start_period, end_period)
 
-    headers_row = ["Período", "Departamento", "Esperado", "Multas", "Pagado", "Saldo", "Estado"]
+    headers_row = [
+        "Período",
+        "Departamento",
+        "Capital",
+        "Interés por mora",
+        "Multas",
+        "Pagado",
+        "Total pendiente",
+        "Estado",
+    ]
 
     if format == "excel":
         import io
@@ -76,6 +85,7 @@ async def export_account_statement(
                 row["period"],
                 row["apartment_code"],
                 row["esperado"],
+                row["interes_mora"],
                 row["multas"],
                 row["pagado"],
                 row["saldo"],
@@ -109,6 +119,7 @@ async def export_account_statement(
                 row["period"],
                 row["apartment_code"],
                 row["esperado"],
+                row["interes_mora"],
                 row["multas"],
                 row["pagado"],
                 row["saldo"],

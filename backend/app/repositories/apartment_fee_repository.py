@@ -8,6 +8,8 @@ from uuid import UUID
 import asyncpg
 
 from app.models.schemas import ApartmentFeeCreate
+from app.repositories.financial_settings_repository import FinancialSettingsRepository
+from app.services.late_interest_service import calculate_late_interest, period_due_date
 
 
 class ApartmentFeeRepository:
@@ -29,7 +31,8 @@ class ApartmentFeeRepository:
                 f.period,
                 f.amount,
                 f.created_at,
-                COALESCE(p.paid_amount, 0) AS paid_amount
+                COALESCE(p.paid_amount, 0) AS paid_amount,
+                COALESCE(fp.payments, '[]'::jsonb) AS pagos_capital
             FROM apartment_fees f
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
@@ -37,11 +40,26 @@ class ApartmentFeeRepository:
                 WHERE status = 'REGISTRADO' AND fine_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $1
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = f.apartment_id AND p.period = f.period
+            LEFT JOIN (
+                SELECT
+                    apartment_id,
+                    period,
+                    jsonb_agg(
+                        jsonb_build_object('paid_at', paid_at, 'amount', amount)
+                        ORDER BY paid_at ASC
+                    ) AS payments
+                FROM payments
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $1
+                GROUP BY apartment_id, period
+            ) fp ON fp.apartment_id = f.apartment_id AND fp.period = f.period
             WHERE f.period <= $1
             ORDER BY f.apartment_id, f.period
             """,
             period,
         )
+        financial_repo = FinancialSettingsRepository(self._conn)
+        due_day = await financial_repo.get_due_day()
+        rates = await financial_repo.get_interest_rate_map()
         balances: dict[UUID, Decimal] = {}
         result: list[dict] = []
 
@@ -63,6 +81,17 @@ class ApartmentFeeRepository:
             row["prior_credit_amount"] = balance_before if balance_before > 0 else Decimal("0")
             row["pending_amount"] = abs(balance_after) if balance_after < 0 else Decimal("0")
             row["credit_amount"] = balance_after if balance_after > 0 else Decimal("0")
+            interest_result = calculate_late_interest(
+                principal=amount,
+                period=row["period"],
+                due_day=due_day,
+                annual_rates_by_period=rates,
+                payments=row.get("pagos_capital") or [],
+            )
+            row["late_interest_amount"] = interest_result["interest"]
+            row["total_pending_amount"] = row["pending_amount"] + interest_result["interest"]
+            row["interest_starts_at"] = interest_result["starts_at"]
+            row["missing_interest_rate_periods"] = interest_result["missing_rate_periods"]
             row["is_paid"] = balance_after >= 0
             result.append(row)
 
@@ -254,19 +283,13 @@ class ApartmentFeeRepository:
             "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre",
         }
 
+        due_day = await FinancialSettingsRepository(self._conn).get_due_day()
         data = []
         for r in rows:
             p = r["period"]
             year_p, month_p = p.split("-")
             label = f"{_MONTHS[month_p]} {year_p}"
-
-            month_int = int(month_p)
-            year_int = int(year_p)
-            if month_int == 12:
-                venc_year, venc_month = year_int + 1, 1
-            else:
-                venc_year, venc_month = year_int, month_int + 1
-            vencimiento = f"{venc_year:04d}-{venc_month:02d}-10"
+            vencimiento = period_due_date(p, due_day).isoformat()
 
             total_emitido = Decimal(str(r["total_emitido"]))
             total_recaudado = Decimal(str(r["total_recaudado"]))

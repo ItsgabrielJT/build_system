@@ -77,6 +77,14 @@ const formatCurrency = (value) => `$${Number(value || 0).toLocaleString(undefine
   maximumFractionDigits: 2,
 })}`;
 
+const formatFeeDebtLabel = (debt) => {
+  const interest = Number(debt.interest_amount || 0);
+  const capital = Number(debt.capital_amount || debt.amount || 0);
+  const total = Number(debt.amount || 0);
+  if (interest <= 0) return `${debt.description} (${formatCurrency(total)})`;
+  return `${debt.description} (${formatCurrency(capital)} capital + ${formatCurrency(interest)} interés por mora)`;
+};
+
 const formatDate = (value) => {
   if (!value) return 'Sin fecha';
   return new Intl.DateTimeFormat('es', {
@@ -335,7 +343,7 @@ export default function AdminPaymentsPage() {
         label: 'Cuotas pendientes',
         options: formPendingDebts.cuotas.map((c) => ({
           value: `cuota:${c.id}`,
-          label: `${c.description} (${formatCurrency(c.amount)})`,
+          label: formatFeeDebtLabel(c),
         })),
       });
     }

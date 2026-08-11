@@ -42,6 +42,14 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
+const formatFeeDebtLabel = (debt) => {
+  const interest = Number(debt.interest_amount || 0);
+  const capital = Number(debt.capital_amount || debt.amount || 0);
+  const total = Number(debt.amount || 0);
+  if (interest <= 0) return `${debt.description} (${formatCurrency(total)})`;
+  return `${debt.description} (${formatCurrency(capital)} capital + ${formatCurrency(interest)} interés por mora)`;
+};
+
 const formatDate = (value) => {
   if (!value) return 'Sin fecha';
   return new Intl.DateTimeFormat('es', {
@@ -314,7 +322,7 @@ export default function OwnerPaymentsPage() {
                   <option value="">Seleccione un concepto</option>
                   {pendingDebts.cuotas.length > 0 && (
                     <optgroup label="Cuotas pendientes">
-                      {pendingDebts.cuotas.map((c) => <option key={`cuota:${c.id}`} value={`cuota:${c.id}`}>{c.description} ({formatCurrency(c.amount)})</option>)}
+                      {pendingDebts.cuotas.map((c) => <option key={`cuota:${c.id}`} value={`cuota:${c.id}`}>{formatFeeDebtLabel(c)}</option>)}
                     </optgroup>
                   )}
                   {pendingDebts.multas.length > 0 && (

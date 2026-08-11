@@ -506,6 +506,8 @@ class PeriodBalance(BaseModel):
     period: str
     esperado: float
     multas: float
+    interes_mora: float = 0.0
+    capital_pendiente: float = 0.0
     pagado: float
     saldo: float
     status: str
@@ -549,6 +551,8 @@ class AccountStatementRow(BaseModel):
     apartment_code: str
     esperado: float
     multas: float
+    interes_mora: float = 0.0
+    capital_pendiente: float = 0.0
     pagado: float
     saldo: float
     status: str

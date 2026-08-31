@@ -44,6 +44,8 @@ async def create_owner_payment(
     amount: str = Form(...),
     method: Optional[str] = Form(None),
     reference: Optional[str] = Form(None),
+    fine_id: Optional[UUID] = Form(None),
+    other_charge_id: Optional[UUID] = Form(None),
     proof_file: UploadFile = File(...),
     user: dict = Depends(require_owner),
     db=Depends(get_db),
@@ -59,6 +61,8 @@ async def create_owner_payment(
         amount=Decimal(amount),
         method=method,
         reference=reference,
+        fine_id=fine_id,
+        other_charge_id=other_charge_id,
     )
     service = _build_service(db)
     return await service.create_payment(

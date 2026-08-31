@@ -67,6 +67,7 @@ const INITIAL_FORM = {
   method: 'transferencia',
   reference: '',
   fine_id: '',
+  other_charge_id: '',
 };
 
 export default function OwnerPaymentsPage() {
@@ -90,7 +91,7 @@ export default function OwnerPaymentsPage() {
   const [successMsg, setSuccessMsg] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
 
-  const [pendingDebts, setPendingDebts] = useState({ cuotas: [], multas: [] });
+  const [pendingDebts, setPendingDebts] = useState({ cuotas: [], otros_cobros: [], multas: [] });
   const [selectedDebt, setSelectedDebt] = useState('');
 
   // Filters & Pagination
@@ -108,7 +109,7 @@ export default function OwnerPaymentsPage() {
 
   useEffect(() => {
     if (!form.apartment_id) {
-      setPendingDebts({ cuotas: [], multas: [] });
+      setPendingDebts({ cuotas: [], otros_cobros: [], multas: [] });
       setSelectedDebt('');
       return;
     }
@@ -119,7 +120,7 @@ export default function OwnerPaymentsPage() {
         setSelectedDebt('');
       })
       .catch(() => {
-        setPendingDebts({ cuotas: [], multas: [] });
+        setPendingDebts({ cuotas: [], otros_cobros: [], multas: [] });
         setSelectedDebt('');
       });
   }, [form.apartment_id, token]);
@@ -133,6 +134,7 @@ export default function OwnerPaymentsPage() {
         period: getCurrentMonth(),
         amount: '',
         fine_id: '',
+        other_charge_id: '',
       }));
       return;
     }
@@ -146,6 +148,18 @@ export default function OwnerPaymentsPage() {
           period: selected.period,
           amount: selected.amount.toString(),
           fine_id: '',
+          other_charge_id: '',
+        }));
+      }
+    } else if (type === 'otros_cobros') {
+      const selected = (pendingDebts.otros_cobros || []).find((c) => c.id === id);
+      if (selected) {
+        setForm((prev) => ({
+          ...prev,
+          period: selected.period,
+          amount: selected.amount.toString(),
+          fine_id: '',
+          other_charge_id: selected.id,
         }));
       }
     } else if (type === 'multas') {
@@ -156,6 +170,7 @@ export default function OwnerPaymentsPage() {
           period: selected.period,
           amount: selected.amount.toString(),
           fine_id: selected.id,
+          other_charge_id: '',
         }));
       }
     }
@@ -192,6 +207,7 @@ export default function OwnerPaymentsPage() {
       data.append('method', form.method);
       if (form.reference) data.append('reference', form.reference);
       if (form.fine_id) data.append('fine_id', form.fine_id);
+      if (form.other_charge_id) data.append('other_charge_id', form.other_charge_id);
       data.append('proof_file', proofFile);
 
       await submitPayment(data);
@@ -244,6 +260,7 @@ export default function OwnerPaymentsPage() {
 
   const firstApartment = apartments[0];
   const pendingTotal = pendingDebts.cuotas.reduce((sum, debt) => sum + Number(debt.amount || 0), 0)
+    + (pendingDebts.otros_cobros || []).reduce((sum, debt) => sum + Number(debt.amount || 0), 0)
     + pendingDebts.multas.reduce((sum, debt) => sum + Number(debt.amount || 0), 0);
   const reviewTotal = payments
     .filter((payment) => payment.status === 'PENDIENTE' || payment.status === 'EN_REVISION')
@@ -328,6 +345,11 @@ export default function OwnerPaymentsPage() {
                   {pendingDebts.multas.length > 0 && (
                     <optgroup label="Multas activas">
                       {pendingDebts.multas.map((m) => <option key={`multas:${m.id}`} value={`multas:${m.id}`}>{m.description} ({formatCurrency(m.amount)})</option>)}
+                    </optgroup>
+                  )}
+                  {(pendingDebts.otros_cobros || []).length > 0 && (
+                    <optgroup label="Otros cobros pendientes">
+                      {pendingDebts.otros_cobros.map((c) => <option key={`otros_cobros:${c.id}`} value={`otros_cobros:${c.id}`}>{c.description} ({formatCurrency(c.amount)})</option>)}
                     </optgroup>
                   )}
                 </select>

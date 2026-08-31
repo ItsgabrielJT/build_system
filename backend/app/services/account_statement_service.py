@@ -76,9 +76,10 @@ class AccountStatementService:
                 Decimal(str(row["esperado"])) - Decimal(str(row["pagado"])),
                 Decimal("0"),
             )
+            otros_cobros = Decimal(str(row.get("otros_cobros") or 0))
             s = _saldo(
                 Decimal(str(row["esperado"])),
-                Decimal(str(row["multas"])),
+                Decimal(str(row["multas"])) + otros_cobros,
                 Decimal(str(row["pagado"])),
                 interes_mora,
             )
@@ -90,6 +91,7 @@ class AccountStatementService:
                     "apartment_code": row["apartment_code"],
                     "esperado": float(row["esperado"]),
                     "multas": float(row["multas"]),
+                    "otros_cobros": float(otros_cobros),
                     "interes_mora": float(interes_mora),
                     "capital_pendiente": float(capital_pendiente),
                     "interes_mora_inicio": interest_result["starts_at"].isoformat(),
@@ -144,13 +146,13 @@ class AccountStatementService:
             return None
         balance = await self._owner_repo._conn.fetchval(
             """
-            SELECT COALESCE(SUM(af.amount - COALESCE(p.paid_amount, 0) + COALESCE(f.fine_amount, 0)), 0)
+            SELECT COALESCE(SUM(af.amount - COALESCE(p.paid_amount, 0) + COALESCE(f.fine_amount, 0) + COALESCE(oc.other_charge_amount, 0)), 0)
             FROM owner_apartments oa
             JOIN apartment_fees af ON af.apartment_id = oa.apartment_id
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
                 FROM payments
-                WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
+                WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL AND other_charge_id IS NULL
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             LEFT JOIN (
@@ -159,6 +161,11 @@ class AccountStatementService:
                 WHERE status = 'ACTIVA'
                 GROUP BY apartment_id, period
             ) f ON f.apartment_id = af.apartment_id AND f.period = af.period
+            LEFT JOIN (
+                SELECT apartment_id, period, SUM(amount) AS other_charge_amount
+                FROM other_charges
+                GROUP BY apartment_id, period
+            ) oc ON oc.apartment_id = af.apartment_id AND oc.period = af.period
             WHERE oa.owner_id = $1
             """,
             owner_id,
@@ -425,6 +432,7 @@ class AccountStatementService:
         totals = {
             "esperado": sum(Decimal(str(r.get("esperado", 0))) for r in rows),
             "multas": sum(Decimal(str(r.get("multas", 0))) for r in rows),
+            "otros_cobros": sum(Decimal(str(r.get("otros_cobros", 0))) for r in rows),
             "interes_mora": sum(Decimal(str(r.get("interes_mora", 0))) for r in rows),
             "pagado": sum(Decimal(str(r.get("pagado", 0))) for r in rows),
             "saldo": sum(Decimal(str(r.get("saldo", 0))) for r in rows),
@@ -448,16 +456,16 @@ class AccountStatementService:
         story.append(summary)
         story.append(Spacer(1, 0.3 * cm))
         story.append(self._p("DETALLE DE MOVIMIENTOS", 10, bold=True, color="#0c42a0"))
-        data = [["PERIODO", "DEPTO.", "CAPITAL", "INTERES MORA", "MULTAS", "PAGADO", "SALDO", "ESTADO"]]
+        data = [["PERIODO", "DEPTO.", "CAPITAL", "OTROS COBROS", "INTERES MORA", "MULTAS", "PAGADO", "SALDO", "ESTADO"]]
         for row in rows:
             s_val = Decimal(str(row["saldo"]))
             s_str = f"{self._money(abs(s_val))} A favor" if s_val < 0 else self._money(s_val)
-            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row["interes_mora"]), self._money(row["multas"]), self._money(row["pagado"]), s_str, self._status_label(row["status"])])
+            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row.get("otros_cobros", 0)), self._money(row["interes_mora"]), self._money(row["multas"]), self._money(row["pagado"]), s_str, self._status_label(row["status"])])
         
         total_s_val = totals["saldo"]
         total_s_str = f"{self._money(abs(total_s_val))} A favor" if total_s_val < 0 else self._money(total_s_val)
-        data.append(["TOTALES", "", self._money(totals["esperado"]), self._money(totals["interes_mora"]), self._money(totals["multas"]), self._money(totals["pagado"]), total_s_str, ""])
-        story.append(self._blue_table(data, [1.9 * cm, 2.1 * cm, 2.1 * cm, 2.4 * cm, 2.0 * cm, 2.1 * cm, 2.2 * cm, 2.7 * cm], font_size=6.4, total_rows=[len(data) - 1]))
+        data.append(["TOTALES", "", self._money(totals["esperado"]), self._money(totals["otros_cobros"]), self._money(totals["interes_mora"]), self._money(totals["multas"]), self._money(totals["pagado"]), total_s_str, ""])
+        story.append(self._blue_table(data, [1.55 * cm, 1.55 * cm, 1.85 * cm, 1.95 * cm, 1.9 * cm, 1.65 * cm, 1.75 * cm, 1.85 * cm, 1.95 * cm], font_size=5.8, total_rows=[len(data) - 1]))
         story.append(Spacer(1, 0.35 * cm))
         important = Table([[self._p(f"INFORMACIÓN IMPORTANTE<br/><br/>El vencimiento de la alícuota es el día {due_day} de cada mes. Desde el día siguiente al vencimiento se genera interés por mora sobre el capital vencido, usando la tasa activa anual BCE vigente por mes. No se generan intereses sobre intereses.<br/>Si tienes alguna duda, contáctanos a través del sistema.", 8, raw=True)]], colWidths=[width])
         important.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#d4dfef")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 12), ("TOPPADDING", (0, 0), (-1, -1), 12), ("BOTTOMPADDING", (0, 0), (-1, -1), 12)]))

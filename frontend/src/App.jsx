@@ -5,6 +5,7 @@ import AdminLayout from './layouts/AdminLayout';
 import OwnerLayout from './layouts/OwnerLayout';
 import LoginPage from './pages/LoginPage';
 import AdminFeesPage from './pages/admin/AdminFeesPage';
+import AdminOtherChargesPage from './pages/admin/AdminOtherChargesPage';
 import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
 import AdminIncomesPage from './pages/admin/AdminIncomesPage';
 import AdminFinesPage from './pages/admin/AdminFinesPage';
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="owners" element={<OwnersDirectoryPage />} />
         <Route path="apartments" element={<DepartmentsPage />} />
         <Route path="fees" element={<AdminFeesPage />} />
+        <Route path="other-charges" element={<AdminOtherChargesPage />} />
         <Route path="payments" element={<AdminPaymentsPage />} />
         <Route path="delinquency" element={<AdminDelinquencyPage />} />
         <Route path="incomes" element={<AdminIncomesPage />} />

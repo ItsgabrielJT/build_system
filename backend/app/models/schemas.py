@@ -271,6 +271,95 @@ class ApartmentFeeResponse(BaseModel):
     created_at: datetime
 
 
+# ─── OTHER CHARGES ────────────────────────────────────────────────────────────
+
+class OtherChargeCreate(BaseModel):
+    apartment_id: UUID
+    period: str
+    concept: str
+    amount: Decimal
+    periodicity: str = "MENSUAL"
+
+    @field_validator("period")
+    @classmethod
+    def validate_period(cls, v: str) -> str:
+        return _validate_period(v)
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
+
+    @field_validator("periodicity")
+    @classmethod
+    def validate_periodicity(cls, v: str) -> str:
+        value = (v or "").upper()
+        if value not in {"MENSUAL", "SEMESTRAL", "ANUAL"}:
+            raise ValueError("Periodicidad inválida")
+        return value
+
+
+class OtherChargeUpdate(BaseModel):
+    concept: Optional[str] = None
+    amount: Optional[Decimal] = None
+    periodicity: Optional[str] = None
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        if v is not None and v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
+
+    @field_validator("periodicity")
+    @classmethod
+    def validate_periodicity(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        value = v.upper()
+        if value not in {"MENSUAL", "SEMESTRAL", "ANUAL"}:
+            raise ValueError("Periodicidad inválida")
+        return value
+
+
+class BulkOtherChargeItem(BaseModel):
+    apartment_id: UUID
+    amount: Decimal
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
+
+
+class BulkOtherChargeCreate(BaseModel):
+    period: str
+    concept: str
+    periodicity: str = "MENSUAL"
+    charges: List[BulkOtherChargeItem]
+
+    @field_validator("period")
+    @classmethod
+    def validate_period(cls, v: str) -> str:
+        return _validate_period(v)
+
+    @field_validator("periodicity")
+    @classmethod
+    def validate_periodicity(cls, v: str) -> str:
+        value = (v or "").upper()
+        if value not in {"MENSUAL", "SEMESTRAL", "ANUAL"}:
+            raise ValueError("Periodicidad inválida")
+        return value
+
+
+class BulkOtherChargeDeleteRequest(BaseModel):
+    charge_ids: List[UUID]
+
+
 # ─── OWNER PAYMENT (SPEC-008) ─────────────────────────────────────────────────
 
 class OwnerPaymentCreate(BaseModel):
@@ -281,6 +370,7 @@ class OwnerPaymentCreate(BaseModel):
     method: Optional[str] = None
     reference: Optional[str] = None
     fine_id: Optional[UUID] = None
+    other_charge_id: Optional[UUID] = None
 
     @field_validator("period")
     @classmethod
@@ -310,6 +400,7 @@ class PaymentCreate(BaseModel):
     method: Optional[str] = None
     reference: Optional[str] = None
     fine_id: Optional[UUID] = None
+    other_charge_id: Optional[UUID] = None
 
     @field_validator("period")
     @classmethod
@@ -334,6 +425,7 @@ class PaymentResponse(BaseModel):
     apartment_code: Optional[str] = None
     owner_name: Optional[str] = None
     fine_id: Optional[UUID] = None
+    other_charge_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
 

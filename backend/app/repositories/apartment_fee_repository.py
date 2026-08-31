@@ -37,7 +37,7 @@ class ApartmentFeeRepository:
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
                 FROM payments
-                WHERE status = 'REGISTRADO' AND fine_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $1
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL AND other_charge_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $1
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = f.apartment_id AND p.period = f.period
             LEFT JOIN (
@@ -49,7 +49,7 @@ class ApartmentFeeRepository:
                         ORDER BY paid_at ASC
                     ) AS payments
                 FROM payments
-                WHERE status = 'REGISTRADO' AND fine_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $1
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL AND other_charge_id IS NULL AND TO_CHAR(paid_at, 'YYYY-MM') <= $1
                 GROUP BY apartment_id, period
             ) fp ON fp.apartment_id = f.apartment_id AND fp.period = f.period
             WHERE f.period <= $1
@@ -179,7 +179,7 @@ class ApartmentFeeRepository:
         total_emitido = Decimal(str(row["total"]))
 
         row = await self._conn.fetchrow(
-            "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE period = $1 AND status = 'REGISTRADO' AND fine_id IS NULL",
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE period = $1 AND status = 'REGISTRADO' AND fine_id IS NULL AND other_charge_id IS NULL",
             period,
         )
         total_recaudado = Decimal(str(row["total"]))
@@ -199,7 +199,7 @@ class ApartmentFeeRepository:
             LEFT JOIN (
                 SELECT apartment_id, period, COALESCE(SUM(amount), 0) AS pagado
                 FROM payments
-                WHERE status = 'REGISTRADO' AND fine_id IS NULL
+                WHERE status = 'REGISTRADO' AND fine_id IS NULL AND other_charge_id IS NULL
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             WHERE af.period < $1
@@ -266,7 +266,7 @@ class ApartmentFeeRepository:
                 ON p.apartment_id = af.apartment_id
                 AND p.period = af.period
                 AND p.status = 'REGISTRADO'
-                AND p.fine_id IS NULL
+                AND p.fine_id IS NULL AND p.other_charge_id IS NULL
             WHERE ($1::int IS NULL OR SUBSTRING(af.period, 1, 4)::int = $1)
             GROUP BY af.period
             ORDER BY af.period DESC

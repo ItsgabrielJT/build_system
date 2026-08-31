@@ -211,7 +211,7 @@ class OwnerRepository:
                         FROM payments p
                         WHERE p.owner_id = current_owner.id
                           AND p.status = 'REGISTRADO'
-                          AND p.fine_id IS NULL
+                          AND p.fine_id IS NULL AND p.other_charge_id IS NULL
                         UNION ALL
                         SELECT i.amount
                         FROM incomes i
@@ -309,7 +309,7 @@ class OwnerRepository:
                     FROM payments p
                     WHERE p.owner_id = current_owner.owner_id
                       AND p.status = 'REGISTRADO'
-                      AND p.fine_id IS NULL
+                      AND p.fine_id IS NULL AND p.other_charge_id IS NULL
                     UNION ALL
                     SELECT i.amount
                     FROM incomes i

@@ -66,6 +66,11 @@ class OwnerPaymentService:
     ) -> dict:
         owner = await self._resolve_owner(user_id)
         owner_id: UUID = owner["id"]
+        if data.fine_id and data.other_charge_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Un pago no puede aplicar a multa y otro cobro a la vez",
+            )
 
         owns = await self._payment_repo.owner_has_apartment(owner_id, data.apartment_id)
         if not owns:

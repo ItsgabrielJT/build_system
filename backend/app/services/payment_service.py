@@ -20,6 +20,11 @@ class PaymentService:
         )
 
     async def create(self, data: PaymentCreate, created_by: str) -> dict:
+        if data.fine_id and data.other_charge_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Un pago no puede aplicar a multa y otro cobro a la vez",
+            )
         return await self._repo.create(data, created_by)
 
     async def update_status(self, payment_id: UUID, data: PaymentUpdate) -> dict:

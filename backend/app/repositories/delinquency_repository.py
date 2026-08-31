@@ -75,6 +75,8 @@ _PERIOD_DATA_QUERY = """
         COALESCE(af.amount, 0) AS esperado,
         COALESCE(f.total_fines, 0) AS multas,
         COALESCE(oc.total_other_charges, 0) AS otros_cobros,
+        COALESCE(p.total_payments, 0) AS pagado_cuota,
+        COALESCE(op.total_other_payments, 0) AS pagado_otros_cobros,
         COALESCE(p.total_payments, 0) + COALESCE(op.total_other_payments, 0) AS pagado,
         COALESCE(fp.payments, '[]'::jsonb) AS pagos_capital
     FROM owners o
@@ -203,6 +205,8 @@ class DelinquencyRepository:
                     COALESCE(af.amount, 0) AS esperado,
                     COALESCE(f.total_fines, 0) AS multas,
                     COALESCE(oc.total_other_charges, 0) AS otros_cobros,
+                    COALESCE(p.total_payments, 0) AS pagado_cuota,
+                    COALESCE(op.total_other_payments, 0) AS pagado_otros_cobros,
                     COALESCE(p.total_payments, 0) + COALESCE(op.total_other_payments, 0) AS pagado,
                     COALESCE(fp.payments, '[]'::jsonb) AS pagos_capital
                 FROM owners o
@@ -234,4 +238,47 @@ class DelinquencyRepository:
             query = _PERIOD_DATA_QUERY + extra + " ORDER BY ap.period, a.code"
             
         rows = await self._conn.fetch(query, *params)
+        return [dict(r) for r in rows]
+
+    async def get_other_charge_statement_lines(
+        self,
+        owner_id: UUID,
+        start_period: Optional[str],
+        end_period: Optional[str],
+    ) -> list[dict]:
+        conditions = ["oa.owner_id = $1"]
+        params: list = [owner_id]
+        idx = 2
+        if start_period:
+            conditions.append(f"oc.period >= ${idx}")
+            params.append(start_period)
+            idx += 1
+        if end_period:
+            conditions.append(f"oc.period <= ${idx}")
+            params.append(end_period)
+
+        rows = await self._conn.fetch(
+            f"""
+            SELECT
+                oc.id AS other_charge_id,
+                oc.apartment_id,
+                a.code AS apartment_code,
+                oc.period,
+                oc.concept,
+                oc.amount,
+                COALESCE(p.paid_amount, 0) AS paid_amount
+            FROM other_charges oc
+            JOIN owner_apartments oa ON oa.apartment_id = oc.apartment_id
+            JOIN apartments a ON a.id = oc.apartment_id
+            LEFT JOIN (
+                SELECT other_charge_id, SUM(amount) AS paid_amount
+                FROM payments
+                WHERE status = 'REGISTRADO' AND other_charge_id IS NOT NULL
+                GROUP BY other_charge_id
+            ) p ON p.other_charge_id = oc.id
+            WHERE {" AND ".join(conditions)}
+            ORDER BY oc.period, a.code, oc.concept
+            """,
+            *params,
+        )
         return [dict(r) for r in rows]

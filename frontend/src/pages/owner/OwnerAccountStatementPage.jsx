@@ -8,6 +8,10 @@ function formatCurrency(value) {
   return `$${Number(value || 0).toLocaleString()}`;
 }
 
+function movementLabel(row) {
+  return row.concepto || (row.tipo === 'OTRO_COBRO' ? 'Otro cobro' : 'Alícuota');
+}
+
 function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -166,7 +170,10 @@ export default function OwnerAccountStatementPage() {
               {statement.map((row, i) => (
                 <tr key={i} className={styles.tr}>
                   <td className={styles.td}>{row.period}</td>
-                  <td className={styles.td}>{row.apartment_code}</td>
+                  <td className={styles.td}>
+                    <div>{row.apartment_code}</div>
+                    <small>{movementLabel(row)}</small>
+                  </td>
                   <td className={styles.td}>{formatCurrency(row.esperado)}</td>
                   <td className={styles.td}>{formatCurrency(row.otros_cobros || 0)}</td>
                   <td className={styles.td}>{formatCurrency(row.interes_mora)}</td>

@@ -3701,7 +3701,7 @@ class ReportService:
 
         # 2. Financial calculation
         total_pagado = await conn.fetchval(
-            "SELECT COALESCE(SUM(amount), 0.0) FROM payments WHERE owner_id = $1 AND status = 'REGISTRADO'",
+            "SELECT COALESCE(SUM(amount), 0.0) FROM payments WHERE owner_id = $1 AND status = 'REGISTRADO' AND fine_id IS NULL AND other_charge_id IS NULL",
             owner_id,
         )
         last_payment_date = await conn.fetchval(
@@ -3713,18 +3713,21 @@ class ReportService:
         balance_row = await conn.fetchrow(
             """
             SELECT
-                COALESCE(SUM(fees_amount - payments_amount + fines_amount), 0.0) as total_balance
-            FROM (
-                SELECT
-                    COALESCE(af.amount, 0.0) as fees_amount,
-                    COALESCE(p.amount, 0.0) as payments_amount,
-                    COALESCE(f.amount, 0.0) as fines_amount
-                FROM apartment_fees af
-                FULL OUTER JOIN payments p ON p.apartment_id = af.apartment_id AND p.period = af.period AND p.status = 'REGISTRADO' AND p.fine_id IS NULL AND p.other_charge_id IS NULL
-                FULL OUTER JOIN fines f ON f.apartment_id = af.apartment_id AND f.period = af.period AND f.status = 'ACTIVA'
-                JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
-                WHERE oa.owner_id = $1
-            ) balance_calc
+                COALESCE((SELECT SUM(af.amount)
+                    FROM apartment_fees af
+                    JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
+                    WHERE oa.owner_id = $1), 0.0)
+                + COALESCE((SELECT SUM(f.amount)
+                    FROM fines f
+                    WHERE f.owner_id = $1 AND f.status = 'ACTIVA'), 0.0)
+                + COALESCE((SELECT SUM(oc.amount)
+                    FROM other_charges oc
+                    JOIN owner_apartments oa ON oc.apartment_id = oa.apartment_id
+                    WHERE oa.owner_id = $1), 0.0)
+                - COALESCE((SELECT SUM(p.amount)
+                    FROM payments p
+                    WHERE p.owner_id = $1 AND p.status = 'REGISTRADO'), 0.0)
+                AS total_balance
             """,
             owner_id,
         )
@@ -3739,9 +3742,15 @@ class ReportService:
         )
         cargos_mes = await conn.fetchval(
             """
-            SELECT COALESCE(SUM(af.amount), 0.0) FROM apartment_fees af
-            JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
-            WHERE oa.owner_id = $1 AND af.period = $2
+            SELECT
+                COALESCE((SELECT SUM(af.amount)
+                    FROM apartment_fees af
+                    JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
+                    WHERE oa.owner_id = $1 AND af.period = $2), 0.0)
+                + COALESCE((SELECT SUM(oc.amount)
+                    FROM other_charges oc
+                    JOIN owner_apartments oa ON oc.apartment_id = oa.apartment_id
+                    WHERE oa.owner_id = $1 AND oc.period = $2), 0.0)
             """,
             owner_id,
             current_month,
@@ -3751,10 +3760,19 @@ class ReportService:
         # Recent 3 payments
         recent_payments = await conn.fetch(
             """
-            SELECT paid_at, period, amount
-            FROM payments
-            WHERE owner_id = $1 AND status = 'REGISTRADO'
-            ORDER BY paid_at DESC
+            SELECT
+                p.paid_at,
+                p.period,
+                p.amount,
+                p.fine_id,
+                p.other_charge_id,
+                oc.concept AS other_charge_concept,
+                f.reason AS fine_reason
+            FROM payments p
+            LEFT JOIN other_charges oc ON oc.id = p.other_charge_id
+            LEFT JOIN fines f ON f.id = p.fine_id
+            WHERE p.owner_id = $1 AND p.status = 'REGISTRADO'
+            ORDER BY p.paid_at DESC
             LIMIT 3
             """,
             owner_id,
@@ -4025,7 +4043,12 @@ class ReportService:
         for p in recent_payments:
             pay_date = p["paid_at"].strftime("%d/%m/%Y") if isinstance(p["paid_at"], (date, datetime)) else str(p["paid_at"])
             pay_period = self._period_name(p["period"]).capitalize()
-            pay_concept = f"Alícuota - {pay_period}"
+            if p.get("other_charge_id"):
+                pay_concept = f"{p.get('other_charge_concept') or 'Otro cobro'} - {pay_period}"
+            elif p.get("fine_id"):
+                pay_concept = f"Multa - {p.get('fine_reason') or pay_period}"
+            else:
+                pay_concept = f"Alícuota - {pay_period}"
             pay_amount = Decimal(str(p["amount"]))
             sum_last_3 += pay_amount
             

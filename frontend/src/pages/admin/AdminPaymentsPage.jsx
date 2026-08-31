@@ -124,7 +124,7 @@ export default function AdminPaymentsPage() {
   const { apartments, fetchApartments } = useApartments();
   const { owners, fetchOwners } = useOwners();
   const { token } = useAuth();
-  const [formPendingDebts, setFormPendingDebts] = useState({ cuotas: [], multas: [] });
+  const [formPendingDebts, setFormPendingDebts] = useState({ cuotas: [], otros_cobros: [], multas: [] });
   const [selectedApartmentId, setSelectedApartmentId] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [annulTarget, setAnnulTarget] = useState(null);
@@ -270,9 +270,9 @@ export default function AdminPaymentsPage() {
     if (apartmentId) {
       getApartmentPendingDebts(token, apartmentId)
         .then((data) => setFormPendingDebts(data))
-        .catch(() => setFormPendingDebts({ cuotas: [], multas: [] }));
+        .catch(() => setFormPendingDebts({ cuotas: [], otros_cobros: [], multas: [] }));
     } else {
-      setFormPendingDebts({ cuotas: [], multas: [] });
+      setFormPendingDebts({ cuotas: [], otros_cobros: [], multas: [] });
     }
     return {
       owner_id: selectedApartment?.owner_id || '',
@@ -290,9 +290,9 @@ export default function AdminPaymentsPage() {
     if (aptId) {
       getApartmentPendingDebts(token, aptId)
         .then((data) => setFormPendingDebts(data))
-        .catch(() => setFormPendingDebts({ cuotas: [], multas: [] }));
+        .catch(() => setFormPendingDebts({ cuotas: [], otros_cobros: [], multas: [] }));
     } else {
-      setFormPendingDebts({ cuotas: [], multas: [] });
+      setFormPendingDebts({ cuotas: [], otros_cobros: [], multas: [] });
     }
     return {
       owner_id: ownerId,
@@ -312,6 +312,10 @@ export default function AdminPaymentsPage() {
       const selected = formPendingDebts.multas.find((m) => m.id === id);
       return selected ? { type, ...selected } : null;
     }
+    if (type === 'otros_cobros') {
+      const selected = (formPendingDebts.otros_cobros || []).find((c) => c.id === id);
+      return selected ? { type, ...selected } : null;
+    }
     return null;
   };
 
@@ -324,6 +328,7 @@ export default function AdminPaymentsPage() {
         period: getCurrentMonth(),
         amount: '',
         fine_id: '',
+        other_charge_id: '',
       };
     }
     const selectedDebts = values.map(findDebtByValue).filter(Boolean);
@@ -333,6 +338,7 @@ export default function AdminPaymentsPage() {
       period: values.length > 1 ? getCurrentMonth() : onlyDebt?.period || getCurrentMonth(),
       amount: total ? total.toFixed(2) : '',
       fine_id: onlyDebt?.type === 'multas' ? onlyDebt.id : '',
+      other_charge_id: onlyDebt?.type === 'otros_cobros' ? onlyDebt.id : '',
     };
   };
 
@@ -353,6 +359,15 @@ export default function AdminPaymentsPage() {
         options: formPendingDebts.multas.map((m) => ({
           value: `multas:${m.id}`,
           label: `${m.description} (${formatCurrency(m.amount)})`,
+        })),
+      });
+    }
+    if ((formPendingDebts.otros_cobros || []).length > 0) {
+      debtOptions.push({
+        label: 'Otros cobros pendientes',
+        options: formPendingDebts.otros_cobros.map((c) => ({
+          value: `otros_cobros:${c.id}`,
+          label: `${c.description} (${formatCurrency(c.amount)})`,
         })),
       });
     }
@@ -388,6 +403,7 @@ export default function AdminPaymentsPage() {
           ]
         : []),
       { name: 'fine_id', type: 'hidden' },
+      { name: 'other_charge_id', type: 'hidden' },
       { name: 'period', label: 'Período (YYYY-MM)', type: 'month', required: true, defaultValue: getCurrentMonth() },
       { name: 'amount', label: 'Monto', type: 'number', required: true, min: '0', step: '0.01' },
       {
@@ -403,7 +419,7 @@ export default function AdminPaymentsPage() {
 
   const handleCreate = async (data) => {
     try {
-      const { selected_debt: _selectedDebt, fine_id, method, reference, ...paymentData } = data;
+      const { selected_debt: _selectedDebt, fine_id, other_charge_id, method, reference, ...paymentData } = data;
       const selectedValues = Array.isArray(_selectedDebt) ? _selectedDebt : [];
       if (selectedValues.length > 0) {
         const selectedDebts = selectedValues.map(findDebtByValue).filter(Boolean);
@@ -426,6 +442,7 @@ export default function AdminPaymentsPage() {
               ...(method ? { method } : {}),
               ...(reference ? { reference } : {}),
               ...(debt.type === 'multas' ? { fine_id: debt.id } : {}),
+              ...(debt.type === 'otros_cobros' ? { other_charge_id: debt.id } : {}),
             });
           } else {
             // Pay off this debt fully if we have enough, otherwise pay what's left
@@ -438,6 +455,7 @@ export default function AdminPaymentsPage() {
                 ...(method ? { method } : {}),
                 ...(reference ? { reference } : {}),
                 ...(debt.type === 'multas' ? { fine_id: debt.id } : {}),
+                ...(debt.type === 'otros_cobros' ? { other_charge_id: debt.id } : {}),
               });
               remainingPayment -= payAmount;
             }
@@ -452,6 +470,7 @@ export default function AdminPaymentsPage() {
           ...(method ? { method } : {}),
           ...(reference ? { reference } : {}),
           ...(fine_id ? { fine_id } : {}),
+          ...(other_charge_id ? { other_charge_id } : {}),
         };
         await createPayment(payload);
       }
@@ -459,7 +478,7 @@ export default function AdminPaymentsPage() {
       setIsFormOpen(false);
       setFilteredApartments([]);
       setSelectedApartmentId('');
-      setFormPendingDebts({ cuotas: [], multas: [] });
+      setFormPendingDebts({ cuotas: [], otros_cobros: [], multas: [] });
       setPaymentsPage(1);
       await fetchPayments(getPaymentFetchParams());
     } catch (err) {
@@ -471,7 +490,7 @@ export default function AdminPaymentsPage() {
     setIsFormOpen(false);
     setFilteredApartments([]);
     setSelectedApartmentId('');
-    setFormPendingDebts({ cuotas: [], multas: [] });
+    setFormPendingDebts({ cuotas: [], otros_cobros: [], multas: [] });
   };
 
   const handleAnnul = async () => {

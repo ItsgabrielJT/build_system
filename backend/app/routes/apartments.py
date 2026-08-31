@@ -209,7 +209,7 @@ async def get_apartment_pending_debts(
         LEFT JOIN (
             SELECT apartment_id, period, SUM(amount) AS paid_amount
             FROM payments
-            WHERE status IN ('REGISTRADO', 'PENDIENTE_APROBACION') AND fine_id IS NULL
+            WHERE status IN ('REGISTRADO', 'PENDIENTE_APROBACION') AND fine_id IS NULL AND other_charge_id IS NULL
             GROUP BY apartment_id, period
         ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
         LEFT JOIN (
@@ -221,7 +221,7 @@ async def get_apartment_pending_debts(
                     ORDER BY paid_at ASC
                 ) AS payments
             FROM payments
-            WHERE status IN ('REGISTRADO', 'PENDIENTE_APROBACION') AND fine_id IS NULL
+            WHERE status IN ('REGISTRADO', 'PENDIENTE_APROBACION') AND fine_id IS NULL AND other_charge_id IS NULL
             GROUP BY apartment_id, period
         ) fp ON fp.apartment_id = af.apartment_id AND fp.period = af.period
         WHERE af.apartment_id = $1
@@ -289,9 +289,43 @@ async def get_apartment_pending_debts(
         """,
         apartment_id,
     )
+    other_charges = await db.fetch(
+        """
+        SELECT
+            oc.id,
+            oc.period,
+            oc.concept,
+            oc.amount,
+            oc.periodicity,
+            COALESCE(p.paid_amount, 0) AS paid_amount
+        FROM other_charges oc
+        LEFT JOIN (
+            SELECT other_charge_id, SUM(amount) AS paid_amount
+            FROM payments
+            WHERE status IN ('REGISTRADO', 'PENDIENTE_APROBACION')
+              AND other_charge_id IS NOT NULL
+            GROUP BY other_charge_id
+        ) p ON p.other_charge_id = oc.id
+        WHERE oc.apartment_id = $1
+          AND COALESCE(p.paid_amount, 0) < oc.amount
+        ORDER BY oc.period ASC, oc.concept ASC
+        """,
+        apartment_id,
+    )
     
     return {
         "cuotas": pending_fees,
+        "otros_cobros": [
+            {
+                "id": str(r["id"]),
+                "period": r["period"],
+                "amount": float(Decimal(str(r["amount"] or 0)) - Decimal(str(r["paid_amount"] or 0))),
+                "concept": r["concept"],
+                "periodicity": r["periodicity"],
+                "description": f"Otro cobro - {r['concept']} ({r['period']})",
+            }
+            for r in other_charges
+        ],
         "multas": [
             {
                 "id": str(r["id"]),

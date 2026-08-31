@@ -82,8 +82,8 @@ class PaymentRepository:
             row = await self._conn.fetchrow(
                 """
                 INSERT INTO payments
-                    (apartment_id, owner_id, period, paid_at, amount, method, reference, created_by, fine_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    (apartment_id, owner_id, period, paid_at, amount, method, reference, created_by, fine_id, other_charge_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING *
                 """,
                 data.apartment_id,
@@ -95,6 +95,7 @@ class PaymentRepository:
                 data.reference,
                 str(created_by),
                 data.fine_id,
+                data.other_charge_id,
             )
             if data.fine_id:
                 await self._conn.execute(
@@ -112,7 +113,7 @@ class PaymentRepository:
     ) -> dict:
         row = await self._conn.fetchrow(
             """
-            INSERT INTO payments (
+                INSERT INTO payments (
                 apartment_id,
                 owner_id,
                 period,
@@ -122,9 +123,10 @@ class PaymentRepository:
                 reference,
                 status,
                 created_by,
-                fine_id
+                fine_id,
+                other_charge_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
             """,
             data.apartment_id,
@@ -137,6 +139,7 @@ class PaymentRepository:
             "PENDIENTE_APROBACION",
             str(created_by),
             data.fine_id,
+            data.other_charge_id,
         )
         return dict(row)
 

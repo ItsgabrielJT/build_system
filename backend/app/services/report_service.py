@@ -2979,7 +2979,7 @@ class ReportService:
             LEFT JOIN (
                 SELECT apartment_id, period, SUM(amount) AS paid_amount
                 FROM payments
-                WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL
+                WHERE status IN ('REGISTRADO', 'APROBADO') AND fine_id IS NULL AND other_charge_id IS NULL
                 GROUP BY apartment_id, period
             ) p ON p.apartment_id = af.apartment_id AND p.period = af.period
             {where}
@@ -3720,7 +3720,7 @@ class ReportService:
                     COALESCE(p.amount, 0.0) as payments_amount,
                     COALESCE(f.amount, 0.0) as fines_amount
                 FROM apartment_fees af
-                FULL OUTER JOIN payments p ON p.apartment_id = af.apartment_id AND p.period = af.period AND p.status = 'REGISTRADO' AND p.fine_id IS NULL
+                FULL OUTER JOIN payments p ON p.apartment_id = af.apartment_id AND p.period = af.period AND p.status = 'REGISTRADO' AND p.fine_id IS NULL AND p.other_charge_id IS NULL
                 FULL OUTER JOIN fines f ON f.apartment_id = af.apartment_id AND f.period = af.period AND f.status = 'ACTIVA'
                 JOIN owner_apartments oa ON af.apartment_id = oa.apartment_id
                 WHERE oa.owner_id = $1

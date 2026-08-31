@@ -98,7 +98,7 @@ class DelinquencyService:
             oid = row["owner_id"]
             s = _saldo(
                 Decimal(str(row["esperado"])),
-                Decimal(str(row["multas"])),
+                Decimal(str(row["multas"])) + Decimal(str(row.get("otros_cobros", 0))),
                 Decimal(str(row["pagado"])),
                 interes_mora,
             )
@@ -192,7 +192,7 @@ class DelinquencyService:
             interes_mora = self._interest_for_row(row, due_day, rates)
             s = _saldo(
                 Decimal(str(row["esperado"])),
-                Decimal(str(row["multas"])),
+                Decimal(str(row["multas"])) + Decimal(str(row.get("otros_cobros", 0))),
                 Decimal(str(row["pagado"])),
                 interes_mora,
             )
@@ -282,7 +282,7 @@ class DelinquencyService:
             interes_mora = Decimal(str(interest_result["interest"]))
             s = _saldo(
                 Decimal(str(row["esperado"])),
-                Decimal(str(row["multas"])),
+                Decimal(str(row["multas"])) + Decimal(str(row.get("otros_cobros", 0))),
                 Decimal(str(row["pagado"])),
                 interes_mora,
             )
@@ -303,13 +303,14 @@ class DelinquencyService:
                     "period": row["period"],
                     "esperado": float(row["esperado"]),
                     "multas": float(row["multas"]),
+                    "otros_cobros": float(row.get("otros_cobros", 0)),
                     "interes_mora": float(interes_mora),
                     "interes_mora_inicio": interest_result["starts_at"].isoformat(),
                     "tasas_faltantes": interest_result["missing_rate_periods"],
                     "interes_mora_aplica_desde": LATE_INTEREST_START_PERIOD,
                     "capital_pendiente": float(
                         max(
-                            Decimal(str(row["esperado"])) - Decimal(str(row["pagado"])),
+                            Decimal(str(row["esperado"])) - Decimal(str(row.get("pagado_cuota", row["pagado"]))),
                             Decimal("0"),
                         )
                     ),

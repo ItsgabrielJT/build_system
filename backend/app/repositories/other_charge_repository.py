@@ -189,7 +189,7 @@ class OtherChargeRepository:
                 WHERE status = 'REGISTRADO' AND other_charge_id IS NOT NULL
                 GROUP BY other_charge_id
             ) p ON p.other_charge_id = oc.id
-            WHERE oc.period < $1 AND COALESCE(p.pagado, 0) < oc.amount
+            WHERE oc.period <= $1 AND COALESCE(p.pagado, 0) < oc.amount
             """,
             current_period,
         ) or 0)

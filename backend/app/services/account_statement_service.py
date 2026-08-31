@@ -64,6 +64,7 @@ class AccountStatementService:
         rates = await financial_repo.get_interest_rate_map()
         result = []
         for row in rows:
+            cuota_pagada = Decimal(str(row.get("pagado_cuota", row["pagado"]) or 0))
             interest_result = calculate_late_interest(
                 principal=Decimal(str(row["esperado"] or 0)),
                 period=row["period"],
@@ -73,35 +74,64 @@ class AccountStatementService:
             )
             interes_mora = Decimal(str(interest_result["interest"]))
             capital_pendiente = max(
-                Decimal(str(row["esperado"])) - Decimal(str(row["pagado"])),
+                Decimal(str(row["esperado"])) - cuota_pagada,
                 Decimal("0"),
             )
-            otros_cobros = Decimal(str(row.get("otros_cobros") or 0))
             s = _saldo(
                 Decimal(str(row["esperado"])),
-                Decimal(str(row["multas"])) + otros_cobros,
-                Decimal(str(row["pagado"])),
+                Decimal(str(row["multas"])),
+                cuota_pagada,
                 interes_mora,
             )
             ps = _period_status(row["period"], s, due_day, Decimal(str(row["esperado"])))
+            if Decimal(str(row["esperado"] or 0)) > 0 or Decimal(str(row["multas"] or 0)) > 0 or cuota_pagada > 0 or interes_mora > 0:
+                result.append(
+                    {
+                        "period": row["period"],
+                        "concepto": "Alícuota",
+                        "tipo": "ALICUOTA",
+                        "apartment_id": row["apartment_id"],
+                        "apartment_code": row["apartment_code"],
+                        "esperado": float(row["esperado"]),
+                        "multas": float(row["multas"]),
+                        "otros_cobros": 0.0,
+                        "interes_mora": float(interes_mora),
+                        "capital_pendiente": float(capital_pendiente),
+                        "interes_mora_inicio": interest_result["starts_at"].isoformat(),
+                        "tasas_faltantes": interest_result["missing_rate_periods"],
+                        "pagado": float(cuota_pagada),
+                        "saldo": float(s),
+                        "status": ps,
+                    }
+                )
+
+        other_charge_rows = await self._delinquency_repo.get_other_charge_statement_lines(
+            owner_id, start_period, end_period
+        )
+        for row in other_charge_rows:
+            amount = Decimal(str(row["amount"] or 0))
+            paid = Decimal(str(row["paid_amount"] or 0))
+            saldo = amount - paid
             result.append(
                 {
                     "period": row["period"],
+                    "concepto": row.get("concept") or "Otro cobro",
+                    "tipo": "OTRO_COBRO",
                     "apartment_id": row["apartment_id"],
                     "apartment_code": row["apartment_code"],
-                    "esperado": float(row["esperado"]),
-                    "multas": float(row["multas"]),
-                    "otros_cobros": float(otros_cobros),
-                    "interes_mora": float(interes_mora),
-                    "capital_pendiente": float(capital_pendiente),
-                    "interes_mora_inicio": interest_result["starts_at"].isoformat(),
-                    "tasas_faltantes": interest_result["missing_rate_periods"],
-                    "pagado": float(row["pagado"]),
-                    "saldo": float(s),
-                    "status": ps,
+                    "esperado": 0.0,
+                    "multas": 0.0,
+                    "otros_cobros": float(amount),
+                    "interes_mora": 0.0,
+                    "capital_pendiente": 0.0,
+                    "interes_mora_inicio": None,
+                    "tasas_faltantes": [],
+                    "pagado": float(paid),
+                    "saldo": float(saldo),
+                    "status": "PENDING" if saldo > 0 else "CURRENT",
                 }
             )
-        return result
+        return sorted(result, key=lambda item: (item["period"], item["apartment_code"], item["tipo"]))
 
     def _money(self, value) -> str:
         return f"${float(Decimal(str(value or 0))):,.2f}"
@@ -124,6 +154,8 @@ class AccountStatementService:
         labels = {
             "CURRENT": "Al día",
             "OVERDUE": "Vencido",
+            "PENDING": "Pendiente",
+            "PENDIENTE": "Pendiente",
         }
         return labels.get((status or "").upper(), status or "")
 
@@ -460,7 +492,12 @@ class AccountStatementService:
         for row in rows:
             s_val = Decimal(str(row["saldo"]))
             s_str = f"{self._money(abs(s_val))} A favor" if s_val < 0 else self._money(s_val)
-            data.append([row["period"], row["apartment_code"], self._money(row["esperado"]), self._money(row.get("otros_cobros", 0)), self._money(row["interes_mora"]), self._money(row["multas"]), self._money(row["pagado"]), s_str, self._status_label(row["status"])])
+            period_cell = self._p(
+                f"{escape(str(row['period']))}<br/><font size='5.4'>{escape(str(row.get('concepto') or 'Alícuota'))}</font>",
+                5.8,
+                raw=True,
+            )
+            data.append([period_cell, row["apartment_code"], self._money(row["esperado"]), self._money(row.get("otros_cobros", 0)), self._money(row["interes_mora"]), self._money(row["multas"]), self._money(row["pagado"]), s_str, self._status_label(row["status"])])
         
         total_s_val = totals["saldo"]
         total_s_str = f"{self._money(abs(total_s_val))} A favor" if total_s_val < 0 else self._money(total_s_val)

@@ -128,7 +128,7 @@ class AccountStatementService:
                     "tasas_faltantes": [],
                     "pagado": float(paid),
                     "saldo": float(saldo),
-                    "status": _period_status(row["period"], saldo, due_day, amount),
+                    "status": "PENDING" if saldo > 0 else "CURRENT",
                 }
             )
         return sorted(result, key=lambda item: (item["period"], item["apartment_code"], item["tipo"]))
@@ -154,6 +154,8 @@ class AccountStatementService:
         labels = {
             "CURRENT": "Al día",
             "OVERDUE": "Vencido",
+            "PENDING": "Pendiente",
+            "PENDIENTE": "Pendiente",
         }
         return labels.get((status or "").upper(), status or "")
 

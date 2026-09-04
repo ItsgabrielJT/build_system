@@ -283,7 +283,7 @@ export default function AdminOtherChargesPage() {
       <div className={styles.statsGrid}>
         <StatsCard title={`TOTAL EMITIDO (${getMonthAbbr(currentPeriod)})`} value={formatMoney(stats?.total_emitido)} icon="arrow" />
         <StatsCard title="TOTAL RECAUDADO" value={formatMoney(stats?.total_recaudado)} progressBar progressValue={stats?.porcentaje_recaudado ?? 0} progressLabel={`${stats?.porcentaje_recaudado ?? 0}% de la meta alcanzada`} icon="bank" />
-        <StatsCard title="PENDIENTE DE COBRO" value={formatMoney(stats?.pendiente_cobro)} badge={{ text: `${stats?.unidades_deuda_vencida ?? 0} UNIDADES`, color: 'red' }} badgeSubtext="con deuda vencida" icon="clock" />
+        <StatsCard title="PENDIENTE DE COBRO" value={formatMoney(stats?.pendiente_cobro)} badge={{ text: `${stats?.unidades_deuda_vencida ?? 0} UNIDADES`, color: 'red' }} badgeSubtext="con saldo pendiente" icon="clock" />
       </div>
 
       <PeriodsHistoryTable

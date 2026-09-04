@@ -85,3 +85,4 @@ async def test_statement_separates_other_charge_payment(monkeypatch):
     assert rows[1]["otros_cobros"] == 400.0
     assert rows[1]["pagado"] == 140.0
     assert rows[1]["saldo"] == 260.0
+    assert rows[1]["status"] == "PENDING"

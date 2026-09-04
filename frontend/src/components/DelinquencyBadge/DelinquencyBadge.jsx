@@ -3,6 +3,8 @@ import styles from './DelinquencyBadge.module.css';
 const STATUS_MAP = {
   OVERDUE: { label: 'EN MORA', className: 'danger' },
   CURRENT: { label: 'AL DÍA', className: 'success' },
+  PENDING: { label: 'PENDIENTE', className: 'warning' },
+  PENDIENTE: { label: 'PENDIENTE', className: 'warning' },
   VENCIDO: { label: 'VENCIDO', className: 'danger' },
   AL_DIA: { label: 'AL DÍA', className: 'success' },
 };

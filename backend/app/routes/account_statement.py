@@ -54,6 +54,7 @@ async def export_account_statement(
 
     headers_row = [
         "Período",
+        "Concepto",
         "Departamento",
         "Capital",
         "Otros cobros",
@@ -84,6 +85,7 @@ async def export_account_statement(
         for row in rows:
             ws.append([
                 row["period"],
+                row.get("concepto", "Alícuota"),
                 row["apartment_code"],
                 row["esperado"],
                 row.get("otros_cobros", 0),
@@ -119,6 +121,7 @@ async def export_account_statement(
         for row in rows:
             writer.writerow([
                 row["period"],
+                row.get("concepto", "Alícuota"),
                 row["apartment_code"],
                 row["esperado"],
                 row.get("otros_cobros", 0),
